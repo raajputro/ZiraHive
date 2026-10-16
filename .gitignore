@@ -18,3 +18,8 @@ web/dist/
 mobile/.dart_tool/
 mobile/build/
 mobile/.flutter-plugins*
+
+# build and runtime leftovers
+*.rdb
+*.tsbuildinfo
+_to_delete/
