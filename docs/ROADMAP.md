@@ -31,14 +31,26 @@
 - Skip intro and next-episode countdown from chapters or per-series markers
 - Age limits per profile; ratings from TMDB certificates, per title and per category
 
+## Batch 3: watch parties (done)
+- Start now or schedule; invite accounts; RSVP; reminder 10 minutes before and a "started" notice
+- Synced play, pause and seek over a WebSocket: shared start time, clock offset from ping/pong,
+  gentle speed-up or slow-down for small drift, a jump for large drift
+- Wait for everyone: pauses while someone's video is loading, carries on when it's ready
+- Host or everyone in control; next episode for everyone; end the party
+- Chat that stays with the party, floating emoji reactions, who is here and who is loading
+- Each viewer keeps their own quality, audio and subtitles; age limits apply to every guest
+- Two-browser Playwright test with a WebM sample that open-source Chromium can play
+
 ## Later for playback
 - Remux instead of re-encode when only the audio needs converting
 - Picture-based subtitles (PGS) burned in; automatic intro detection by audio fingerprint
 - Chromecast and DLNA
 
-## Milestone 3: together
-- Watch parties: rooms, invite links, synced play/pause/seek over WebSocket, chat
-- Shared albums, share links with expiry and password
+## Batches 4 to 7
+- Batch 4: music, audiobooks, ebooks and comics
+- Batch 5: encrypted vault, encrypted offsite backup, Bangla interface, PC sync client
+- Batch 6: document scanner and OCR in the browser, Chromecast and DLNA
+- Batch 7: passkeys, plugins, linking two GharBox servers; voice chat in watch parties
 
 ## Milestone 4: local AI (docker compose --profile ai)
 - Search photos by description (CLIP embeddings in pgvector)

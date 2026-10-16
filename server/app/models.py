@@ -306,3 +306,46 @@ class OfflineCopy(Base):
     requested_by: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class WatchParty(Base):
+    """Watching a movie or episode together, now or at a set time."""
+
+    __tablename__ = "watch_parties"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    host_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    media_id: Mapped[str] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"))
+    title: Mapped[str] = mapped_column(String(256))
+    scheduled_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+    # who may press play/pause/seek: "host" or "everyone"
+    control: Mapped[str] = mapped_column(String(16), default="everyone", server_default="everyone")
+    # pause everyone while someone's video is loading
+    wait_for_all: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    reminded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    started_notice_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    ended_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    # last known playback state, so a party survives a server restart
+    position: Mapped[float] = mapped_column(Float, default=0, server_default="0")
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PartyMember(Base):
+    __tablename__ = "party_members"
+    __table_args__ = (UniqueConstraint("party_id", "user_id"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    party_id: Mapped[str] = mapped_column(ForeignKey("watch_parties.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    rsvp: Mapped[str] = mapped_column(String(16), default="invited")  # invited | going | declined
+
+
+class PartyMessage(Base):
+    __tablename__ = "party_messages"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    party_id: Mapped[str] = mapped_column(ForeignKey("watch_parties.id", ondelete="CASCADE"), index=True)
+    user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    username: Mapped[str] = mapped_column(String(64))
+    text: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)

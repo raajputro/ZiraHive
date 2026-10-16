@@ -75,9 +75,16 @@ async def disk_check(ctx) -> None:
         await session.commit()
 
 
+async def party_reminders(ctx) -> None:
+    from .routers.parties import send_reminders
+    async with db.sessionmaker()() as session:
+        await send_reminders(session)
+
+
 class WorkerSettings:
     functions = [process_asset, scan_library, make_offline_copy]
-    cron_jobs = [cron(nightly, hour={3}, minute={0}), cron(disk_check, minute={17})]
+    cron_jobs = [cron(nightly, hour={3}, minute={0}), cron(disk_check, minute={17}),
+                 cron(party_reminders, second={5})]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url or "redis://localhost:6379")

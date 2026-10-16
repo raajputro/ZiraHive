@@ -12,6 +12,8 @@ import FilesPage from "./pages/Files";
 import WatchHome, { LibraryPage } from "./pages/Watch";
 import SeriesPage from "./pages/Series";
 import PlayerRoute from "./pages/Player";
+import PartyRoute from "./pages/Party";
+import PartiesPage from "./pages/Parties";
 import TrashPage from "./pages/Trash";
 import AdminPage from "./pages/Admin";
 
@@ -60,6 +62,8 @@ function SignedInApp() {
               <Route path="/watch/c/:id" element={<LibraryPage />} />
               <Route path="/watch/series/:id" element={<SeriesPage />} />
               <Route path="/play/:id" element={<PlayerRoute />} />
+              <Route path="/watch/parties" element={<PartiesPage />} />
+              <Route path="/party/:id" element={<PartyRoute />} />
               <Route path="/movies" element={<Navigate to="/watch" replace />} />
               <Route path="/trash" element={<TrashPage />} />
               <Route path="/settings" element={<AdminPage />} />
@@ -75,7 +79,7 @@ function SignedInApp() {
 function Shell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
-  const cinema = pathname.startsWith("/watch") || pathname.startsWith("/play");
+  const cinema = pathname.startsWith("/watch") || pathname.startsWith("/play") || pathname.startsWith("/party");
   useEffect(() => { document.documentElement.dataset.room = cinema ? "cinema" : "home"; }, [cinema]);
   const links = [
     { to: "/photos", label: "Photos", icon: Images },

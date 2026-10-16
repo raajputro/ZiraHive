@@ -17,6 +17,10 @@ your PC, phone and TV.
   "next episode". Every format plays in the browser: anything the browser can't play is converted
   on the fly. Pick the quality (down to 360p for mobile data), the audio language and subtitles,
   skip intros, and download a smaller copy to watch offline
+- **Watch parties**: press Watch together on any movie or episode, start now or pick a time, and
+  invite family or friends. Everyone's video stays in step, anyone (or only the host) can pause and
+  skip, the party waits when someone's video is loading, and there's chat, emoji reactions and
+  "next episode for everyone". Each person still picks their own quality, audio and subtitles
 - **Kids**: give a profile an age limit and it only sees titles rated for that age
 - **Family**: several accounts with their own private space, admin and member roles, and
   storage limits
@@ -26,8 +30,8 @@ your PC, phone and TV.
   disk, and on your phone through the free ntfy app
 - **Admin dashboard**: who is watching what, background jobs, and free space on every disk
 
-> Status: milestone 1 plus batch 1. Next up: transcoding (play any format in the browser), offline
-> downloads and skip intro. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: milestone 1, batches 1 to 3 and remote access. Next up: music, audiobooks, ebooks and
+> comics. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it fits together
 

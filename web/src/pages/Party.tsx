@@ -1,0 +1,327 @@
+import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { Link, useParams } from "react-router-dom";
+import { ArrowLeft, SkipForward, Send, Users, Wifi, WifiOff, Play } from "lucide-react";
+import { api, ApiError, episodeCode, type Media, type Party, type Quality, type Tracks } from "../api";
+import { useAuth } from "../App";
+import { usePrefs } from "../prefs";
+import { defaultAudio, defaultQuality, SubtitleTracks, TrackMenus, useSubtitle, useVideoSource } from "../video";
+
+export default function PartyRoute() {
+  const { id } = useParams();
+  return id ? <PartyRoom key={id} id={id} /> : null;
+}
+
+interface RemoteState {
+  media_id: string; playing: boolean; position: number; at: number; server_time: number;
+  waiting_for: string[]; control: "host" | "everyone"; wait_for_all: boolean; by: string | null;
+}
+interface Person { user_id: string; username: string; devices: number; buffering: boolean; host: boolean }
+type Line = { id: string; kind: "chat"; username: string; text: string } | { id: string; kind: "notice"; text: string };
+interface Floating { id: number; emoji: string; username: string; left: number }
+
+const REACTIONS = ["😂", "❤️", "👏", "😮", "😢", "🔥", "🎉", "👍"];
+const when = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+
+function PartyRoom({ id }: { id: string }) {
+  const { user } = useAuth();
+  const { lowData } = usePrefs();
+  const [party, setParty] = useState<Party | null>(null);
+  const [media, setMedia] = useState<Media | null>(null);
+  const [tracks, setTracks] = useState<Tracks | null>(null);
+  const [quality, setQuality] = useState<Quality | null>(null);
+  const [audio, setAudio] = useState(0);
+  const [subtitle, setSubtitle] = useState("off");
+  const [remote, setRemote] = useState<RemoteState | null>(null);
+  const [people, setPeople] = useState<Person[]>([]);
+  const [lines, setLines] = useState<Line[]>([]);
+  const [floating, setFloating] = useState<Floating[]>([]);
+  const [conn, setConn] = useState<"connecting" | "live" | "reconnecting" | "ended" | "refused">("connecting");
+  const [needsTap, setNeedsTap] = useState(false);
+  const [error, setError] = useState("");
+  const [draft, setDraft] = useState("");
+
+  const video = useRef<HTMLVideoElement>(null);
+  const ws = useRef<WebSocket | null>(null);
+  const remoteRef = useRef<RemoteState | null>(null);
+  const offset = useRef(0);          // server clock minus ours, seconds
+  const bestRtt = useRef(Infinity);
+  const suppressUntil = useRef(0);   // ignore video events we caused ourselves
+  const startAt = useRef<number | null>(null);
+  const startTimer = useRef<number>();
+  const waitTimer = useRef<number>();
+  const sentBuffering = useRef(false);
+  const lastReport = useRef(0);
+  const chatEnd = useRef<HTMLDivElement>(null);
+
+  const serverNow = () => Date.now() / 1000 + offset.current;
+  const expected = (s: RemoteState) => (s.playing ? s.position + Math.max(0, serverNow() - s.at) : s.position);
+  const suppress = () => { suppressUntil.current = Date.now() + 700; };
+  const suppressed = () => Date.now() < suppressUntil.current;
+  const send = (msg: object) => { if (ws.current?.readyState === WebSocket.OPEN) ws.current.send(JSON.stringify(msg)); };
+
+  useEffect(() => { api.party(id).then(setParty).catch((e) => setError(e.message)); }, [id]);
+
+  // ---------------------------------------------------- apply the room's state
+  const apply = useCallback(() => {
+    const v = video.current, s = remoteRef.current;
+    if (!v || !s || !media || s.media_id !== media.id) return;
+    const target = expected(s);
+    window.clearTimeout(startTimer.current);
+    suppress();
+    if (v.readyState >= 1 && Math.abs(v.currentTime - target) > 0.5) v.currentTime = target;
+    if (v.readyState < 1) startAt.current = target;
+    if (!s.playing) { v.pause(); v.playbackRate = 1; return; }
+    const wait = s.at - serverNow();
+    const go = () => {
+      suppress();
+      v.currentTime = expected(s);
+      v.play().then(() => setNeedsTap(false)).catch(() => setNeedsTap(true));
+    };
+    if (wait > 0) { v.pause(); startTimer.current = window.setTimeout(go, wait * 1000); } else go();
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media]);
+
+  // -------------------------------------------------------- the live socket
+  useEffect(() => {
+    let closed = false, retry = 0, pinger = 0;
+    const connect = () => {
+      const sock = new WebSocket(`${location.protocol === "https:" ? "wss" : "ws"}://${location.host}/api/parties/${id}/ws`);
+      ws.current = sock;
+      sock.onopen = () => {
+        retry = 0;
+        setConn("live");
+        bestRtt.current = Infinity;
+        for (let i = 0; i < 5; i++) setTimeout(() => send({ type: "ping", t0: Date.now() }), i * 150);
+        pinger = window.setInterval(() => send({ type: "ping", t0: Date.now() }), 20_000);
+      };
+      sock.onmessage = (e) => {
+        const msg = JSON.parse(e.data);
+        switch (msg.type) {
+          case "hello":
+            setLines(msg.chat.map((c: { id: string; username: string; text: string }) => ({ ...c, kind: "chat" })));
+            break;
+          case "pong": {
+            const rtt = Date.now() - msg.t0;
+            if (rtt <= bestRtt.current) {  // the fastest round trip gives the best estimate
+              bestRtt.current = rtt;
+              offset.current = msg.server - (msg.t0 + rtt / 2) / 1000;
+            }
+            break;
+          }
+          case "state":
+            remoteRef.current = msg;
+            setRemote(msg);
+            break;
+          case "people": setPeople(msg.people); break;
+          case "chat": setLines((l) => [...l.slice(-300), { ...msg, kind: "chat" }]); break;
+          case "notice": setLines((l) => [...l.slice(-300), { id: `n${Date.now()}${Math.random()}`, kind: "notice", text: msg.text }]); break;
+          case "react": {
+            const f = { id: Date.now() + Math.random(), emoji: msg.emoji, username: msg.username, left: 10 + Math.random() * 75 };
+            setFloating((x) => [...x.slice(-20), f]);
+            setTimeout(() => setFloating((x) => x.filter((y) => y.id !== f.id)), 2600);
+            break;
+          }
+          case "ended": closed = true; setConn("ended"); video.current?.pause(); break;
+        }
+      };
+      sock.onclose = (e) => {
+        window.clearInterval(pinger);
+        if (closed) return;
+        if (e.code >= 4400) { setConn("refused"); return; }
+        setConn("reconnecting");
+        retry = Math.min(retry + 1, 6);
+        setTimeout(connect, 500 * 2 ** retry);
+      };
+    };
+    connect();
+    return () => { closed = true; window.clearInterval(pinger); ws.current?.close(); };
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // --------------------------------------- load the title the room is playing
+  useEffect(() => {
+    if (!remote || remote.media_id === media?.id) return;
+    Promise.all([api.mediaItem(remote.media_id), api.tracks(remote.media_id)]).then(([m, t]) => {
+      startAt.current = remoteRef.current ? expected(remoteRef.current) : 0;
+      setTracks(t);
+      setAudio(defaultAudio(t));
+      setQuality((q) => q && (q === "original" ? t.direct_play : t.qualities.includes(q as never)) ? q : defaultQuality(t, lowData));
+      setMedia(m);
+    }).catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load the video"));
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [remote?.media_id]);
+
+  useEffect(() => { apply(); }, [remote, apply]);
+  useVideoSource(video, { media, tracks, quality, audio, startAt, autoplay: false, onError: setError });
+  useSubtitle(video, subtitle, [media, quality, audio]);
+
+  // ------------------------------------------- drift correction, every second
+  useEffect(() => {
+    const t = window.setInterval(() => {
+      const v = video.current, s = remoteRef.current;
+      if (!v || !s || !media || s.media_id !== media.id || v.readyState < 2) return;
+      if (s.playing && serverNow() >= s.at && !sentBuffering.current) {
+        const d = v.currentTime - expected(s);
+        if (v.paused && !needsTap) { suppress(); void v.play().catch(() => setNeedsTap(true)); }
+        if (Math.abs(d) > 1.5) { suppress(); v.currentTime = expected(s); v.playbackRate = 1; }
+        else if (Math.abs(d) > 0.25) v.playbackRate = d > 0 ? 0.95 : 1.05;  // ease back, nobody notices
+        else v.playbackRate = 1;
+      }
+      if (Date.now() - lastReport.current > 3000) { lastReport.current = Date.now(); send({ type: "report", position: v.currentTime }); }
+    }, 1000);
+    return () => window.clearInterval(t);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [media, needsTap]);
+
+  useEffect(() => { chatEnd.current?.scrollIntoView({ block: "end" }); }, [lines]);
+
+  // ---------------------------------------------------------- your actions
+  const onPlay = () => { const v = video.current!; if (!suppressed()) send({ type: "play", position: v.currentTime }); };
+  const onPause = () => { const v = video.current!; if (!suppressed() && !v.ended) send({ type: "pause", position: v.currentTime }); };
+  const onSeeked = () => { const v = video.current!; if (!suppressed()) send({ type: "seek", position: v.currentTime }); };
+  const onWaiting = () => {
+    window.clearTimeout(waitTimer.current);
+    waitTimer.current = window.setTimeout(() => {  // only count real stalls, not a quick hiccup
+      if ((video.current?.readyState ?? 4) < 3 && !sentBuffering.current) { sentBuffering.current = true; send({ type: "buffering", state: true }); }
+    }, 1500);
+  };
+  const onReady = () => {
+    window.clearTimeout(waitTimer.current);
+    if (sentBuffering.current) { sentBuffering.current = false; send({ type: "buffering", state: false }); }
+  };
+  const onEnded = () => { if (party?.is_host && media?.next_id) send({ type: "media", media_id: media.next_id }); };
+  const tapToJoin = () => { setNeedsTap(false); apply(); };
+  const sendChat = (e: FormEvent) => { e.preventDefault(); if (draft.trim()) { send({ type: "chat", text: draft }); setDraft(""); } };
+
+  const answer = async (rsvp: "going" | "declined") => setParty(await api.rsvp(id, rsvp));
+  const changeSettings = async (change: { control?: "host" | "everyone"; wait_for_all?: boolean }) => setParty(await api.updateParty(id, change));
+  const end = async () => { if (confirm("End the watch party for everyone?")) setParty(await api.endParty(id)); };
+
+  if (error && !party) return <div className="page cinema-page"><p className="error">{error}</p><Link to="/watch/parties">Watch parties</Link></div>;
+  if (!party) return <div className="page cinema-page" aria-busy="true" />;
+  if (conn === "ended" || party.ended_at) {
+    return (
+      <div className="page cinema-page">
+        <h1>{party.title}</h1>
+        <p className="muted">This watch party has ended.</p>
+        <Link to="/watch/parties" className="button">Watch parties</Link>
+      </div>
+    );
+  }
+  if (conn === "refused") {
+    return <div className="page cinema-page"><h1>{party.title}</h1><p className="error">You can't join this party. The title may not be available to your profile.</p></div>;
+  }
+
+  const hostOnly = remote?.control === "host" && !party.is_host;
+  const future = party.scheduled_at && new Date(party.scheduled_at).getTime() > Date.now();
+
+  return (
+    <div className="party-page">
+      <Link to="/watch/parties" className="back"><ArrowLeft size={18} /> Watch parties</Link>
+      <div className="party-layout">
+        <section className="party-main">
+          <header className="party-head">
+            <h1>{party.title}</h1>
+            <span className={`conn ${conn}`}>{conn === "live" ? <Wifi size={15} /> : <WifiOff size={15} />}
+              {conn === "live" ? `${people.length} watching` : conn === "connecting" ? "Connecting" : "Reconnecting"}</span>
+          </header>
+          {future && (
+            <div className="party-banner">
+              Starts {when.format(new Date(party.scheduled_at!))}. You can come in early and chat.
+              {party.my_rsvp && (
+                <span className="rsvp">
+                  <button className={party.my_rsvp === "going" ? "primary" : ""} onClick={() => void answer("going")}>Going</button>
+                  <button className={party.my_rsvp === "declined" ? "primary" : ""} onClick={() => void answer("declined")}>Can't make it</button>
+                </span>
+              )}
+            </div>
+          )}
+          <div className="player-frame">
+            <video ref={video} controls playsInline preload="auto" onPlay={onPlay} onPause={onPause} onSeeked={onSeeked}
+              onWaiting={onWaiting} onPlaying={onReady} onCanPlay={onReady} onEnded={onEnded}
+              onLoadedMetadata={() => apply()}>
+              {media && tracks && <SubtitleTracks media={media} tracks={tracks} />}
+            </video>
+            <div className="reactions-layer" aria-hidden>
+              {floating.map((f) => <span key={f.id} className="float" style={{ left: `${f.left}%` }}>{f.emoji}<small>{f.username}</small></span>)}
+            </div>
+            {needsTap && (
+              <button className="overlay-btn tap" onClick={tapToJoin}><Play size={18} fill="currentColor" /> Tap to join the party</button>
+            )}
+            {remote && remote.waiting_for.length > 0 && (
+              <div className="overlay-wait" role="status">Waiting for {remote.waiting_for.join(", ")} to load…</div>
+            )}
+          </div>
+          <div className="player-controls">
+            {tracks && quality && (
+              <TrackMenus tracks={tracks} quality={quality} setQuality={setQuality} audio={audio} setAudio={setAudio}
+                subtitle={subtitle} setSubtitle={setSubtitle} />
+            )}
+            {party.is_host && media?.next_id && (
+              <button onClick={() => send({ type: "media", media_id: media.next_id })}><SkipForward size={16} /> Next episode for everyone</button>
+            )}
+          </div>
+          {media?.series_id && <p className="episode-code">{media.series_title}, {episodeCode(media)}</p>}
+          {hostOnly && <p className="muted small">{party.host} controls playback in this party.</p>}
+          {remote?.by && <p className="muted small">Last change by {remote.by}.</p>}
+          {error && <p className="error" role="alert">{error}</p>}
+        </section>
+
+        <aside className="party-side">
+          <section>
+            <h2><Users size={16} aria-hidden /> People</h2>
+            <ul className="people">
+              {people.map((p) => (
+                <li key={p.user_id}>
+                  <span className={`dot ${p.buffering ? "loading" : "on"}`} aria-hidden />
+                  {p.username}{p.host && <span className="tag">host</span>}
+                  {p.buffering && <span className="muted small"> loading</span>}
+                  {p.devices > 1 && <span className="muted small"> {p.devices} devices</span>}
+                </li>
+              ))}
+              {party.members.filter((m) => !people.some((p) => p.user_id === m.user_id)).map((m) => (
+                <li key={m.user_id} className="away">
+                  <span className="dot" aria-hidden />{m.username}
+                  <span className="muted small"> {m.rsvp === "going" ? "coming" : m.rsvp === "declined" ? "not coming" : "invited"}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+
+          <section className="chat">
+            <h2>Chat</h2>
+            <div className="chat-lines" aria-live="polite">
+              {lines.length === 0 && <p className="muted small">Say hello. Messages stay with the party.</p>}
+              {lines.map((l) => l.kind === "chat"
+                ? <p key={l.id} className={l.username === user.username ? "mine" : ""}><strong>{l.username}</strong> {l.text}</p>
+                : <p key={l.id} className="notice-line">{l.text}</p>)}
+              <div ref={chatEnd} />
+            </div>
+            <div className="reaction-bar" role="group" aria-label="Reactions">
+              {REACTIONS.map((r) => <button key={r} className="icon" onClick={() => send({ type: "react", emoji: r })} aria-label={`React ${r}`}>{r}</button>)}
+            </div>
+            <form className="chat-form" onSubmit={sendChat}>
+              <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Message" maxLength={500} aria-label="Chat message" />
+              <button className="icon" aria-label="Send"><Send size={17} /></button>
+            </form>
+          </section>
+
+          {party.is_host && (
+            <section className="host-tools">
+              <h2>Host</h2>
+              <label>Who can pause and skip
+                <select value={party.control} onChange={(e) => void changeSettings({ control: e.target.value as "host" | "everyone" })}>
+                  <option value="everyone">Everyone</option>
+                  <option value="host">Only me</option>
+                </select>
+              </label>
+              <label className="check"><input type="checkbox" checked={party.wait_for_all}
+                onChange={(e) => void changeSettings({ wait_for_all: e.target.checked })} /> Wait for anyone whose video is loading</label>
+              <button className="danger" onClick={() => void end()}>End the party</button>
+            </section>
+          )}
+        </aside>
+      </div>
+    </div>
+  );
+}

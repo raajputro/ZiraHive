@@ -10,6 +10,12 @@ export interface Asset {
   taken_at: string | null; created_at: string; deleted_at: string | null; updated_at: string | null;
   owner_id: string | null;
 }
+export interface Party {
+  id: string; title: string; host_id: string; host: string; is_host: boolean; media_id: string; media_title: string;
+  series_title: string | null; poster_ready: boolean; scheduled_at: string | null; control: "host" | "everyone";
+  wait_for_all: boolean; ended_at: string | null; created_at: string; my_rsvp: "invited" | "going" | "declined" | null;
+  members: { user_id: string; username: string; rsvp: string; online: boolean }[]; online: number;
+}
 export interface Version { id: string; size: number; sha256: string; created_at: string }
 export interface Memory { year: number; years_ago: number; items: Asset[] }
 export type ShareTarget = "asset" | "folder" | "album";
@@ -208,6 +214,15 @@ export const api = {
   setSeriesRating: (id: string, age_rating: number | null) => request<void>("PUT", `/api/series/${id}/rating`, { age_rating }),
   setSeriesMarkers: (id: string, m: { intro_start: number | null; intro_end: number | null; credits_before_end: number | null }) =>
     request<SeriesDetail>("PUT", `/api/series/${id}/markers`, m),
+  parties: () => request<Party[]>("GET", "/api/parties"),
+  party: (id: string) => request<Party>("GET", `/api/parties/${id}`),
+  createParty: (body: { media_id: string; scheduled_at?: string; invite: string[]; control: "host" | "everyone"; wait_for_all: boolean }) =>
+    request<Party>("POST", "/api/parties", body),
+  updateParty: (id: string, change: { scheduled_at?: string; clear_schedule?: boolean; control?: "host" | "everyone"; wait_for_all?: boolean }) =>
+    request<Party>("PATCH", `/api/parties/${id}`, change),
+  rsvp: (id: string, rsvp: "going" | "declined") => request<Party>("PUT", `/api/parties/${id}/rsvp`, { rsvp }),
+  inviteToParty: (id: string, user_ids: string[]) => request<Party>("POST", `/api/parties/${id}/invite`, { user_ids }),
+  endParty: (id: string) => request<Party>("POST", `/api/parties/${id}/end`),
   streamLink: (id: string) => request<{ path: string }>("GET", `/api/media/${id}/link`),
   saveProgress: (id: string, position: number, duration?: number) =>
     request<void>("PUT", `/api/media/${id}/progress`, { position, duration }),

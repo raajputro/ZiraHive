@@ -11,6 +11,7 @@ export function WatchTabs({ libraries, query, onQuery }:
     <div className="watch-bar">
       <nav className="lib-tabs" aria-label="Categories">
         <NavLink to="/watch" end>Home</NavLink>
+        <NavLink to="/watch/parties">Watch parties</NavLink>
         {libraries.filter((l) => l.available && l.item_count > 0).map((l) => (
           <NavLink key={l.id} to={`/watch/c/${l.id}`}>{l.name}</NavLink>
         ))}

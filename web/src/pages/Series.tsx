@@ -1,6 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, Play, Check, Timer } from "lucide-react";
+import { ArrowLeft, Play, Check, Timer, PartyPopper } from "lucide-react";
+import PartyDialog from "../components/PartyDialog";
 import { api, ApiError, url, clock, parseClock, episodeCode, formatDuration, AGE_LABEL, type SeriesDetail } from "../api";
 import { useAuth } from "../App";
 import Dialog from "../components/Dialog";
@@ -12,6 +13,7 @@ export default function SeriesPage() {
   const [season, setSeason] = useState<number | null | undefined>(undefined);
   const [error, setError] = useState("");
   const [markers, setMarkers] = useState(false);
+  const [together, setTogether] = useState(false);
   const { user } = useAuth();
 
   useEffect(() => {
@@ -45,8 +47,12 @@ export default function SeriesPage() {
           </p>
           {s.overview && <p className="overview">{s.overview}</p>}
           {next && label && (
-            <Link to={`/play/${next.id}`} className="button primary play-btn"><Play size={18} fill="currentColor" /> {label}</Link>
+            <div className="admin-row">
+              <Link to={`/play/${next.id}`} className="button primary play-btn"><Play size={18} fill="currentColor" /> {label}</Link>
+              <button className="play-btn" onClick={() => setTogether(true)}><PartyPopper size={17} /> Watch together</button>
+            </div>
           )}
+          {together && next && <PartyDialog mediaId={next.id} title={`${s.title} ${episodeCode(next)}`} onClose={() => setTogether(false)} />}
           {!next && <p className="muted">You've watched every episode.</p>}
           {user.is_admin && (
             <div className="admin-row">

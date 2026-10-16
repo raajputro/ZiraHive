@@ -31,4 +31,10 @@ ffmpeg -y -v error -f lavfi -i "testsrc=duration=40:size=640x360:rate=24" \
 rm "$RICH/_bn.srt" "$RICH/_ch.txt"
 printf '1\n00:00:02,000 --> 00:00:05,000\nHello from the side file\n\n' > "$RICH/Dhaka Nights (2024).en.srt"
 clip "$OUT/Animation/Avatar The Last Airbender/Book 1/Avatar.S01E01.mp4"
+
+# VP9 + Opus WebM: every browser plays it as it is, including the open-source Chromium
+# that the watch-party test drives (it has no H.264).
+mkdir -p "$OUT/Animation/Big Garden (2021)"
+ffmpeg -y -v error -f lavfi -i "testsrc2=duration=60:size=640x360:rate=24" -f lavfi -i "sine=duration=60" \
+  -c:v libvpx-vp9 -b:v 300k -deadline realtime -cpu-used 8 -c:a libopus -shortest "$OUT/Animation/Big Garden (2021)/Big Garden (2021).webm"
 echo "Sample media written to $OUT"

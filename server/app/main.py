@@ -11,7 +11,7 @@ from sqlalchemy import select
 from . import db
 from .config import get_settings
 from .models import Library
-from .routers import admin, albums, auth, files, media, playback, shares, uploads
+from .routers import admin, albums, auth, files, media, parties, playback, shares, uploads
 from .services import jobs, transcode
 from .services.libraries import discover
 
@@ -72,7 +72,7 @@ def create_app() -> FastAPI:
                            allow_methods=["*"], allow_headers=["*"],
                            expose_headers=["Upload-Offset", "Content-Range"])
     for r in (auth.router, uploads.router, files.router, albums.router, shares.router,
-              media.router, playback.router, admin.router):
+              media.router, playback.router, parties.router, admin.router):
         app.include_router(r)
 
     @app.get("/api/health", tags=["system"])

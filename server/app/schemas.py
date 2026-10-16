@@ -501,3 +501,60 @@ class OfflineOut(ORM):
     size: int | None
     error: str | None
     created_at: datetime
+
+
+class PartyIn(BaseModel):
+    media_id: str
+    scheduled_at: datetime | None = None
+    invite: list[str] = []
+    control: str = Field(default="everyone", pattern=r"^(host|everyone)$")
+    wait_for_all: bool = True
+
+
+class PartyUpdateIn(BaseModel):
+    scheduled_at: datetime | None = None
+    clear_schedule: bool = False
+    control: str | None = Field(default=None, pattern=r"^(host|everyone)$")
+    wait_for_all: bool | None = None
+
+
+class RsvpIn(BaseModel):
+    rsvp: str = Field(pattern=r"^(going|declined)$")
+
+
+class InviteIn(BaseModel):
+    user_ids: list[str]
+
+
+class PartyMemberOut(BaseModel):
+    user_id: str
+    username: str
+    rsvp: str
+    online: bool
+
+
+class PartyOut(BaseModel):
+    id: str
+    title: str
+    host_id: str
+    host: str
+    is_host: bool
+    media_id: str
+    media_title: str
+    series_title: str | None
+    poster_ready: bool
+    scheduled_at: datetime | None
+    control: str
+    wait_for_all: bool
+    ended_at: datetime | None
+    created_at: datetime
+    my_rsvp: str | None
+    members: list[PartyMemberOut]
+    online: int
+
+
+class ChatOut(BaseModel):
+    id: str
+    username: str
+    text: str
+    created_at: datetime
