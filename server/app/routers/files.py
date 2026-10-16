@@ -3,20 +3,22 @@ from __future__ import annotations
 import asyncio
 import base64
 import shutil
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
-from fastapi.responses import FileResponse
-from sqlalchemy import and_, or_, select
+from sqlalchemy import and_, extract, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
-from ..models import Asset, Folder, User
-from ..schemas import (AssetOut, AssetUpdateIn, FolderCreateIn, FolderListing, PhotoPage)
+from ..models import Asset, AssetVersion, Folder, User
+from ..schemas import (AssetOut, AssetUpdateIn, FolderCreateIn, FolderListing, MemoryGroup,
+                       PhotoPage, VersionOut)
 from ..security import current_user
 from ..services import storage
 from ..services.ranged import ranged_file_response
-from .uploads import ensure_folders
+from ..services.assets import file_response, preview_response, thumb_response, viewable_asset
+from ..services.events import audit
+from .uploads import add_version, ensure_folders
 
 router = APIRouter(prefix="/api", tags=["files"])
 TRASH_DAYS = 30
@@ -87,28 +89,73 @@ async def delete_folder(path: str, user: User = Depends(current_user),
 @router.get("/assets/{asset_id}", response_model=AssetOut)
 async def get_asset(asset_id: str, user: User = Depends(current_user),
                     session: AsyncSession = Depends(get_session)):
-    return await _get_asset(asset_id, user, session)
+    return await viewable_asset(session, user.id, asset_id)
 
 
 @router.get("/assets/{asset_id}/file")
 async def download_asset(asset_id: str, request: Request, download: bool = False,
                          user: User = Depends(current_user),
                          session: AsyncSession = Depends(get_session)):
-    asset = await _get_asset(asset_id, user, session, include_deleted=True)
-    path = storage.abs_storage_path(asset.storage_path)
-    return ranged_file_response(request, path, asset.mime, asset.filename, inline=not download)
+    asset = await viewable_asset(session, user.id, asset_id, include_deleted=True)
+    return file_response(request, asset, download)
 
 
 @router.get("/assets/{asset_id}/thumb")
 async def asset_thumb(asset_id: str, user: User = Depends(current_user),
                       session: AsyncSession = Depends(get_session)):
-    asset = await _get_asset(asset_id, user, session, include_deleted=True)
-    path = storage.thumb_path(asset.id)
-    if not asset.thumb_ready or not path.exists():
-        raise HTTPException(404, "No thumbnail yet")
-    return FileResponse(path, media_type="image/webp",
-                        headers={"Cache-Control": "private, max-age=604800"})
+    return thumb_response(await viewable_asset(session, user.id, asset_id, include_deleted=True))
 
+
+@router.get("/assets/{asset_id}/preview")
+async def asset_preview(asset_id: str, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)):
+    return await preview_response(await viewable_asset(session, user.id, asset_id, include_deleted=True))
+
+
+# --------------------------------------------------------------- versions
+
+@router.get("/assets/{asset_id}/versions", response_model=list[VersionOut])
+async def list_versions(asset_id: str, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)):
+    asset = await _get_asset(asset_id, user, session)
+    return (await session.scalars(select(AssetVersion).where(AssetVersion.asset_id == asset.id)
+                                  .order_by(AssetVersion.created_at.desc()))).all()
+
+
+async def _get_version(asset: Asset, version_id: str, session: AsyncSession) -> AssetVersion:
+    version = await session.get(AssetVersion, version_id)
+    if version is None or version.asset_id != asset.id:
+        raise HTTPException(404, "Version not found")
+    return version
+
+
+@router.get("/assets/{asset_id}/versions/{version_id}/file")
+async def download_version(asset_id: str, version_id: str, request: Request,
+                           user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    asset = await _get_asset(asset_id, user, session)
+    version = await _get_version(asset, version_id, session)
+    return ranged_file_response(request, storage.abs_storage_path(version.storage_path), asset.mime,
+                                asset.filename, inline=False)
+
+
+@router.post("/assets/{asset_id}/versions/{version_id}/restore", response_model=AssetOut)
+async def restore_version(asset_id: str, version_id: str, request: Request,
+                          user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    """Make an older copy current again. The current copy is kept as a version."""
+    asset = await _get_asset(asset_id, user, session)
+    version = await _get_version(asset, version_id, session)
+    old_file = storage.abs_storage_path(version.storage_path)
+    staged = old_file.with_name(old_file.name + ".restoring")
+    await asyncio.to_thread(shutil.move, str(old_file), str(staged))
+    size, digest = version.size, version.sha256
+    await session.delete(version)
+    await add_version(session, user, asset, staged, digest, size)
+    await audit(session, "version_restored", user, detail=asset.filename, request=request)
+    await session.commit()
+    return asset
+
+
+# ------------------------------------------------------------------ edits
 
 @router.patch("/assets/{asset_id}", response_model=AssetOut)
 async def update_asset(asset_id: str, body: AssetUpdateIn, user: User = Depends(current_user),
@@ -160,6 +207,9 @@ async def restore_asset(asset_id: str, user: User = Depends(current_user),
 async def purge_asset(asset: Asset, session: AsyncSession) -> None:
     storage.abs_storage_path(asset.storage_path).unlink(missing_ok=True)
     storage.thumb_path(asset.id).unlink(missing_ok=True)
+    storage.preview_path(asset.id).unlink(missing_ok=True)
+    for version in (await session.scalars(select(AssetVersion).where(AssetVersion.asset_id == asset.id))).all():
+        storage.abs_storage_path(version.storage_path).unlink(missing_ok=True)
     await session.delete(asset)
 
 
@@ -174,8 +224,9 @@ async def delete_forever(asset_id: str, user: User = Depends(current_user),
 
 
 @router.delete("/trash", status_code=204)
-async def empty_trash(user: User = Depends(current_user),
+async def empty_trash(request: Request, user: User = Depends(current_user),
                       session: AsyncSession = Depends(get_session)):
+    await audit(session, "trash_emptied", user, request=request)
     for asset in (await session.scalars(select(Asset).where(
             Asset.owner_id == user.id, Asset.deleted_at.is_not(None)))).all():
         await purge_asset(asset, session)
@@ -221,3 +272,20 @@ async def photo_timeline(cursor: str | None = None, limit: int = Query(120, ge=1
     more = len(rows) > limit
     rows = rows[:limit]
     return PhotoPage(items=rows, next_cursor=_encode_cursor(rows[-1]) if more and rows else None)
+
+
+@router.get("/photos/on-this-day", response_model=list[MemoryGroup])
+async def on_this_day(day: date | None = None, user: User = Depends(current_user),
+                      session: AsyncSession = Depends(get_session)):
+    """Photos and videos taken on today's date in earlier years, newest year first."""
+    today = day or datetime.now(timezone.utc).date()
+    rows = (await session.scalars(select(Asset).where(
+        Asset.owner_id == user.id, Asset.deleted_at.is_(None), Asset.kind.in_(("photo", "video")),
+        Asset.taken_at.is_not(None),
+        extract("month", Asset.taken_at) == today.month, extract("day", Asset.taken_at) == today.day,
+        extract("year", Asset.taken_at) < today.year).order_by(Asset.taken_at))).all()
+    groups: dict[int, list[Asset]] = {}
+    for a in rows:
+        groups.setdefault(a.taken_at.year, []).append(a)
+    return [MemoryGroup(year=y, years_ago=today.year - y, items=items)
+            for y, items in sorted(groups.items(), reverse=True)]

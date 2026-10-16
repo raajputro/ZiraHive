@@ -12,6 +12,17 @@
 - Web series: seasons and episodes, series pages, next episode autoplay, up next
 - Phone app: camera roll backup with dedup, Live Photos, resume
 
+## Batch 1: accounts and sharing (done)
+- Share links for files, folders and albums: password, expiry, view-only, visit count
+- Document version history (last 20) with restore; copies allowed across folders
+- Albums shared with family members, who can add their own photos
+- On this day memories; screen-sized previews (HEIC in any browser); low-data mode
+- Roles and storage limits editable by the admin, password reset, 2FA reset
+- Two-factor sign-in (TOTP) with recovery codes; sign out everywhere; login throttling
+- Audit log; notifications in-app and via ntfy (backups, albums, new videos, disk 90% full)
+- Admin dashboard: active streams, job queue, disks
+- Playwright end-to-end suite, Locust load test, GitHub Actions CI with Docker build
+
 ## Milestone 2: play anything
 - FFmpeg transcoding to HLS, with NVIDIA NVENC when available
 - Subtitles (embedded and .srt), audio track choice
@@ -31,6 +42,6 @@
 
 ## Platform
 - Alembic database migrations (needed before the first schema change after release)
-- 2FA and passkeys, audit log
+- Passkeys
 - Bangla interface
 - Admin dashboard: active streams and job queue

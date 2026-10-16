@@ -4,9 +4,10 @@ import 'dart:typed_data';
 import 'package:http/http.dart' as http;
 
 class ApiException implements Exception {
-  ApiException(this.status, this.message);
+  ApiException(this.status, this.message, [this.code]);
   final int status;
   final String message;
+  final String? code; // e.g. "2fa_required"
   @override
   String toString() => message;
 }
@@ -46,11 +47,17 @@ class GharBoxApi {
         await _client.send(req).timeout(const Duration(minutes: 5)));
     if (res.statusCode >= 400) {
       var message = 'Server error ${res.statusCode}';
+      String? code;
       try {
         final body = jsonDecode(res.body);
-        if (body is Map && body['detail'] is String) message = body['detail'] as String;
+        final detail = body is Map ? body['detail'] : null;
+        if (detail is String) message = detail;
+        if (detail is Map) {
+          message = (detail['message'] ?? message) as String;
+          code = detail['code'] as String?;
+        }
       } catch (_) {}
-      throw ApiException(res.statusCode, message);
+      throw ApiException(res.statusCode, message, code);
     }
     if (res.statusCode == 204 || res.body.isEmpty) return null;
     return jsonDecode(res.body);
@@ -71,8 +78,12 @@ class GharBoxApi {
   }
 
   /// Returns the username on success and stores the token on this client.
-  Future<String> login(String username, String password) async {
-    final data = await _json('POST', '/api/auth/login', {'username': username, 'password': password});
+  Future<String> login(String username, String password, {String? code}) async {
+    final data = await _json('POST', '/api/auth/login', {
+      'username': username,
+      'password': password,
+      if (code != null && code.isNotEmpty) 'code': code,
+    });
     token = data['token'] as String;
     return data['user']['username'] as String;
   }
@@ -108,6 +119,15 @@ class GharBoxApi {
       ..bodyBytes = bytes;
     return UploadState.fromJson(await _send(req) as Map<String, dynamic>);
   }
+
+  /// Tells the server a backup run finished, so it shows up as a notification.
+  Future<void> reportBackup({required int uploaded, required int skipped, required int failed, String? device}) =>
+      _json('POST', '/api/events/backup', {
+        'uploaded': uploaded,
+        'skipped': skipped,
+        'failed': failed,
+        if (device != null) 'device': device,
+      });
 
   Future<UploadState> uploadStatus(String id) async =>
       UploadState.fromJson(await _json('GET', '/api/uploads/$id') as Map<String, dynamic>);

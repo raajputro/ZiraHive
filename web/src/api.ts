@@ -1,11 +1,40 @@
 // Typed client for the GharBox API. Auth uses the httpOnly cookie set at login.
 
-export interface User { id: string; username: string; is_admin: boolean; quota_bytes: number | null; created_at: string }
+export interface User { id: string; username: string; is_admin: boolean; quota_bytes: number | null; created_at: string; totp_enabled: boolean }
+export interface Me extends User { ntfy_url: string | null; used_bytes: number }
+export interface AdminUser extends User { used_bytes: number }
 export interface Asset {
   id: string; folder: string; filename: string; size: number; mime: string;
   kind: "photo" | "video" | "document" | "other"; sha256: string; thumb_ready: boolean;
   width: number | null; height: number | null; duration: number | null;
-  taken_at: string | null; created_at: string; deleted_at: string | null;
+  taken_at: string | null; created_at: string; deleted_at: string | null; updated_at: string | null;
+  owner_id: string | null;
+}
+export interface Version { id: string; size: number; sha256: string; created_at: string }
+export interface Memory { year: number; years_ago: number; items: Asset[] }
+export type ShareTarget = "asset" | "folder" | "album";
+export interface Share {
+  id: string; token: string; target_type: ShareTarget; target_id: string; label: string; has_password: boolean;
+  expires_at: string | null; allow_download: boolean; views: number; created_at: string;
+}
+export interface PublicShare { type: ShareTarget; title: string; owner: string; needs_password: boolean; expires_at: string | null; allow_download: boolean }
+export interface PublicAsset {
+  id: string; filename: string; size: number; mime: string; kind: Asset["kind"]; width: number | null;
+  height: number | null; duration: number | null; taken_at: string | null; thumb_ready: boolean;
+}
+export interface PublicListing { path: string; folders: string[]; assets: PublicAsset[] }
+export interface AlbumMember { user_id: string; username: string; can_add: boolean }
+export interface Album {
+  id: string; title: string; owner_id: string; owner: string; is_owner: boolean; can_add: boolean;
+  cover_asset_id: string | null; item_count: number; members: AlbumMember[]; created_at: string;
+}
+export interface AlbumDetail extends Album { items: Asset[] }
+export interface Notice { id: string; kind: string; title: string; body: string | null; link: string | null; read_at: string | null; created_at: string }
+export interface AuditEvent { id: string; username: string | null; action: string; detail: string | null; ip: string | null; created_at: string }
+export interface Activity {
+  streams: { username: string; media_id: string; title: string; last_seen: string }[];
+  jobs_queued: number | null; jobs_mode: string; cache_bytes: number; started_at: string;
+  disks: { label: string; path: string; total: number; free: number }[];
 }
 export interface FolderListing { folder: string; folders: string[]; assets: Asset[] }
 export interface PhotoPage { items: Asset[]; next_cursor: string | null }
@@ -40,7 +69,7 @@ export interface Stats {
 export interface UploadResult { id: string | null; offset: number; size: number; status: "uploading" | "complete" | "exists"; asset: Asset | null }
 
 export class ApiError extends Error {
-  constructor(public status: number, message: string) { super(message); }
+  constructor(public status: number, message: string, public code?: string) { super(message); }
 }
 
 async function request<T>(method: string, path: string, body?: unknown, init: RequestInit = {}): Promise<T> {
@@ -51,13 +80,16 @@ async function request<T>(method: string, path: string, body?: unknown, init: Re
   const res = await fetch(path, { ...init, method, body: payload, headers, credentials: "same-origin" });
   if (!res.ok) {
     let message = `${res.status} ${res.statusText}`;
+    let code: string | undefined;
     try {
       const data = await res.json();
       if (typeof data.detail === "string") message = data.detail;
       else if (Array.isArray(data.detail)) message = data.detail.map((d: { msg: string }) => d.msg).join("; ");
+      else if (data.detail && typeof data.detail === "object") { message = data.detail.message; code = data.detail.code; }
     } catch { /* not JSON */ }
-    if (res.status === 401 && path !== "/api/auth/login") window.dispatchEvent(new Event("gharbox:signed-out"));
-    throw new ApiError(res.status, message);
+    if (res.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/s/"))
+      window.dispatchEvent(new Event("gharbox:signed-out"));
+    throw new ApiError(res.status, message, code);
   }
   if (res.status === 204) return undefined as T;
   return res.json() as Promise<T>;
@@ -73,11 +105,49 @@ const q = (params: Record<string, string | number | undefined | null>) => {
 export const api = {
   setupStatus: () => request<{ needs_setup: boolean }>("GET", "/api/setup/status"),
   setup: (username: string, password: string) => request<{ user: User }>("POST", "/api/setup", { username, password }),
-  login: (username: string, password: string) => request<{ user: User }>("POST", "/api/auth/login", { username, password }),
+  login: (username: string, password: string, code?: string) =>
+    request<{ user: User }>("POST", "/api/auth/login", { username, password, code: code || undefined }),
   logout: () => request<void>("POST", "/api/auth/logout"),
-  me: () => request<User>("GET", "/api/auth/me"),
+  logoutAll: () => request<void>("POST", "/api/auth/logout-all"),
+  me: () => request<Me>("GET", "/api/auth/me"),
+  saveMySettings: (ntfy_url: string) => request<Me>("PUT", "/api/auth/me/settings", { ntfy_url }),
+  testNotification: () => request<void>("POST", "/api/auth/me/test-notification"),
   changePassword: (current_password: string, new_password: string) =>
-    request<void>("POST", "/api/auth/password", { current_password, new_password }),
+    request<{ user: User }>("POST", "/api/auth/password", { current_password, new_password }),
+  twoFactorSetup: () => request<{ secret: string; uri: string; qr_svg: string }>("POST", "/api/auth/2fa/setup"),
+  twoFactorEnable: (code: string) => request<{ recovery_codes: string[] }>("POST", "/api/auth/2fa/enable", { code }),
+  twoFactorDisable: (password: string) => request<void>("POST", "/api/auth/2fa/disable", { password }),
+
+  versions: (id: string) => request<Version[]>("GET", `/api/assets/${id}/versions`),
+  restoreVersion: (id: string, vid: string) => request<Asset>("POST", `/api/assets/${id}/versions/${vid}/restore`),
+  onThisDay: () => request<Memory[]>("GET", "/api/photos/on-this-day"),
+
+  shares: () => request<Share[]>("GET", "/api/shares"),
+  createShare: (body: { target_type: ShareTarget; target_id: string; password?: string; expires_days?: number; allow_download: boolean }) =>
+    request<Share>("POST", "/api/shares", body),
+  deleteShare: (id: string) => request<void>("DELETE", `/api/shares/${id}`),
+  publicShare: (token: string) => request<PublicShare>("GET", `/api/s/${token}`),
+  unlockShare: (token: string, password: string) => request<{ key: string }>("POST", `/api/s/${token}/unlock`, { password }),
+  publicItems: (token: string, path: string, key?: string) =>
+    request<PublicListing>("GET", `/api/s/${token}/items${q({ path, key })}`),
+
+  albums: () => request<Album[]>("GET", "/api/albums"),
+  album: (id: string) => request<AlbumDetail>("GET", `/api/albums/${id}`),
+  createAlbum: (title: string, asset_ids: string[] = []) => request<Album>("POST", "/api/albums", { title, asset_ids }),
+  updateAlbum: (id: string, change: { title?: string; cover_asset_id?: string }) => request<Album>("PATCH", `/api/albums/${id}`, change),
+  deleteAlbum: (id: string) => request<void>("DELETE", `/api/albums/${id}`),
+  addToAlbum: (id: string, asset_ids: string[]) => request<Album>("POST", `/api/albums/${id}/items`, { asset_ids }),
+  removeFromAlbum: (id: string, asset_ids: string[]) => request<Album>("POST", `/api/albums/${id}/items/remove`, { asset_ids }),
+  setAlbumMembers: (id: string, members: { user_id: string; can_add: boolean }[]) =>
+    request<Album>("PUT", `/api/albums/${id}/members`, { members }),
+  directory: () => request<User[]>("GET", "/api/users/directory"),
+
+  notifications: () => request<{ unread: number; items: Notice[] }>("GET", "/api/notifications"),
+  markNotificationsRead: () => request<void>("POST", "/api/notifications/read"),
+  audit: (before?: string) => request<AuditEvent[]>("GET", `/api/admin/audit${q({ before, limit: 100 })}`),
+  activity: () => request<Activity>("GET", "/api/admin/activity"),
+  updateUser: (id: string, change: { is_admin?: boolean; quota_gb?: number; clear_quota?: boolean; new_password?: string; reset_2fa?: boolean }) =>
+    request<AdminUser>("PATCH", `/api/users/${id}`, change),
 
   files: (folder: string) => request<FolderListing>("GET", `/api/files${q({ folder })}`),
   createFolder: (path: string) => request<{ path: string }>("POST", "/api/folders", { path }),
@@ -107,13 +177,13 @@ export const api = {
   saveProgress: (id: string, position: number, duration?: number) =>
     request<void>("PUT", `/api/media/${id}/progress`, { position, duration }),
 
-  users: () => request<User[]>("GET", "/api/users"),
+  users: () => request<AdminUser[]>("GET", "/api/users"),
   createUser: (username: string, password: string, is_admin: boolean) =>
     request<User>("POST", "/api/users", { username, password, is_admin }),
   deleteUser: (id: string) => request<void>("DELETE", `/api/users/${id}`),
   stats: () => request<Stats>("GET", "/api/admin/stats"),
 
-  uploadCreate: (body: { filename: string; size: number; folder: string; sha256?: string; taken_at?: string }) =>
+  uploadCreate: (body: { filename: string; size: number; folder: string; sha256?: string; taken_at?: string; dedupe?: boolean }) =>
     request<UploadResult>("POST", "/api/uploads", body),
   uploadChunk: (id: string, offset: number, chunk: Blob, signal?: AbortSignal) =>
     request<UploadResult>("PATCH", `/api/uploads/${id}`, chunk, { headers: { "Upload-Offset": String(offset) }, signal }),
@@ -121,7 +191,14 @@ export const api = {
 };
 
 export const url = {
-  thumb: (a: Asset) => `/api/assets/${a.id}/thumb`,
+  thumb: (a: { id: string }) => `/api/assets/${a.id}/thumb`,
+  preview: (a: { id: string }) => `/api/assets/${a.id}/preview`,
+  version: (a: { id: string }, v: { id: string }) => `/api/assets/${a.id}/versions/${v.id}/file`,
+  shareLink: (s: { token: string }) => `${location.origin}/s/${s.token}`,
+  publicFile: (token: string, a: { id: string }, key?: string, download = false) =>
+    `/api/s/${token}/assets/${a.id}/file${q({ key, download: download ? "true" : undefined })}`,
+  publicThumb: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/thumb${q({ key })}`,
+  publicPreview: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/preview${q({ key })}`,
   file: (a: Asset, download = false) => `/api/assets/${a.id}/file${download ? "?download=true" : ""}`,
   poster: (m: { id: string }) => `/api/media/${m.id}/poster`,
   seriesPoster: (s: { id: string }) => `/api/series/${s.id}/poster`,

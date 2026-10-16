@@ -6,9 +6,9 @@ const CHUNK = 8 * 1024 * 1024;
 const HASH_LIMIT = 512 * 1024 * 1024; // hash in the browser below this size; the server always verifies
 
 type State = "queued" | "hashing" | "uploading" | "done" | "exists" | "error";
-interface Item { key: string; file: File; folder: string; sent: number; state: State; error?: string }
+interface Item { key: string; file: File; folder: string; dedupe: boolean; sent: number; state: State; error?: string }
 
-interface Ctx { enqueue: (files: File[], folder: string) => void; onComplete: (fn: () => void) => () => void }
+interface Ctx { enqueue: (files: File[], folder: string, opts?: { dedupe?: boolean }) => void; onComplete: (fn: () => void) => () => void }
 const UploadContext = createContext<Ctx | null>(null);
 export const useUploads = () => useContext(UploadContext)!;
 
@@ -33,7 +33,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     const hash = await sha256(item.file);
     patch(item.key, { state: "uploading" });
     let res = await api.uploadCreate({
-      filename: item.file.name, size: item.file.size, folder: item.folder, sha256: hash,
+      filename: item.file.name, size: item.file.size, folder: item.folder, sha256: hash, dedupe: item.dedupe,
       taken_at: item.file.type.startsWith("image/") || item.file.type.startsWith("video/")
         ? new Date(item.file.lastModified).toISOString() : undefined,
     });
@@ -65,8 +65,9 @@ export function UploadProvider({ children }: { children: ReactNode }) {
     running.current = false;
   }, []);
 
-  const enqueue = useCallback((files: File[], folder: string) => {
-    const added = files.map((file) => ({ key: `${Date.now()}-${Math.random()}`, file, folder, sent: 0, state: "queued" as State }));
+  const enqueue = useCallback((files: File[], folder: string, opts: { dedupe?: boolean } = {}) => {
+    const added = files.map((file) => ({ key: `${Date.now()}-${Math.random()}`, file, folder, dedupe: opts.dedupe ?? true,
+      sent: 0, state: "queued" as State }));
     queue.current.push(...added);
     setItems((list) => [...list, ...added]);
     void pump();

@@ -17,6 +17,7 @@ class SetupIn(BaseModel):
 class LoginIn(BaseModel):
     username: str
     password: str
+    code: str | None = None  # 6-digit authenticator code or a recovery code, when 2FA is on
 
 
 class PasswordChangeIn(BaseModel):
@@ -35,6 +36,46 @@ class UserOut(ORM):
     is_admin: bool
     quota_bytes: int | None
     created_at: datetime
+    totp_enabled: bool = False
+
+
+class MeOut(UserOut):
+    ntfy_url: str | None = None
+    used_bytes: int = 0
+
+
+class UserAdminOut(UserOut):
+    used_bytes: int = 0
+
+
+class UserUpdateIn(BaseModel):
+    is_admin: bool | None = None
+    quota_gb: float | None = Field(default=None, ge=0)
+    clear_quota: bool = False
+    new_password: str | None = Field(default=None, min_length=8, max_length=256)
+    reset_2fa: bool = False
+
+
+class MySettingsIn(BaseModel):
+    ntfy_url: str | None = Field(default=None, max_length=512, pattern=r"^(https?://.+)?$")
+
+
+class TwoFactorSetupOut(BaseModel):
+    secret: str
+    uri: str
+    qr_svg: str
+
+
+class CodeIn(BaseModel):
+    code: str = Field(min_length=6, max_length=16)
+
+
+class PasswordIn(BaseModel):
+    password: str
+
+
+class RecoveryCodesOut(BaseModel):
+    recovery_codes: list[str]
 
 
 class TokenOut(BaseModel):
@@ -57,6 +98,8 @@ class AssetOut(ORM):
     taken_at: datetime | None
     created_at: datetime
     deleted_at: datetime | None = None
+    updated_at: datetime | None = None
+    owner_id: str | None = None
 
 
 class FolderListing(BaseModel):
@@ -89,6 +132,9 @@ class UploadCreateIn(BaseModel):
     sha256: str | None = Field(default=None, pattern=r"^[0-9a-fA-F]{64}$")
     taken_at: datetime | None = None
     device_asset_id: str | None = None
+    # True for camera-roll backup (skip what's already saved anywhere); False when you put a
+    # file into a specific folder in Files and expect to see it there.
+    dedupe: bool = True
 
 
 class UploadOut(BaseModel):
@@ -209,3 +255,169 @@ class StatsOut(BaseModel):
     disk_total: int
     disk_free: int
     jobs_mode: str
+
+
+class VersionOut(ORM):
+    id: str
+    size: int
+    sha256: str
+    created_at: datetime
+
+
+class MemoryGroup(BaseModel):
+    year: int
+    years_ago: int
+    items: list[AssetOut]
+
+
+class ShareIn(BaseModel):
+    target_type: str = Field(pattern=r"^(asset|folder|album)$")
+    target_id: str = Field(min_length=1, max_length=1024)
+    password: str | None = Field(default=None, max_length=256)
+    expires_days: int | None = Field(default=None, ge=1, le=3650)
+    allow_download: bool = True
+
+
+class ShareOut(ORM):
+    id: str
+    token: str
+    target_type: str
+    target_id: str
+    label: str = ""
+    has_password: bool = False
+    expires_at: datetime | None
+    allow_download: bool
+    views: int
+    created_at: datetime
+
+
+class PublicShareOut(BaseModel):
+    type: str
+    title: str
+    owner: str
+    needs_password: bool
+    expires_at: datetime | None
+    allow_download: bool
+
+
+class PublicAsset(BaseModel):
+    id: str
+    filename: str
+    size: int
+    mime: str
+    kind: str
+    width: int | None
+    height: int | None
+    duration: float | None
+    taken_at: datetime | None
+    thumb_ready: bool
+
+
+class PublicListing(BaseModel):
+    path: str
+    folders: list[str]
+    assets: list[PublicAsset]
+
+
+class UnlockIn(BaseModel):
+    password: str
+
+
+class AlbumIn(BaseModel):
+    title: str = Field(min_length=1, max_length=256)
+    asset_ids: list[str] = []
+
+
+class AlbumUpdateIn(BaseModel):
+    title: str | None = Field(default=None, min_length=1, max_length=256)
+    cover_asset_id: str | None = None
+
+
+class AssetIdsIn(BaseModel):
+    asset_ids: list[str] = Field(max_length=5000)
+
+
+class MemberIn(BaseModel):
+    user_id: str
+    can_add: bool = True
+
+
+class MembersIn(BaseModel):
+    members: list[MemberIn]
+
+
+class AlbumMemberOut(BaseModel):
+    user_id: str
+    username: str
+    can_add: bool
+
+
+class AlbumOut(BaseModel):
+    id: str
+    title: str
+    owner_id: str
+    owner: str
+    is_owner: bool
+    can_add: bool
+    cover_asset_id: str | None
+    item_count: int
+    members: list[AlbumMemberOut]
+    created_at: datetime
+
+
+class AlbumDetailOut(AlbumOut):
+    items: list[AssetOut]
+
+
+class NotificationOut(ORM):
+    id: str
+    kind: str
+    title: str
+    body: str | None
+    link: str | None
+    read_at: datetime | None
+    created_at: datetime
+
+
+class NotificationList(BaseModel):
+    unread: int
+    items: list[NotificationOut]
+
+
+class BackupReportIn(BaseModel):
+    uploaded: int = Field(ge=0)
+    skipped: int = Field(ge=0)
+    failed: int = Field(ge=0)
+    device: str | None = Field(default=None, max_length=128)
+
+
+class AuditOut(ORM):
+    id: str
+    username: str | None
+    action: str
+    detail: str | None
+    ip: str | None
+    created_at: datetime
+
+
+class StreamOut(BaseModel):
+    username: str
+    media_id: str
+    title: str
+    last_seen: datetime
+
+
+class DiskOut(BaseModel):
+    label: str
+    path: str
+    total: int
+    free: int
+
+
+class ActivityOut(BaseModel):
+    streams: list[StreamOut]
+    jobs_queued: int | None
+    jobs_mode: str
+    disks: list[DiskOut]
+    cache_bytes: int
+    started_at: datetime

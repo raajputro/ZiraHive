@@ -45,6 +45,16 @@ async def enqueue(name: str, *args: Any) -> None:
     task.add_done_callback(_local_tasks.discard)
 
 
+async def queued_count() -> int | None:
+    """Jobs waiting in the queue (None when jobs run in-process)."""
+    if _redis_pool is None:
+        return len(_local_tasks)
+    try:
+        return await _redis_pool.zcard("arq:queue")
+    except Exception:
+        return None
+
+
 async def drain_local() -> None:
     """Wait for in-process jobs (used by tests)."""
     while _local_tasks:

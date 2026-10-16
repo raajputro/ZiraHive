@@ -294,6 +294,13 @@ async def scan(library_id: str) -> dict:
                 stats["missing"] += 1
         lib.last_scan_at = datetime.now(timezone.utc)
         stats["total"] = len(files)
+        if stats["added"]:
+            from ..models import User
+            from .events import notify
+            n = stats["added"]
+            for user in (await session.scalars(select(User))).all():
+                await notify(session, user, "media", f"{n} new {'video' if n == 1 else 'videos'} in {lib.name}",
+                             link=f"/watch/c/{lib.id}")
         await session.commit()
     log.info("scan of %s finished: %s", library_id, stats)
     return stats

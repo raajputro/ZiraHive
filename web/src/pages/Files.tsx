@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Upload, FolderPlus, Folder, FileText, Image, Film, File, Download, Pencil, Trash2 } from "lucide-react";
+import { Upload, FolderPlus, Folder, FileText, Image, Film, File, Download, Pencil, Trash2, Link2, History } from "lucide-react";
 import { api, url, formatBytes, type Asset, type FolderListing } from "../api";
 import { useUploads } from "../uploads";
 import { Lightbox } from "./Photos";
+import ShareDialog from "../components/ShareDialog";
+import VersionsDialog from "../components/VersionsDialog";
+import type { ShareTarget } from "../api";
 
 export function DropZone({ onFiles, children }: { onFiles: (f: File[]) => void; children: ReactNode }) {
   const [over, setOver] = useState(false);
@@ -31,6 +34,8 @@ export default function FilesPage() {
   const [listing, setListing] = useState<FolderListing | null>(null);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<number | null>(null);
+  const [sharing, setSharing] = useState<{ type: ShareTarget; id: string; label: string } | null>(null);
+  const [versionsOf, setVersionsOf] = useState<Asset | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const { enqueue, onComplete } = useUploads();
 
@@ -58,7 +63,7 @@ export default function FilesPage() {
   const viewable = listing?.assets.filter((a) => a.kind === "photo" || a.kind === "video") ?? [];
 
   return (
-    <DropZone onFiles={(files) => enqueue(files, folder)}>
+    <DropZone onFiles={(files) => enqueue(files, folder, { dedupe: false })}>
       <div className="page">
         <header className="page-head">
           <nav className="crumbs" aria-label="Folder path">
@@ -68,10 +73,13 @@ export default function FilesPage() {
               return <span key={path} className="crumb"><span className="sep" aria-hidden>/</span><button onClick={() => go(path)} className={i === crumbs.length - 1 ? "here" : ""}>{c}</button></span>;
             })}
           </nav>
+          {folder !== "/" && (
+            <button onClick={() => setSharing({ type: "folder", id: folder, label: folder.split("/").pop()! })}><Link2 size={17} /> Share folder</button>
+          )}
           <button onClick={newFolder}><FolderPlus size={17} /> New folder</button>
           <button className="primary" onClick={() => input.current?.click()}><Upload size={17} /> Upload</button>
           <input ref={input} type="file" multiple hidden
-            onChange={(e) => { enqueue(Array.from(e.target.files ?? []), folder); e.target.value = ""; }} />
+            onChange={(e) => { enqueue(Array.from(e.target.files ?? []), folder, { dedupe: false }); e.target.value = ""; }} />
         </header>
         {error && <p className="error" role="alert">{error}</p>}
         {listing && listing.folders.length === 0 && listing.assets.length === 0 && (
@@ -82,13 +90,15 @@ export default function FilesPage() {
         )}
         {listing && (listing.folders.length > 0 || listing.assets.length > 0) && (
           <table className="filelist">
-            <thead><tr><th>Name</th><th className="num">Size</th><th className="hide-sm">Added</th><th><span className="sr">Actions</span></th></tr></thead>
+            <thead><tr><th>Name</th><th className="num">Size</th><th className="hide-sm">Modified</th><th><span className="sr">Actions</span></th></tr></thead>
             <tbody>
               {listing.folders.map((f) => (
                 <tr key={f}>
                   <td><Link className="fname" to={`/files${f.split("/").map(encodeURIComponent).join("/")}`}><Folder size={18} className="ico folder" /> {f.split("/").pop()}</Link></td>
                   <td className="num">—</td><td className="hide-sm" />
                   <td className="row-actions">
+                    <button className="icon" aria-label={`Share folder ${f}`} title="Share"
+                      onClick={() => setSharing({ type: "folder", id: f, label: f.split("/").pop()! })}><Link2 size={16} /></button>
                     <button className="icon" aria-label={`Delete folder ${f}`} title="Move folder to trash"
                       onClick={() => confirm(`Move "${f.split("/").pop()}" and everything in it to the trash?`) && act(() => api.deleteFolder(f))}><Trash2 size={16} /></button>
                   </td>
@@ -105,8 +115,13 @@ export default function FilesPage() {
                         : <a className="fname" href={url.file(a)} target="_blank" rel="noreferrer"><Icon size={18} className="ico" /> {a.filename}</a>}
                     </td>
                     <td className="num">{formatBytes(a.size)}</td>
-                    <td className="hide-sm">{dateFmt.format(new Date(a.created_at))}</td>
+                    <td className="hide-sm">{dateFmt.format(new Date(a.updated_at ?? a.created_at))}</td>
                     <td className="row-actions">
+                      <button className="icon" onClick={() => setSharing({ type: "asset", id: a.id, label: a.filename })}
+                        aria-label={`Share ${a.filename}`} title="Share"><Link2 size={16} /></button>
+                      {(a.kind === "document" || a.kind === "other") && (
+                        <button className="icon" onClick={() => setVersionsOf(a)} aria-label={`Versions of ${a.filename}`} title="Versions"><History size={16} /></button>
+                      )}
                       <a className="icon" href={url.file(a, true)} aria-label={`Download ${a.filename}`} title="Download"><Download size={16} /></a>
                       <button className="icon" onClick={() => rename(a)} aria-label={`Rename ${a.filename}`} title="Rename"><Pencil size={16} /></button>
                       <button className="icon" onClick={() => act(() => api.trashAsset(a.id))} aria-label={`Move ${a.filename} to trash`} title="Move to trash"><Trash2 size={16} /></button>
@@ -119,6 +134,8 @@ export default function FilesPage() {
         )}
       </div>
       {preview !== null && <Lightbox items={viewable} index={preview} onIndex={setPreview} onClose={() => setPreview(null)} />}
+      {sharing && <ShareDialog {...sharing} onClose={() => setSharing(null)} />}
+      {versionsOf && <VersionsDialog asset={versionsOf} onClose={() => setVersionsOf(null)} onRestored={refresh} />}
     </DropZone>
   );
 }

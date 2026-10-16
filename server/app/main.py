@@ -10,7 +10,7 @@ from sqlalchemy import select
 from . import db
 from .config import get_settings
 from .models import Library
-from .routers import admin, auth, files, media, uploads
+from .routers import admin, albums, auth, files, media, shares, uploads
 from .services import jobs
 from .services.libraries import discover
 
@@ -58,7 +58,8 @@ def create_app() -> FastAPI:
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True,
                            allow_methods=["*"], allow_headers=["*"],
                            expose_headers=["Upload-Offset", "Content-Range"])
-    for r in (auth.router, uploads.router, files.router, media.router, admin.router):
+    for r in (auth.router, uploads.router, files.router, albums.router, shares.router,
+              media.router, admin.router):
         app.include_router(r)
 
     @app.get("/api/health", tags=["system"])

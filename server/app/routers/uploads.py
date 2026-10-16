@@ -22,7 +22,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_session
-from ..models import Asset, Folder, UploadSession, User
+from ..models import Asset, AssetVersion, Folder, UploadSession, User, utcnow
 from ..schemas import AssetOut, HashCheckIn, HashCheckOut, UploadCreateIn, UploadOut
 from ..security import current_user
 from ..services import jobs, storage
@@ -66,9 +66,10 @@ async def check_hashes(body: HashCheckIn, user: User = Depends(current_user),
 async def create_upload(body: UploadCreateIn, user: User = Depends(current_user),
                         session: AsyncSession = Depends(get_session)):
     folder = storage.normalize_folder(body.folder)
-    if body.sha256:
-        existing = await session.scalar(select(Asset).where(
-            Asset.owner_id == user.id, Asset.sha256 == body.sha256.lower()))
+    if body.sha256 and body.dedupe:
+        existing = (await session.scalars(select(Asset).where(
+            Asset.owner_id == user.id, Asset.sha256 == body.sha256.lower())
+            .order_by(Asset.deleted_at.is_not(None)).limit(1))).first()
         if existing:
             if existing.deleted_at:  # uploading again brings it back from the trash
                 existing.deleted_at = None
@@ -76,16 +77,16 @@ async def create_upload(body: UploadCreateIn, user: User = Depends(current_user)
             return UploadOut(status="exists", size=existing.size, offset=existing.size,
                              asset=AssetOut.model_validate(existing))
     if user.quota_bytes is not None:
-        used = await session.scalar(select(func.coalesce(func.sum(Asset.size), 0)).where(
-            Asset.owner_id == user.id)) or 0
-        if used + body.size > user.quota_bytes:
+        from .auth import used_bytes
+        if await used_bytes(session, user.id) + body.size > user.quota_bytes:
             raise HTTPException(507, "Storage quota exceeded")
     free = shutil.disk_usage(get_settings().data_dir).free
     if body.size > free:
         raise HTTPException(507, "Not enough disk space on the server")
     up = UploadSession(owner_id=user.id, filename=storage.safe_name(body.filename), folder=folder,
                        size=body.size, sha256=body.sha256.lower() if body.sha256 else None,
-                       taken_at=as_utc(body.taken_at), device_asset_id=body.device_asset_id)
+                       taken_at=as_utc(body.taken_at), device_asset_id=body.device_asset_id,
+                       dedupe=body.dedupe)
     session.add(up)
     await session.commit()
     _part_path(up.id).touch()
@@ -143,6 +144,31 @@ async def cancel_upload(upload_id: str, user: User = Depends(current_user),
     await session.commit()
 
 
+VERSIONED_KINDS = ("document", "other")
+MAX_VERSIONS = 20
+
+
+async def add_version(session: AsyncSession, user: User, asset: Asset, new_file: Path,
+                      digest: str, size: int) -> None:
+    """Uploading a document with the same name into the same folder keeps the old copy as
+    a version (like Google Drive) instead of making 'report (1).pdf'. Photos are not
+    versioned, because phones reuse names like IMG_0001.JPG."""
+    current_path = storage.abs_storage_path(asset.storage_path)
+    old_abs, old_rel = storage.version_target(user.username, asset.id, asset.filename)
+    if current_path.exists():
+        await asyncio.to_thread(shutil.move, str(current_path), str(old_abs))
+    session.add(AssetVersion(asset_id=asset.id, size=asset.size, sha256=asset.sha256,
+                             storage_path=old_rel, created_at=asset.updated_at or asset.created_at))
+    await asyncio.to_thread(shutil.move, str(new_file), str(current_path))
+    asset.size, asset.sha256, asset.updated_at = size, digest, utcnow()
+    await session.flush()
+    versions = (await session.scalars(select(AssetVersion).where(AssetVersion.asset_id == asset.id)
+                                      .order_by(AssetVersion.created_at.desc()))).all()
+    for old in versions[MAX_VERSIONS:]:
+        storage.abs_storage_path(old.storage_path).unlink(missing_ok=True)
+        await session.delete(old)
+
+
 def _sha256_file(path: Path) -> str:
     h = hashlib.sha256()
     with open(path, "rb") as f:
@@ -159,8 +185,11 @@ async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> Upl
         await session.delete(up)
         await session.commit()
         raise HTTPException(422, "Checksum mismatch: the file was corrupted in transit, upload it again")
-    existing = await session.scalar(select(Asset).where(
-        Asset.owner_id == user.id, Asset.sha256 == digest))
+    existing = None
+    if up.dedupe:
+        existing = (await session.scalars(select(Asset).where(
+            Asset.owner_id == user.id, Asset.sha256 == digest)
+            .order_by(Asset.deleted_at.is_not(None)).limit(1))).first()
     if existing:
         part.unlink(missing_ok=True)
         await session.delete(up)
@@ -169,6 +198,16 @@ async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> Upl
         await session.commit()
         return UploadOut(status="exists", size=existing.size, offset=existing.size,
                          asset=AssetOut.model_validate(existing))
+    if storage.kind_for(up.filename) in VERSIONED_KINDS:
+        current = await session.scalar(select(Asset).where(
+            Asset.owner_id == user.id, Asset.folder == up.folder, Asset.filename == up.filename,
+            Asset.deleted_at.is_(None)))
+        if current:
+            await add_version(session, user, current, part, digest, up.size)
+            await session.delete(up)
+            await session.commit()
+            return UploadOut(status="complete", size=current.size, offset=current.size,
+                             asset=AssetOut.model_validate(current))
     target, rel = storage.unique_target(user.username, up.folder, up.filename)
     await asyncio.to_thread(shutil.move, str(part), str(target))
     asset = Asset(owner_id=user.id, folder=up.folder, filename=target.name, size=up.size,

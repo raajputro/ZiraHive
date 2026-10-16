@@ -97,8 +97,10 @@ class _SignInScreenState extends State<SignInScreen> {
   final _server = TextEditingController(text: 'http://192.168.0.100:8080');
   final _user = TextEditingController();
   final _pass = TextEditingController();
+  final _code = TextEditingController();
   String _error = '';
   bool _busy = false;
+  bool _needCode = false;
 
   @override
   void initState() {
@@ -119,9 +121,13 @@ class _SignInScreenState extends State<SignInScreen> {
       if (!url.startsWith('http')) url = 'http://$url';
       final api = GharBoxApi(url);
       await api.health();
-      final username = await api.login(_user.text.trim(), _pass.text);
+      final username = await api.login(_user.text.trim(), _pass.text, code: _needCode ? _code.text.trim() : null);
       await widget.onSignedIn(api, username);
     } on ApiException catch (e) {
+      if (e.code == '2fa_required') {
+        setState(() => _needCode = true);
+        return;
+      }
       setState(() => _error = e.message);
     } catch (_) {
       setState(() => _error = "Can't reach that address. Check the server address and that your phone is on the same Wi-Fi.");
@@ -158,6 +164,15 @@ class _SignInScreenState extends State<SignInScreen> {
                     TextField(controller: _pass, obscureText: true,
                         decoration: const InputDecoration(labelText: 'Password'),
                         onSubmitted: (_) => _submit()),
+                    if (_needCode)
+                      TextField(
+                          controller: _code,
+                          autofocus: true,
+                          keyboardType: TextInputType.number,
+                          decoration: const InputDecoration(
+                              labelText: 'Code from your authenticator app',
+                              helperText: 'Or one of your recovery codes'),
+                          onSubmitted: (_) => _submit()),
                     if (_error.isNotEmpty) ...[
                       const SizedBox(height: 12),
                       Text(_error, style: TextStyle(color: Theme.of(context).colorScheme.error)),

@@ -131,11 +131,12 @@ async def test_oversized_chunk_rejected(client, admin):
     assert r.status_code == 413
 
 
-async def test_name_clash_keeps_both(client, admin):
-    a = await upload(client, b"first", "report.pdf")
-    b = await upload(client, b"second", "report.pdf")
-    assert a["asset"]["filename"] == "report.pdf"
-    assert b["asset"]["filename"] == "report (1).pdf"
+async def test_name_clash_keeps_both_photos(client, admin):
+    # phones reuse names like IMG_0001.JPG, so photos are never versioned
+    a = await upload(client, jpeg_bytes((1, 2, 3)), "IMG_0001.jpg")
+    b = await upload(client, jpeg_bytes((9, 8, 7)), "IMG_0001.jpg")
+    assert a["asset"]["filename"] == "IMG_0001.jpg"
+    assert b["asset"]["filename"] == "IMG_0001 (1).jpg"
 
 
 async def test_path_traversal_blocked(client, admin):

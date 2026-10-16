@@ -111,3 +111,19 @@ def poster_path(media_id: str) -> Path:
 
 def series_poster_path(series_id: str) -> Path:
     return get_settings().cache_dir / "posters" / f"series-{series_id}.webp"
+
+
+def version_target(username: str, asset_id: str, filename: str) -> tuple[Path, str]:
+    """Where an older copy of a document is kept: storage/.versions/<user>/<asset>/<time>-<name>"""
+    from datetime import datetime, timezone
+
+    stamp = datetime.now(timezone.utc).strftime("%Y%m%d-%H%M%S-%f")
+    folder = get_settings().storage_dir / ".versions" / safe_name(username) / asset_id
+    folder.mkdir(parents=True, exist_ok=True)
+    path = folder / f"{stamp}-{safe_name(filename)}"
+    rel = path.relative_to(get_settings().storage_dir)
+    return path, str(PurePosixPath(*rel.parts))
+
+
+def preview_path(asset_id: str) -> Path:
+    return get_settings().cache_dir / "previews" / f"{asset_id}.webp"

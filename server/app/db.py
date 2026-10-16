@@ -50,6 +50,9 @@ async def create_all() -> None:
         if conn.dialect.name == "postgresql":
             # api and worker start at the same time; let only one create/upgrade tables.
             await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(424242)")
+        # Runs first, while no table references assets yet (album_items etc. are created
+        # below), so rebuilding the table on SQLite can't break anyone's foreign keys.
+        await conn.run_sync(drop_asset_hash_unique)
         await conn.run_sync(Base.metadata.create_all)
         await conn.run_sync(add_missing_columns)
 
@@ -88,3 +91,32 @@ async def dispose() -> None:
 async def get_session() -> AsyncIterator[AsyncSession]:
     async with sessionmaker()() as session:
         yield session
+
+
+def drop_asset_hash_unique(conn) -> None:
+    """v0.1 allowed one copy of a file per account. Files may now hold copies in several
+    folders (photo backup still skips duplicates), so the unique rule is removed."""
+    insp = inspect(conn)
+    if not insp.has_table("assets"):
+        return
+    uniques = [u for u in insp.get_unique_constraints("assets")
+               if sorted(u["column_names"]) == ["owner_id", "sha256"]]
+    if not uniques:
+        return
+    if conn.dialect.name == "postgresql":
+        for u in uniques:
+            conn.exec_driver_sql(f'ALTER TABLE assets DROP CONSTRAINT "{u["name"]}"')
+    else:  # SQLite can't drop a constraint: rebuild the table
+        table = Base.metadata.tables["assets"]
+        cols = ", ".join(c["name"] for c in insp.get_columns("assets"))
+        # legacy_alter_table keeps other tables' foreign keys pointing at "assets" (the new
+        # table) instead of following the rename to assets_v1.
+        conn.exec_driver_sql("PRAGMA legacy_alter_table=ON")
+        for idx in insp.get_indexes("assets"):
+            conn.exec_driver_sql(f'DROP INDEX IF EXISTS "{idx["name"]}"')
+        conn.exec_driver_sql("ALTER TABLE assets RENAME TO assets_v1")
+        table.create(conn)
+        conn.exec_driver_sql(f"INSERT INTO assets ({cols}) SELECT {cols} FROM assets_v1")
+        conn.exec_driver_sql("DROP TABLE assets_v1")
+        conn.exec_driver_sql("PRAGMA legacy_alter_table=OFF")
+    log.info("database upgraded: files may now have copies in several folders")

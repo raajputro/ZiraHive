@@ -34,9 +34,34 @@ async def nightly(ctx) -> None:
         await scan_library(ctx, lib_id)
 
 
+async def disk_check(ctx) -> None:
+    """Warn admins once a day when the backup disk is over 90% full."""
+    from datetime import timedelta
+    import shutil
+
+    from sqlalchemy import func
+
+    from .models import Notification, utcnow
+    from .services.events import notify_admins
+
+    usage = shutil.disk_usage(get_settings().data_dir)
+    used = 1 - usage.free / usage.total
+    if used < 0.9:
+        return
+    async with db.sessionmaker()() as session:
+        recent = await session.scalar(select(func.count()).select_from(Notification).where(
+            Notification.kind == "disk", Notification.created_at > utcnow() - timedelta(hours=23)))
+        if recent:
+            return
+        await notify_admins(session, "disk", f"Backup disk is {used:.0%} full",
+                            f"{usage.free / 1024**3:.1f} GB left. Empty the trash or add a bigger disk.",
+                            link="/settings")
+        await session.commit()
+
+
 class WorkerSettings:
     functions = [process_asset, scan_library]
-    cron_jobs = [cron(nightly, hour={3}, minute={0})]
+    cron_jobs = [cron(nightly, hour={3}, minute={0}), cron(disk_check, minute={17})]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url or "redis://localhost:6379")

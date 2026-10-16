@@ -3,16 +3,27 @@
 Your own Google Drive + Jellyfin, running on your PC. Free, open source, and private: your
 photos, documents and movies never leave your home.
 
-- **Backup**: phone camera roll and any files, with duplicate detection and resumable uploads
-- **Photos**: timeline grouped by date, thumbnails for photos (including iPhone HEIC) and videos
-- **Files**: folders, rename, move, download, a 30-day trash
+- **Backup**: phone camera roll and any files, with resumable uploads. Photo backup skips
+  anything already saved
+- **Photos**: timeline grouped by date, "On this day" memories, albums you can share with
+  family, full-screen previews that work for iPhone HEIC in every browser
+- **Files**: folders, rename, move, download, a 30-day trash, and version history: upload a
+  document with the same name and the old copy is kept (last 20)
+- **Sharing**: links for a file, folder or album, with an optional password, an expiry date and
+  a view-only mode. Visitors don't need an account
 - **Watch**: one category per folder (English Movies, Hindi Movies, Bangla Movies, Web Series,
   Animation, ...). Movies get titles, years and posters; web series get seasons, episodes and
   "next episode". Streams with seeking and remembers where each person stopped
-- **Family**: several accounts, each with their own private space and optional storage quota
+- **Family**: several accounts with their own private space, admin and member roles, and
+  storage limits
+- **Security**: two-factor sign-in with recovery codes, "sign out everywhere", password changes
+  end other sessions, slowed-down password guessing, and an activity log for the admin
+- **Notifications**: a bell in the app for backups, shared albums, new movies and a nearly full
+  disk, and on your phone through the free ntfy app
+- **Admin dashboard**: who is watching what, background jobs, and free space on every disk
 
-> Status: milestone 1. Next up: transcoding (play any format in the browser), group watch
-> parties, and local AI search. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: milestone 1 plus batch 1. Next up: transcoding (play any format in the browser), offline
+> downloads and skip intro. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it fits together
 
@@ -130,6 +141,24 @@ under the `api` volumes), restart, then use **Add a folder from another drive** 
   show a copyable link you can open in VLC on your PC, phone or TV until transcoding lands.
 - Categories rescan every night at 03:00, or press the scan button in Settings.
 
+## Sharing and family
+
+- **Albums**: in Photos, press **Select**, pick photos and choose **Add to album**. In the album,
+  **Share with family** lets other GharBox accounts see it, and add their own photos if you allow.
+- **Links**: the link button on any file, folder or album makes a link anyone can open. Add a
+  password, choose when it stops working, and untick **Allow downloads** for view-only (photos are
+  then shown as previews and the original is never handed out).
+- **Uploading again**: in **Files**, a document with the same name in the same folder becomes a
+  new version (see the clock button). Photos are never versioned, because phones reuse names like
+  `IMG_0001.JPG`. Uploading the same file into a different folder keeps a separate copy.
+
+## Notifications on your phone
+
+Install the free **ntfy** app (Android or iPhone), subscribe to a topic with a long random name,
+for example `gharbox-k2v9x7q`, then paste `https://ntfy.sh/gharbox-k2v9x7q` into
+**Settings > Your account > Phone notifications** and press **Send test**. To keep everything
+inside your home, you can run your own ntfy server instead (it's open source).
+
 ## Watching from outside your home
 
 Don't open ports to the internet. Use a free VPN that you host yourself:
@@ -162,6 +191,36 @@ and runs background jobs inside the API process, which is handy for development.
 `ffmpeg` on your PATH for video thumbnails (`winget install ffmpeg`).
 
 API docs are at http://localhost:8000/docs while the server runs.
+
+## Testing
+
+GharBox is tested at three levels:
+
+| What | Where | Run |
+|---|---|---|
+| API tests (pytest, 53 tests) | `server/tests` | `cd server; pytest` |
+| End-to-end tests in a real browser (Playwright) | `e2e/tests` | see below |
+| Load test (Locust) | `loadtest/locustfile.py` | see the file's header |
+
+End-to-end tests run against a running GharBox. On a fresh install they create the admin
+account themselves; on yours, pass your admin login:
+
+```powershell
+cd e2e
+npm install
+npx playwright install chromium
+$env:E2E_BASE_URL="http://localhost:8080"; $env:E2E_ADMIN="mahbub"; $env:E2E_PASSWORD="..."
+npx playwright test          # npx playwright show-report for the HTML report
+```
+
+They cover folders and trash, version history, password-protected links opened by a visitor,
+albums shared with a family member, two-factor sign-in with recovery codes, the Watch pages and
+the phone layout. They create their own uniquely named test data, so they're safe to run against
+your real server, though the test users and folders stay afterwards.
+
+GitHub Actions (`.github/workflows/ci.yml`) runs the API tests, builds the web app and the Docker
+images, then starts the full stack with Postgres, Redis and sample media
+(`scripts/make-sample-media.sh`) and runs the Playwright suite on every push.
 
 ## License
 

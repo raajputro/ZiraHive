@@ -133,6 +133,15 @@ class BackupService {
         progress.message = 'Backing up ${progress.done} of ${progress.total}';
         onProgress(progress);
       }
+      if (progress.uploaded > 0 || progress.failed > 0) {
+        try {
+          await api.reportBackup(
+              uploaded: progress.uploaded,
+              skipped: progress.skipped,
+              failed: progress.failed,
+              device: Platform.isIOS ? 'iPhone' : 'Android phone');
+        } catch (_) {/* the backup itself worked; the notification is optional */}
+      }
       progress.message = _cancel
           ? 'Paused. ${progress.total - progress.done} items left.'
           : progress.failed > 0

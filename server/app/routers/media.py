@@ -14,7 +14,7 @@ from ..models import Library, MediaItem, Series, User, WatchProgress, utcnow
 from ..schemas import (LibraryIn, LibraryOrderIn, LibraryOut, LibraryUpdateIn, MediaOut,
                        ProgressIn, SeasonOut, SeriesOut, TitleOut)
 from ..security import admin_user, create_token, current_user
-from ..services import jobs, storage
+from ..services import activity, jobs, storage
 from ..services.libraries import discover
 from ..services.ranged import ranged_file_response
 
@@ -371,10 +371,11 @@ async def media_poster(media_id: str, _: User = Depends(current_user),
 
 
 @router.get("/media/{media_id}/stream")
-async def stream_media(media_id: str, request: Request, _: User = Depends(current_user),
+async def stream_media(media_id: str, request: Request, user: User = Depends(current_user),
                        session: AsyncSession = Depends(get_session)):
     """Direct play: the original file, with Range support so players can seek."""
     item = await _get_media(media_id, session)
+    activity.stream_seen(user.id, user.username, item.id, item.title)
     lib = await session.get(Library, item.library_id)
     root = Path(lib.path).resolve()
     path = (root / item.rel_path).resolve()
@@ -389,7 +390,7 @@ async def stream_link(media_id: str, user: User = Depends(current_user),
                       session: AsyncSession = Depends(get_session)) -> dict:
     """A signed URL (valid 24 h) for players that can't log in, e.g. VLC on a TV."""
     await _get_media(media_id, session)
-    return {"path": f"/api/media/{media_id}/stream?token={create_token(user.id, days=1)}"}
+    return {"path": f"/api/media/{media_id}/stream?token={create_token(user, days=1)}"}
 
 
 @router.put("/media/{media_id}/progress", status_code=204)

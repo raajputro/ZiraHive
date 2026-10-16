@@ -3,7 +3,11 @@ import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "re
 import { Images, Folder, Clapperboard, Trash2, Settings, LogOut } from "lucide-react";
 import { api, ApiError, type User } from "./api";
 import { UploadProvider } from "./uploads";
+import { PrefsProvider } from "./prefs";
+import NotificationBell from "./components/Notifications";
 import PhotosPage from "./pages/Photos";
+import AlbumsPage, { AlbumPage } from "./pages/Albums";
+import PublicSharePage from "./pages/PublicShare";
 import FilesPage from "./pages/Files";
 import WatchHome, { LibraryPage } from "./pages/Watch";
 import SeriesPage from "./pages/Series";
@@ -11,11 +15,18 @@ import PlayerRoute from "./pages/Player";
 import TrashPage from "./pages/Trash";
 import AdminPage from "./pages/Admin";
 
-interface AuthCtx { user: User; signOut: () => void }
+interface AuthCtx { user: User; signOut: () => void; refreshUser: () => void }
 const AuthContext = createContext<AuthCtx | null>(null);
 export const useAuth = () => useContext(AuthContext)!;
 
 export default function App() {
+  // Share links work without an account, so they bypass sign-in entirely.
+  const share = location.pathname.match(/^\/s\/([A-Za-z0-9_-]+)/);
+  if (share) return <PrefsProvider><PublicSharePage token={share[1]} /></PrefsProvider>;
+  return <PrefsProvider><SignedInApp /></PrefsProvider>;
+}
+
+function SignedInApp() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
   const [needsSetup, setNeedsSetup] = useState(false);
 
@@ -33,14 +44,17 @@ export default function App() {
   if (user === null) return <SignIn firstRun={needsSetup} onSignedIn={(u) => { setNeedsSetup(false); setUser(u); }} />;
 
   const signOut = () => { void api.logout().finally(() => setUser(null)); };
+  const refreshUser = () => { void api.me().then(setUser).catch(() => undefined); };
   return (
-    <AuthContext.Provider value={{ user, signOut }}>
+    <AuthContext.Provider value={{ user, signOut, refreshUser }}>
       <UploadProvider>
         <BrowserRouter>
           <Shell>
             <Routes>
               <Route path="/" element={<Navigate to="/photos" replace />} />
               <Route path="/photos" element={<PhotosPage />} />
+              <Route path="/photos/albums" element={<AlbumsPage />} />
+              <Route path="/photos/albums/:id" element={<AlbumPage />} />
               <Route path="/files/*" element={<FilesPage />} />
               <Route path="/watch" element={<WatchHome />} />
               <Route path="/watch/c/:id" element={<LibraryPage />} />
@@ -79,9 +93,14 @@ function Shell({ children }: { children: ReactNode }) {
         ))}
         <div className="rail-foot">
           <span className="who">{user.username}</span>
+          <NotificationBell />
           <button className="icon" onClick={signOut} aria-label="Sign out" title="Sign out"><LogOut size={17} /></button>
         </div>
       </nav>
+      <div className="mobile-top">
+        <span className="brand-inline"><span lang="bn">ঘর</span> GharBox</span>
+        <NotificationBell />
+      </div>
       <main>{children}</main>
     </div>
   );
@@ -92,6 +111,8 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
   const [password, setPassword] = useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
+  const [needCode, setNeedCode] = useState(false);
+  const [code, setCode] = useState("");
 
   const submit = async (e: FormEvent) => {
     e.preventDefault();
@@ -99,9 +120,10 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
     if (firstRun && password.length < 8) { setError("Use at least 8 characters for the password."); return; }
     setBusy(true);
     try {
-      const res = firstRun ? await api.setup(username, password) : await api.login(username, password);
+      const res = firstRun ? await api.setup(username, password) : await api.login(username, password, needCode ? code : undefined);
       onSignedIn(res.user);
     } catch (err) {
+      if (err instanceof ApiError && err.code === "2fa_required") { setNeedCode(true); return; }
       setError(err instanceof ApiError ? err.message : "Can't reach the server. Check that GharBox is running.");
     } finally { setBusy(false); }
   };
@@ -115,8 +137,14 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
         <label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus /></label>
         <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           autoComplete={firstRun ? "new-password" : "current-password"} required /></label>
+        {needCode && (
+          <label>Code from your authenticator app
+            <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code"
+              placeholder="123456, or a recovery code" required autoFocus />
+          </label>
+        )}
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>{firstRun ? "Create admin account" : "Sign in"}</button>
+        <button className="primary" disabled={busy}>{firstRun ? "Create admin account" : needCode ? "Verify and sign in" : "Sign in"}</button>
       </form>
     </div>
   );
