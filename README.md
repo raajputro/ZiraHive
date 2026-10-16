@@ -94,9 +94,10 @@ address and choose **Add to Home Screen** (Safari: Share button; Chrome: menu). 
 screen with its own icon, like an app.
 
 To back up your camera roll, open **Photos > Upload photos** and pick everything you want. Files
-already saved are skipped, and uploads continue where they stopped if the connection drops. The
-screen stays awake while uploading, but keep GharBox open until it finishes: browsers can't back up
-in the background. On iPhone, Safari may hand over JPEG copies of HEIC photos and only the still
+already saved are skipped, and uploads continue where they stopped if the connection drops. You can
+lock the phone: the browser pauses the upload and carries on when you open GharBox again. When a
+backup finishes, or a file fails, you get a notification (on the phone too, with ntfy set up), so
+there's no need to keep the screen on. On iPhone, Safari may hand over JPEG copies of HEIC photos and only the still
 image of Live Photos; to keep the originals, copy them to a PC first and upload from there.
 
 ## Watch categories

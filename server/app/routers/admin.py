@@ -155,7 +155,11 @@ async def phone_backup_finished(body: BackupReportIn, user: User = Depends(curre
     if body.uploaded == 0 and body.failed == 0:
         return
     device = f" from {body.device}" if body.device else ""
-    title = f"Backed up {body.uploaded} photos and videos{device}"
-    text = f"{body.skipped} were already safe." + (f" {body.failed} failed; open the app to retry." if body.failed else "")
+    if body.failed:
+        title = f"Upload needs attention: {body.failed} {'file' if body.failed == 1 else 'files'} failed{device}"
+        text = f"{body.uploaded} uploaded, {body.skipped} already saved. Open GharBox and upload the failed ones again."
+    else:
+        title = f"Backed up {body.uploaded} photos and videos{device}"
+        text = f"{body.skipped} were already safe."
     await notify(session, user, "backup", title, text, link="/photos")
     await session.commit()

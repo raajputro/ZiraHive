@@ -57,10 +57,6 @@ export function UploadProvider({ children }: { children: ReactNode }) {
   const pump = useCallback(async () => {
     if (running.current) return;
     running.current = true;
-    // Phones stop a page when the screen locks, so keep it awake while uploading.
-    let lock: { release: () => Promise<void> } | null = null;
-    try { lock = await (navigator as Navigator & { wakeLock?: { request: (t: "screen") => Promise<{ release: () => Promise<void> }> } }).wakeLock?.request("screen") ?? null; }
-    catch { /* not supported or not allowed: uploads still work */ }
     // photo-backup style uploads (dedupe on) are reported so they show as a notification
     const run = { uploaded: 0, skipped: 0, failed: 0, backup: false };
     while (queue.current.length) {
@@ -70,12 +66,13 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       catch (e) { run.failed++; patch(item.key, { state: "error", error: e instanceof Error ? e.message : "Upload failed" }); }
       listeners.current.forEach((fn) => fn());
     }
-    if (run.backup && run.uploaded + run.skipped + run.failed >= 5) {
+    // Report bigger backups, and any failure, so a push notification reaches the phone
+    // (the browser itself can't wake a locked screen).
+    if (run.failed > 0 || (run.backup && run.uploaded + run.skipped >= 5)) {
       const device = /iPhone|iPad/.test(navigator.userAgent) ? "iPhone" : /Android/.test(navigator.userAgent) ? "Android phone" : "browser";
       void api.reportBackup({ ...run, device }).catch(() => undefined);
     }
     running.current = false;
-    void lock?.release().catch(() => undefined);
   }, []);
 
   const enqueue = useCallback((files: File[], folder: string, opts: { dedupe?: boolean } = {}) => {
@@ -106,7 +103,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             {!active && <button className="icon" aria-label="Close" onClick={() => setItems([])}><X size={16} /></button>}
           </header>
           <div className="tray-bar"><span style={{ width: `${total ? (sent / total) * 100 : 0}%` }} /></div>
-          {active > 0 && <p className="tray-hint">Keep this page open until it finishes.</p>}
+          {active > 0 && <p className="tray-hint">You can lock your phone: uploading pauses and carries on when you open GharBox again. You'll get a notification when it's done.</p>}
           <ul>
             {items.slice(-50).reverse().map((i) => (
               <li key={i.key} className={i.state}>
