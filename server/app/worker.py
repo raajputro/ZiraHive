@@ -11,7 +11,8 @@ from . import db
 from .config import get_settings
 from .models import Library
 from .routers.files import purge_expired_trash
-from .services.jobs import make_offline_copy, offsite_backup, offsite_check, process_asset, scan_library
+from .services.jobs import (extract_text, make_offline_copy, offsite_backup, offsite_check, process_asset, scan_library,
+                            text_backfill)
 from .services.libraries import discover
 
 
@@ -39,6 +40,7 @@ async def nightly(ctx) -> None:
         ids = (await session.scalars(select(Library.id))).all()
     for lib_id in ids:
         await scan_library(ctx, lib_id)
+    await text_backfill(ctx)
 
 
 async def purge_old_offline_copies(session) -> int:
@@ -108,7 +110,7 @@ async def weekly_check(ctx) -> None:
 
 
 class WorkerSettings:
-    functions = [process_asset, scan_library, make_offline_copy, offsite_backup, offsite_check]
+    functions = [process_asset, scan_library, make_offline_copy, offsite_backup, offsite_check, extract_text, text_backfill]
     cron_jobs = [cron(nightly, hour={3}, minute={0}), cron(disk_check, minute={17}),
                  cron(party_reminders, second={5}), cron(backup_if_due, minute={41}),
                  cron(weekly_check, weekday={2}, hour={5}, minute={11})]

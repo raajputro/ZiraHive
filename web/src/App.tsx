@@ -22,6 +22,7 @@ import { AlbumDetailPage, AlbumsPage as MusicAlbumsPage, ArtistDetailPage, Artis
 import { ReadHome, ReadLibraryPage, ReadSeriesPage } from "./pages/Read";
 import ReaderRoute from "./pages/Reader";
 import VaultPage from "./pages/Vault";
+import ScanPage from "./pages/Scan";
 import AdminPage from "./pages/Admin";
 
 import { t as tr, adoptAccountLanguage, lang, setLang } from "./i18n";
@@ -90,6 +91,7 @@ function SignedInApp() {
               <Route path="/read/book/:id" element={<ReaderRoute />} />
               <Route path="/trash" element={<TrashPage />} />
               <Route path="/vault" element={<VaultPage />} />
+              <Route path="/scan" element={<ScanPage />} />
               <Route path="/settings" element={<AdminPage />} />
               <Route path="*" element={<Navigate to="/photos" replace />} />
             </Routes>

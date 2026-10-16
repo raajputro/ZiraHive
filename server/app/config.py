@@ -25,6 +25,9 @@ class Settings(BaseSettings):
     media_root: str = ""
     # Extra libraries outside media_root: "Name:/path[:kind],Name2:/path2"
     media_libraries: str = ""
+    # Your drives, mounted read-only by Docker as /drives/c, /drives/d, ... (DRIVE_D=D:/ in .env).
+    # Settings > Server lets the admin pick any folder on them as a category, where it is.
+    drives_dir: str = "/drives"
     tmdb_api_key: str = ""
 
     # The public address of the share-link gateway, used when making share links, e.g.
@@ -42,6 +45,12 @@ class Settings(BaseSettings):
     hw_accel: str = "auto"
     max_transcodes: int = 3  # films converting at the same time
     offline_days: int = 14  # offline copies unused this long are deleted
+
+    # Reading text in files so Files can search inside them (Tesseract, Bangla + English):
+    #   documents = PDFs, Word and text files, scans and screenshots;  all = every photo too;  off
+    ocr: str = "documents"
+    ocr_languages: str = "ben+eng"
+    lan_url: str = ""  # e.g. http://192.168.0.105:8080: how TVs and Chromecasts reach GharBox
 
     ffmpeg_bin: str = "ffmpeg"
     ffprobe_bin: str = "ffprobe"
@@ -68,6 +77,11 @@ class Settings(BaseSettings):
         for d in (self.data_dir, self.storage_dir, self.cache_dir / "thumbs",
                   self.cache_dir / "posters", self.upload_dir):
             d.mkdir(parents=True, exist_ok=True)
+        # Marks this folder as GharBox's own (people's files, the vault, the database), so it is
+        # never offered or scanned as media, even when the drive it's on is shared with GharBox.
+        mark = self.data_dir / ".gharbox-data"
+        if not mark.exists():
+            mark.write_text("GharBox's own data. Never shown as media.\n")
 
     def resolved_secret(self) -> str:
         if self.secret_key:
@@ -86,7 +100,7 @@ class Settings(BaseSettings):
             name, _, rest = part.partition(":")
             path, kind = rest, "movies"
             # allow an optional ":kind" suffix, but keep Windows-like "C:/x" intact
-            if rest.rsplit(":", 1)[-1] in ("movies", "shows", "mixed"):
+            if rest.rsplit(":", 1)[-1] in ("movies", "shows", "mixed", "music", "audiobooks", "books", "comics"):
                 path, kind = rest.rsplit(":", 1)
             if name and path:
                 out.append((name.strip(), path.strip(), kind))

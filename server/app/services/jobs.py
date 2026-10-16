@@ -159,3 +159,50 @@ async def offsite_check(_ctx: Any) -> str:
 
 JOBS = {"process_asset": process_asset, "scan_library": scan_library, "make_offline_copy": make_offline_copy,
         "offsite_backup": offsite_backup, "offsite_check": offsite_check}
+
+
+async def extract_text(_ctx: Any, asset_id: str) -> str:
+    """Read the words in one file (text layer or OCR) so Files can search inside it."""
+    from ..models import AssetText
+    from . import textsearch
+
+    async with sessionmaker()() as session:
+        asset = await session.get(Asset, asset_id)
+        if asset is None or asset.deleted_at:
+            return "gone"
+        row = await session.get(AssetText, asset_id)
+        if row and row.sha256 == asset.sha256:
+            return "done already"
+        src = storage.abs_storage_path(asset.storage_path)
+        try:
+            text, method, pages = await asyncio.to_thread(textsearch.extract, src)
+        except Exception as exc:  # a damaged file must not stop the queue
+            log.info("reading text of %s failed: %s", asset.filename, exc)
+            text, method, pages = "", "failed", None
+        if row is None:
+            row = AssetText(asset_id=asset_id, sha256=asset.sha256, method=method)
+            session.add(row)
+        row.text, row.method, row.pages, row.sha256 = text, method, pages, asset.sha256
+        await session.commit()
+        return method
+
+
+async def text_backfill(_ctx: Any, limit: int = 300) -> int:
+    """Files uploaded before text search existed (or changed since): a few hundred per night."""
+    from sqlalchemy import or_, select
+
+    from ..models import AssetText
+    from . import textsearch
+
+    async with sessionmaker()() as session:
+        rows = (await session.execute(
+            select(Asset.id, Asset.filename, Asset.folder, Asset.kind).outerjoin(AssetText, AssetText.asset_id == Asset.id)
+            .where(Asset.deleted_at.is_(None), or_(AssetText.asset_id.is_(None), AssetText.sha256 != Asset.sha256))
+            .order_by(Asset.created_at.desc()).limit(limit * 5))).all()
+    todo = [r.id for r in rows if textsearch.wanted(r.filename, r.folder, r.kind)][:limit]
+    for asset_id in todo:
+        await extract_text(None, asset_id)
+    return len(todo)
+
+
+JOBS.update({"extract_text": extract_text, "text_backfill": text_backfill})

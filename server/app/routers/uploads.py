@@ -177,6 +177,13 @@ def _sha256_file(path: Path) -> str:
     return h.hexdigest()
 
 
+async def _read_text_later(asset: Asset) -> None:
+    from ..services.textsearch import wanted
+
+    if wanted(asset.filename, asset.folder, asset.kind):
+        await jobs.enqueue("extract_text", asset.id)
+
+
 async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> UploadOut:
     part = _part_path(up.id)
     digest = await asyncio.to_thread(_sha256_file, part)
@@ -214,6 +221,7 @@ async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> Upl
             await session.commit()
             if current.kind in ("photo", "video"):
                 await jobs.enqueue("process_asset", current.id)  # new picture, new thumbnail
+            await _read_text_later(current)
             return UploadOut(status="complete", size=current.size, offset=current.size,
                              asset=AssetOut.model_validate(current))
     target, rel = storage.unique_target(user.username, up.folder, up.filename)
@@ -228,5 +236,6 @@ async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> Upl
     await session.commit()
     if asset.kind in ("photo", "video"):
         await jobs.enqueue("process_asset", asset.id)
+    await _read_text_later(asset)
     return UploadOut(status="complete", size=asset.size, offset=asset.size,
                      asset=AssetOut.model_validate(asset))

@@ -60,26 +60,51 @@ def read_scope(token: str | None, prefix: str) -> str | None:
 
 
 _STREAM_PATH = re.compile(r"^/api/media/[0-9a-f]{32}/stream$")
+# what a Chromecast or a smart TV fetches for one title
+_MEDIA_URL = re.compile(r"^/api/(?:media|tracks|books)/(?P<id>[0-9a-f]{32})/(?:stream|poster|cover|audio/\d+|"
+                        r"hls/\w+/\d+/(?:index\.m3u8|seg/\d+\.ts)|subtitles/[\w.-]+\.vtt)$")
+_MUSIC_URL = re.compile(r"^/api/music/(?:tracks/(?P<tid>[0-9a-f]{32})/stream|albums/(?P<aid>[0-9a-f]{32})/cover)$")
 
 
-def _token_from_request(request: Request) -> str | None:
+def create_media_token(user: User, media_id: str, hours: int = 12) -> str:
+    """For devices that fetch a video themselves (Chromecast, TVs): works only for this one title's
+    stream, picture and subtitles, only for a while, and stops with "sign out everywhere"."""
+    exp = datetime.now(timezone.utc) + timedelta(hours=hours)
+    return jwt.encode({"sub": user.id, "v": user.token_version or 0, "scope": f"media:{media_id}", "exp": exp},
+                      get_settings().resolved_secret(), algorithm=_ALGO)
+
+
+def _url_media_id(path: str) -> str | None:
+    m = _MEDIA_URL.match(path) or _MUSIC_URL.match(path)
+    if not m:
+        return None
+    return next(v for v in m.groupdict().values() if v)
+
+
+def _token_from_request(request: Request) -> tuple[str | None, bool]:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
-        return auth[7:].strip()
+        return auth[7:].strip(), False
     if request.cookies.get(COOKIE_NAME):
-        return request.cookies[COOKIE_NAME]
-    # Tokens in URLs end up in logs and history, so ?token= only works for the video
-    # stream link made for players like VLC that can't send cookies.
-    if _STREAM_PATH.match(request.url.path):
-        return request.query_params.get("token")
-    return None
+        return request.cookies[COOKIE_NAME], False
+    # Tokens in URLs end up in logs and history, so ?token= only works on media URLs:
+    # the VLC link (/stream), and the one-title links made for Chromecasts and TVs.
+    if _url_media_id(request.url.path):
+        return request.query_params.get("token"), True
+    return None, False
 
 
 async def optional_user(request: Request, session: AsyncSession = Depends(get_session)) -> User | None:
-    token = _token_from_request(request)
+    token, in_url = _token_from_request(request)
     payload = decode_token(token) if token else None
     if not payload or "sub" not in payload:
         return None
+    scope = payload.get("scope")
+    if scope:  # a one-title token: only on that title's media URLs
+        if not in_url or scope != f"media:{_url_media_id(request.url.path)}":
+            return None
+    elif in_url and not _STREAM_PATH.match(request.url.path):
+        return None  # a full sign-in in a URL: only the old VLC stream link
     user = await session.get(User, payload["sub"])
     if user is None or payload.get("v", 0) != (user.token_version or 0):
         return None

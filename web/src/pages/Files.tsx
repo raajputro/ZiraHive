@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Upload, FolderPlus, Folder, FileText, Image, Film, File, Download, Pencil, Trash2, Link2, History, ShieldCheck } from "lucide-react";
-import { api, url, formatBytes, type Asset, type FolderListing } from "../api";
+import { Upload, FolderPlus, Folder, FileText, Image, Film, File, Download, Pencil, Trash2, Link2, History, ShieldCheck, ScanLine, Search } from "lucide-react";
+import { api, url, formatBytes, type Asset, type FolderListing, type SearchHit } from "../api";
 import { useUploads } from "../uploads";
 import { Lightbox } from "./Photos";
 import ShareDialog from "../components/ShareDialog";
@@ -29,7 +29,7 @@ const icons = { photo: Image, video: Film, document: FileText, other: File };
 const dateFmt = new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short", year: "numeric" });
 
 export default function FilesPage() {
-  const { pathname } = useLocation();
+  const { pathname, state } = useLocation() as { pathname: string; state: { saved?: string } | null };
   const navigate = useNavigate();
   const folder = decodeURIComponent(pathname.replace(/^\/files/, "")) || "/";
   const [listing, setListing] = useState<FolderListing | null>(null);
@@ -39,6 +39,14 @@ export default function FilesPage() {
   const [versionsOf, setVersionsOf] = useState<Asset | null>(null);
   const input = useRef<HTMLInputElement>(null);
   const { enqueue, onComplete } = useUploads();
+  const [query, setQuery] = useState("");
+  const [hits, setHits] = useState<SearchHit[] | null>(null);
+  useEffect(() => {
+    const q = query.trim();
+    if (q.length < 2) { setHits(null); return; }
+    const t = setTimeout(() => { api.search(q).then(setHits).catch(() => setHits([])); }, 250);
+    return () => clearTimeout(t);
+  }, [query]);
 
   const refresh = useCallback(() => {
     api.files(folder).then((l) => { setListing(l); setError(""); })
@@ -78,19 +86,25 @@ export default function FilesPage() {
             <button onClick={() => setSharing({ type: "folder", id: folder, label: folder.split("/").pop()! })}><Link2 size={17} />{" "}{tr("Share folder")}</button>
           )}
           <Link to="/vault" className="button"><ShieldCheck size={17} />{" "}{tr("Vault")}</Link>
+          <Link to={`/scan?folder=${encodeURIComponent(folder === "/" ? "/Scans" : folder)}`} className="button"><ScanLine size={17} />{" "}{tr("Scan")}</Link>
           <button onClick={newFolder}><FolderPlus size={17} />{" "}{tr("New folder")}</button>
           <button className="primary" onClick={() => input.current?.click()}><Upload size={17} />{" "}{tr("Upload")}</button>
           <input ref={input} type="file" multiple hidden
             onChange={(e) => { enqueue(Array.from(e.target.files ?? []), folder, { dedupe: false }); e.target.value = ""; }} />
         </header>
+        <label className="search files-search"><Search size={17} aria-hidden />
+          <input type="search" value={query} onChange={(e) => setQuery(e.target.value)}
+            placeholder={tr("Search names and the words inside files")} aria-label={tr("Search files")} /></label>
         {error && <p className="error" role="alert">{error}</p>}
-        {listing && listing.folders.length === 0 && listing.assets.length === 0 && (
+        {state?.saved && <p className="notice" role="status">{tr("Saved {name}. You can find it by searching for any word on it.", { name: state.saved })}</p>}
+        {hits && <SearchResults hits={hits} query={query.trim()} />}
+        {!hits && listing && listing.folders.length === 0 && listing.assets.length === 0 && (
           <div className="empty">
             <h2>{folder === "/" ? tr("Nothing backed up yet") : tr("This folder is empty")}</h2>
             <p>{tr("Drag files here or use Upload. Documents, photos and anything else you want to keep are welcome.")}</p>
           </div>
         )}
-        {listing && (listing.folders.length > 0 || listing.assets.length > 0) && (
+        {!hits && listing && (listing.folders.length > 0 || listing.assets.length > 0) && (
           <table className="filelist">
             <thead><tr><th>{tr("Name")}</th><th className="num">{tr("Size")}</th><th className="hide-sm">{tr("Modified")}</th><th><span className="sr">{tr("Actions")}</span></th></tr></thead>
             <tbody>
@@ -121,7 +135,7 @@ export default function FilesPage() {
                     <td className="row-actions">
                       <button className="icon" onClick={() => setSharing({ type: "asset", id: a.id, label: a.filename })}
                         aria-label={tr("Share {filename}", { filename: a.filename })} title={tr("Share")}><Link2 size={16} /></button>
-                      {(a.kind === "document" || a.kind === "other") && (
+                      {(a.kind === "document" || a.kind === "other" || a.updated_at) && (
                         <button className="icon" onClick={() => setVersionsOf(a)} aria-label={tr("Versions of {filename}", { filename: a.filename })} title={tr("Versions")}><History size={16} /></button>
                       )}
                       <a className="icon" href={url.file(a, true)} aria-label={tr("Download {filename}", { filename: a.filename })} title={tr("Download")}><Download size={16} /></a>
@@ -139,5 +153,34 @@ export default function FilesPage() {
       {sharing && <ShareDialog {...sharing} onClose={() => setSharing(null)} />}
       {versionsOf && <VersionsDialog asset={versionsOf} onClose={() => setVersionsOf(null)} onRestored={refresh} />}
     </DropZone>
+  );
+}
+
+function Highlight({ text, query }: { text: string; query: string }) {
+  const i = text.toLowerCase().indexOf(query.toLowerCase());
+  if (i < 0 || !query) return <>{text}</>;
+  return <>{text.slice(0, i)}<mark>{text.slice(i, i + query.length)}</mark>{text.slice(i + query.length)}</>;
+}
+
+function SearchResults({ hits, query }: { hits: SearchHit[]; query: string }) {
+  if (!hits.length) return <p className="muted">{tr("Nothing matches \"{query}\".", { query })}</p>;
+  return (
+    <ul className="search-hits">
+      {hits.map(({ asset: a, snippet, in_text }) => {
+        const Icon = icons[a.kind];
+        return (
+          <li key={a.id}>
+            <a href={url.file(a)} target="_blank" rel="noreferrer" className="hit-name">
+              {a.thumb_ready ? <img src={url.thumb(a)} alt="" className="mini" /> : <Icon size={18} className="ico" />}
+              <Highlight text={a.filename} query={query} />
+            </a>
+            <Link to={`/files${a.folder === "/" ? "" : a.folder.split("/").map(encodeURIComponent).join("/")}`} className="muted small hit-folder">
+              {a.folder === "/" ? tr("My files") : a.folder}</Link>
+            {in_text && snippet && <p className="hit-snippet"><Highlight text={snippet} query={query} /></p>}
+            <a className="icon" href={url.file(a, true)} aria-label={tr("Download {filename}", { filename: a.filename })}><Download size={16} /></a>
+          </li>
+        );
+      })}
+    </ul>
   );
 }

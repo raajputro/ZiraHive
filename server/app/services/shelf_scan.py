@@ -25,6 +25,7 @@ from sqlalchemy import select
 from ..db import sessionmaker
 from ..models import Book, Library, MusicAlbum, Track, User
 from . import storage
+from .browse import DATA_MARK, walk_filter
 from .shelf_files import (AUDIO_EXT, COMIC_EXT, EBOOK_EXT, IMAGE_EXT, audio_info, clean_name, comic_meta,
                           comic_series_from_name, embedded_art, epub_meta, folder_image, natural_key, pdf_meta,
                           save_cover)
@@ -57,7 +58,7 @@ def _visible(p: Path) -> bool:
 def walk_music(root: Path) -> list[tuple[str, int, float]]:
     out = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        dirnames[:] = walk_filter(dirpath, dirnames)
         for fn in filenames:
             p = Path(dirpath) / fn
             if p.suffix.lower() in AUDIO_EXT and _visible(p):
@@ -96,7 +97,8 @@ def walk_audiobooks(root: Path) -> list[Unit]:
 
     def subdirs(d: Path) -> list[Path]:
         try:
-            return sorted((p for p in d.iterdir() if p.is_dir() and _visible(p)), key=lambda p: natural_key(p.name))
+            return sorted((p for p in d.iterdir() if p.is_dir() and _visible(p) and not (p / DATA_MARK).exists()),
+                          key=lambda p: natural_key(p.name))
         except OSError:
             return []
 
@@ -123,7 +125,7 @@ def walk_audiobooks(root: Path) -> list[Unit]:
 def walk_books(root: Path) -> list[Unit]:
     units: list[Unit] = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
+        dirnames[:] = sorted(walk_filter(dirpath, dirnames))
         d = Path(dirpath)
         books = [d / f for f in filenames if Path(f).suffix.lower() in EBOOK_EXT | COMIC_EXT and _visible(d / f)]
         images = [f for f in filenames if Path(f).suffix.lower() in IMAGE_EXT]

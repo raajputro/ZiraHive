@@ -83,7 +83,7 @@ export interface BookDetail extends Book {
 export interface BookProgressIn { position: number; fraction: number; locator?: string | null; finished?: boolean }
 export interface Library {
   id: string; name: string; path: string; kind: LibraryKind; sort_order: number; age_rating: number | null;
-  last_scan_at: string | null; item_count: number; available: boolean;
+  last_scan_at: string | null; item_count: number; available: boolean; display_path: string;
 }
 export interface Media {
   id: string; library_id: string; title: string; year: number | null; overview: string | null;
@@ -186,7 +186,19 @@ export interface BackupInfo {
   restic: string | null; runs: BackupRun[]; password: string | null; created: boolean;
 }
 
+export interface FolderBrowse {
+  path: string | null; label: string | null; parent: string | null; guess: string | null;
+  folders: { path: string; label: string; name: string; guess: string | null }[];
+}
+export interface SearchHit { asset: Asset; snippet: string | null; in_text: boolean }
+
 export const api = {
+  browseFolders: (path?: string) => request<FolderBrowse>("GET", `/api/admin/folders${q({ path })}`),
+  search: (text: string) => request<SearchHit[]>("GET", `/api/search${q({ q: text })}`),
+  startScan: () => request<{ id: string }>("POST", "/api/scans"),
+  scanPage: (id: string, n: number, jpeg: Blob) => request<void>("PUT", `/api/scans/${id}/pages/${n}`, jpeg),
+  finishScan: (id: string, title: string, folder: string) => request<Asset>("POST", `/api/scans/${id}/finish`, { title, folder }),
+  cancelScan: (id: string) => request<void>("DELETE", `/api/scans/${id}`),
   backup: () => request<BackupInfo>("GET", "/api/admin/backup"),
   saveBackup: (body: { repository: string; password?: string; env?: Record<string, string>; hour: number; include_media: boolean; enabled: boolean }) =>
     request<BackupInfo>("PUT", "/api/admin/backup", body),

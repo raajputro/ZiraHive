@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { RefreshCw, Trash2, Pencil, ArrowUp, ArrowDown, FolderSearch, ShieldCheck, Bell, Smartphone, Check, AlertTriangle } from "lucide-react";
+import { RefreshCw, Trash2, Pencil, ArrowUp, ArrowDown, FolderSearch, ShieldCheck, Bell, Smartphone, Check, AlertTriangle, FolderOpen } from "lucide-react";
 import { api, ApiError, formatBytes, AGE_LABEL, AGE_OPTIONS, type Activity, type AdminUser, type AuditEvent, type Library, type LibraryKind,
   type Me, type SecurityItem, type Stats } from "../api";
 import { useAuth } from "../App";
@@ -8,6 +8,7 @@ import Dialog from "../components/Dialog";
 
 import { locale, t as tr, lang, setLang, type Lang, tx } from "../i18n";
 import BackupPanel from "../components/BackupPanel";
+import FolderPicker from "../components/FolderPicker";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(locale()) : tr("never"));
 
 type Tab = "account" | "server" | "people" | "log";
@@ -77,6 +78,8 @@ function Libraries() {
   const [libs, setLibs] = useState<Library[]>([]);
   const [name, setName] = useState("");
   const [path, setPath] = useState("");
+  const [pathLabel, setPathLabel] = useState("");
+  const [picking, setPicking] = useState(false);
   const [kind, setKind] = useState<LibraryKind>("movies");
   const [msg, setMsg] = useState("");
   const refresh = useCallback(() => { api.libraries().then(setLibs).catch(() => undefined); }, []);
@@ -104,13 +107,21 @@ function Libraries() {
   };
   const add = (e: FormEvent) => {
     e.preventDefault();
-    void run(async () => { await api.addLibrary(name, path, kind); setName(""); setPath(""); }, tr("Category added. Scanning has started."));
+    void run(async () => { await api.addLibrary(name, path, kind); setName(""); setPath(""); setPathLabel(""); }, tr("Category added. Scanning has started."));
+  };
+  const picked = (f: { path: string; label: string; name: string; guess: string | null }) => {
+    setPicking(false);
+    setPath(f.path);
+    setPathLabel(f.label);
+    const pretty = f.name.replace(/[_.]+/g, " ").replace(/\b\w/g, (c) => c.toUpperCase());
+    setName((n) => n || pretty);
+    if (f.guess && f.guess in KIND_LABEL) setKind(f.guess as LibraryKind);
   };
 
   return (
     <section className="panel">
-      <h2>{tr("Watch categories")}</h2>
-      <p className="muted small">{tr("Every folder inside your media folder becomes a category, such as English Movies, Hindi Movies, Bangla Movies, Web Series or Animation. They show on the Watch page in this order.")}</p>
+      <h2>{tr("Categories")}</h2>
+      <p className="muted small">{tr("Each category is a folder of movies, series, music, audiobooks, books or comics, read where it already is on your drives. Nothing is copied or changed. They show on the Watch, Listen and Read pages in this order.")}</p>
       <div className="panel-actions">
         <button onClick={findFolders}><FolderSearch size={16} />{" "}{tr("Find new folders")}</button>
       </div>
@@ -123,7 +134,7 @@ function Libraries() {
                 <button className="icon" aria-label={tr("Move {name} down", { name: l.name })} disabled={i === libs.length - 1} onClick={() => move(i, 1)}><ArrowDown size={15} /></button>
               </div>
               <div>
-                <strong>{l.name}</strong> <code>{l.path}</code><br />
+                <strong>{l.name}</strong> <code>{l.display_path || l.path}</code><br />
                 <span className={l.available ? "muted" : "error"}>
                   {l.available ? tr("{item_count} titles, last scanned {when}", { item_count: l.item_count, when: when(l.last_scan_at) }) : tr("Folder not found. Is the drive connected?")}
                 </span>
@@ -131,7 +142,7 @@ function Libraries() {
               <label className="sr" htmlFor={`kind-${l.id}`}>{tr("Type of {name}", { name: l.name })}</label>
               <select id={`kind-${l.id}`} value={l.kind} title={tr("Changing the type re-sorts movies and episodes")}
                 onChange={(e) => void run(() => api.updateLibrary(l.id, { kind: e.target.value as LibraryKind }),
-                  `${l.name} is now ${KIND_LABEL[e.target.value as LibraryKind].toLowerCase()}. Re-scanning.`)}>
+                  tr("{name} is now: {kind}. Scanning it again.", { name: l.name, kind: KIND_LABEL[e.target.value as LibraryKind] }))}>
                 {(Object.keys(KIND_LABEL) as LibraryKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
               </select>
               <label className="sr" htmlFor={`age-${l.id}`}>{tr("Who {name} suits", { name: l.name })}</label>
@@ -149,19 +160,20 @@ function Libraries() {
           ))}
         </ul>
       )}
-      <details className="add-folder">
-        <summary>{tr("Add a folder from another drive")}</summary>
-        <form className="inline-form" onSubmit={add}>
-          <label>{tr("Name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr("Korean Dramas")} required /></label>
-          <label>{tr("Folder inside the server")}<input value={path} onChange={(e) => setPath(e.target.value)} placeholder="/media-e/korean" required /></label>
-          <label>{tr("Type")}<select value={kind} onChange={(e) => setKind(e.target.value as LibraryKind)}>
-              {(Object.keys(KIND_LABEL) as LibraryKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
-            </select>
-          </label>
-          <button>{tr("Add category")}</button>
-        </form>
-        <p className="muted small">{tr("With Docker, mount the drive in docker-compose.yml first. See the README.")}</p>
-      </details>
+      <h3 className="add-head">{tr("Add a category")}</h3>
+      <form className="inline-form add-category" onSubmit={add}>
+        <div className="picked">
+          <button type="button" onClick={() => setPicking(true)}><FolderOpen size={16} />{" "}{tr("Choose folder")}</button>
+          {pathLabel ? <code>{pathLabel}</code> : <span className="muted small">{tr("For example E:\\Movies\\English")}</span>}
+        </div>
+        <label>{tr("Name")}<input value={name} onChange={(e) => setName(e.target.value)} placeholder={tr("Korean Dramas")} required /></label>
+        <label>{tr("Type")}<select value={kind} onChange={(e) => setKind(e.target.value as LibraryKind)}>
+            {(Object.keys(KIND_LABEL) as LibraryKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+          </select>
+        </label>
+        <button className="primary" disabled={!path}>{tr("Add category")}</button>
+      </form>
+      {picking && <FolderPicker onPick={picked} onClose={() => setPicking(false)} />}
       {msg && <p role="status">{msg}</p>}
     </section>
   );

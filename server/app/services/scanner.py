@@ -17,6 +17,7 @@ from sqlalchemy import select
 from ..config import get_settings
 from ..db import sessionmaker
 from ..models import Library, MediaItem, Series
+from .browse import walk_filter
 from . import media_tools, storage
 from .ratings import pick_certification
 from .tracks import markers_from_chapters, probe_tracks
@@ -134,7 +135,7 @@ def parse_episode(rel_path: str, strict: bool = False) -> EpisodeInfo | None:
 def _walk(root: Path) -> list[tuple[str, int, float]]:
     found = []
     for dirpath, dirnames, filenames in os.walk(root):
-        dirnames[:] = [d for d in dirnames if not d.startswith(".")]
+        dirnames[:] = walk_filter(dirpath, dirnames)
         for fn in filenames:
             if Path(fn).suffix.lower() not in MOVIE_EXT or _SKIP_WORDS.search(fn):
                 continue

@@ -26,11 +26,19 @@ x-server-env: &server-env
 
 x-server-volumes: &server-volumes
   - ${GHARBOX_DATA_PATH:-./gharbox-data}:/data
-  # Your media folder, read-only so GharBox can never modify or delete it.
+  # Your media folder (optional), read-only so GharBox can never modify or delete it.
   - ${MEDIA_PATH:-./media}:/media:ro
-  # A category on another drive: mount it outside /media, then add it in
-  # Settings > Watch categories > Add a folder from another drive.
-  # - E:/Korean Dramas:/media-e/korean-dramas:ro
+  # Your drives, read-only, so you can pick media folders where they already are:
+  # Settings > Server > Categories > Choose folder. setup.ps1 fills these in for you,
+  # or set DRIVE_D=D:/ etc. in .env. Drives not listed show nothing.
+  - ${DRIVE_C:-./no-drive}:/drives/c:ro
+  - ${DRIVE_D:-./no-drive}:/drives/d:ro
+  - ${DRIVE_E:-./no-drive}:/drives/e:ro
+  - ${DRIVE_F:-./no-drive}:/drives/f:ro
+  - ${DRIVE_G:-./no-drive}:/drives/g:ro
+  - ${DRIVE_H:-./no-drive}:/drives/h:ro
+  - ${DRIVE_I:-./no-drive}:/drives/i:ro
+  - ${DRIVE_J:-./no-drive}:/drives/j:ro
   # Offsite backup to a USB or second disk: mount a folder on it here, then choose
   # /backup-disk/gharbox in Settings > Server > Offsite backup. See docs/BACKUP.md.
   # - F:/GharBox Backup:/backup-disk

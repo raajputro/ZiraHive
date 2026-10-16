@@ -11,11 +11,12 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
 from ..models import Book, Library, MediaItem, MusicAlbum, Series, Track, User, WatchProgress, utcnow
-from ..schemas import (LibraryIn, LibraryOrderIn, LibraryOut, LibraryUpdateIn, MediaOut,
+from ..schemas import (FolderBrowseOut, FolderPick, LibraryIn, LibraryOrderIn, LibraryOut, LibraryUpdateIn, MediaOut,
                        ProgressIn, SeasonOut, SeriesOut, TitleOut)
 from ..security import admin_user, create_token, current_user
 from ..services import activity, jobs, storage
-from ..services.libraries import discover
+from ..services import browse
+from ..services.libraries import discover, guess_kind, pretty_name
 from ..services.shelf_scan import SHELF_KINDS
 from ..services.ranged import ranged_file_response
 from ..services.ratings import allowed, effective_age
@@ -139,6 +140,7 @@ async def _library_out(session: AsyncSession, libs: list[Library]) -> list[Libra
         o = LibraryOut.model_validate(lib)
         o.item_count = movies.get(lib.id, 0) + series.get(lib.id, 0) + albums.get(lib.id, 0) + books.get(lib.id, 0)
         o.available = Path(lib.path).is_dir()
+        o.display_path = browse.display(lib.path)
         out.append(o)
     return out
 
@@ -157,9 +159,11 @@ async def list_libraries(_: User = Depends(current_user),
 @router.post("/libraries", response_model=LibraryOut, status_code=201)
 async def add_library(body: LibraryIn, _: User = Depends(admin_user),
                       session: AsyncSession = Depends(get_session)):
-    if not Path(body.path).is_dir():
-        raise HTTPException(400, "That folder doesn't exist inside the server. With Docker, "
-                                 "mount it in docker-compose.yml first (e.g. /media/Movies).")
+    folder = browse.allowed(body.path)
+    if folder is None or not folder.is_dir():
+        raise HTTPException(400, "Pick a folder on one of your drives. With Docker, list the drive in .env first "
+                                 "(for example DRIVE_E=E:/) and restart.")
+    body.path = str(folder)
     order = (await session.scalar(select(func.max(Library.sort_order)))) or 0
     lib = Library(name=body.name, path=body.path, kind=body.kind, sort_order=order + 1)
     session.add(lib)
@@ -169,6 +173,23 @@ async def add_library(body: LibraryIn, _: User = Depends(admin_user),
         raise HTTPException(409, "That folder is already a category")
     await jobs.enqueue("scan_library", lib.id)
     return (await _library_out(session, [lib]))[0]
+
+
+@router.get("/admin/folders", response_model=FolderBrowseOut)
+async def browse_folders(path: str | None = None, _: User = Depends(admin_user)):
+    """Folders to pick a category from: the drives first, then any folder inside them."""
+    if not path:
+        return FolderBrowseOut(path=None, label=None, parent=None, folders=[
+            FolderPick(path=str(p), label=label, name=label) for p, label in browse.roots()])
+    folder = browse.allowed(path)
+    if folder is None or not folder.is_dir():
+        raise HTTPException(404, "Folder not found")
+    root_paths = {str(r.resolve()) for r, _ in browse.roots()}
+    parent = None if str(folder) in root_paths else str(folder.parent)
+    return FolderBrowseOut(path=str(folder), label=browse.display(folder), parent=parent,
+                           guess=guess_kind(pretty_name(folder.name)), folders=[
+        FolderPick(path=str(c), label=browse.display(c), name=c.name, guess=guess_kind(pretty_name(c.name)))
+        for c in browse.list_folder(folder)])
 
 
 @router.post("/libraries/discover", response_model=list[LibraryOut])

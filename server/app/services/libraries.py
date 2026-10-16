@@ -70,7 +70,7 @@ async def discover(session: AsyncSession) -> list[Library]:
     order = (await session.scalar(select(func.max(Library.sort_order)))) or 0
     created = []
     for child in sorted(root.iterdir(), key=lambda p: p.name.lower()):
-        if not child.is_dir() or child.name.startswith((".", "$")) or str(child) in known:
+        if not child.is_dir() or child.name.startswith((".", "$")) or str(child) in known or (child / ".gharbox-data").exists():
             continue
         order += 1
         name = pretty_name(child.name)

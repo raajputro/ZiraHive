@@ -19,6 +19,9 @@ def tc(tmp_path, monkeypatch):
     monkeypatch.setenv("GHARBOX_DATABASE_URL", "")
     monkeypatch.setenv("GHARBOX_MEDIA_LIBRARIES", "")
     monkeypatch.setenv("GHARBOX_MEDIA_ROOT", "")
+    (tmp_path / "drives").mkdir()
+    (tmp_path / "drives" / "t").symlink_to(tmp_path)  # a pretend drive, so categories can be added
+    monkeypatch.setenv("GHARBOX_DRIVES_DIR", str(tmp_path / "drives"))
     from app.config import get_settings
     get_settings.cache_clear()
     from app.main import create_app

@@ -16,6 +16,11 @@ async def app(tmp_path, monkeypatch):
     monkeypatch.setenv("GHARBOX_DATABASE_URL", "")
     monkeypatch.setenv("GHARBOX_MEDIA_LIBRARIES", "")
     monkeypatch.setenv("GHARBOX_MAX_CHUNK_MB", "1")
+    # a pretend drive "T:" that is the test folder, so tests can add categories anywhere in it
+    drives = tmp_path / "drives"
+    drives.mkdir()
+    (drives / "t").symlink_to(tmp_path)
+    monkeypatch.setenv("GHARBOX_DRIVES_DIR", str(drives))
     from app.config import get_settings
     get_settings.cache_clear()
     from app.main import create_app

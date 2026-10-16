@@ -63,30 +63,23 @@ your PC, phone and TV.
 
 ## Run it on Windows
 
-You need **Docker Desktop** (free for personal use) with the WSL 2 backend.
+You need **Docker Desktop** (free for personal use) with the WSL 2 backend. Start it once.
 
-1. Open PowerShell in this folder and create your settings file:
+1. In this folder, right-click **setup.ps1** > **Run with PowerShell**. It:
+   - creates `.env` with a random database password,
+   - puts GharBox's own data (photos, files, database) on the drive with the most free space,
+   - lets GharBox **read** your drives (never change them), so you can pick media folders where they
+     already are,
+   - builds and starts everything (10 to 20 minutes the first time) and opens GharBox.
 
-   ```powershell
-   copy .env.example .env
-   notepad .env
-   ```
+   Prefer doing it by hand? `copy .env.example .env`, fill in `POSTGRES_PASSWORD`,
+   `GHARBOX_DATA_PATH` and a `DRIVE_X=X:/` line per drive, then `docker compose up -d --build`.
 
-   Set at least:
-   - `POSTGRES_PASSWORD`: letters and numbers. Make one with
-     `python -c "import secrets; print(secrets.token_hex(24))"`
-   - `GHARBOX_DATA_PATH`: where backups go, for example `D:/GharBoxData` (use forward slashes)
-   - `MEDIA_PATH`: your media folder, for example `D:/Media` (see [Watch categories](#watch-categories))
+2. Open **http://localhost:8080** and create the admin account.
 
-2. Start everything:
-
-   ```powershell
-   docker compose up -d --build
-   ```
-
-   The first build takes a few minutes. Check that it's healthy with `docker compose ps`.
-
-3. Open **http://localhost:8080** and create the admin account.
+3. **Settings > Server > Categories > Choose folder**: click through to a folder, for example
+   `E:\Movies\English`, check the name and type, press **Add category**. Repeat for every folder:
+   movies, series, music, audiobooks, books, comics, on any drive. Nothing is moved or copied.
 
 4. To use it from your phone or TV, find your PC's address with `ipconfig` (the IPv4 address,
    such as `192.168.0.105`) and open `http://192.168.0.105:8080`. If it doesn't load, allow
@@ -124,41 +117,28 @@ backup finishes, or a file fails, you get a notification (on the phone too, with
 there's no need to keep the screen on. On iPhone, Safari may hand over JPEG copies of HEIC photos and only the still
 image of Live Photos; to keep the originals, copy them to a PC first and upload from there.
 
-## Watch categories
+## Categories
 
-Make one folder per category inside your media folder. Each one becomes a tab and a row on the
-Watch page, in the order you choose in Settings:
+A category is one folder of one kind of media, read where it is. Add each in **Settings > Server >
+Categories > Choose folder**; they can be on different drives:
 
 ```
-D:/Media/
-  English Movies/
-    Inception (2010)/Inception (2010).mkv
-    The.Matrix.1999.1080p.BluRay.mkv
-  Hindi Movies/
-  Bangla Movies/
-  Web Series/
-    Mirzapur/
-      Season 1/Mirzapur.S01E01.mkv
-      Season 2/Mirzapur.S02E01.mkv
-    Karnaphuli/Karnaphuli.S01E01.mp4
-  Animation/
-    Kung Fu Panda (2008).mkv
-    Avatar The Last Airbender/Book 1/Avatar.S01E01.mkv
-  Music/
-    Shonar Band/Monsoon Songs (2021)/01 - Rain on Tin.mp3
-  Audiobooks/
-    The River Journey.m4b
-    Rabindra Thakur/Short Stories/01 The Postmaster.mp3, 02 Kabuliwala.mp3, ...
-  Ebooks/
-    Nadi Writer/The River Journey.epub
-    Cooking with Mustard Oil.pdf
-  Comics/
-    Sky Rider/Sky Rider 001.cbz
-    Hero Academy/Chapter 001/001.jpg, 002.jpg, ...
+E:\Movies\English\Inception (2010)\Inception (2010).mkv      -> "English Movies" (movies)
+E:\Movies\Hindi\3 Idiots (2009).mp4                         -> "Hindi Movies" (movies)
+F:\Series\Mirzapur\Season 1\Mirzapur.S01E01.mkv             -> "Web Series" (series)
+D:\Kids\Kung Fu Panda (2008).mkv                             -> "Animation" (movies and series)
+D:\Music\Shonar Band\Monsoon Songs (2021)\01 - Rain on Tin.mp3 -> "Music"
+D:\Audiobooks\Rabindra Thakur\Short Stories\01 ....mp3       -> "Audiobooks"
+D:\Books\The River Journey.epub, Cooking.pdf                -> "Ebooks"
+D:\Comics\Sky Rider\Sky Rider 001.cbz                        -> "Comics"
 ```
 
-GharBox finds new folders on start, every night, and when you press **Find new folders** in
-Settings. Folder names like `english_movies` are tidied to "English Movies". Each category has a
+**Or one media folder for everything:** set `MEDIA_PATH=D:/Media` in `.env`; every folder inside it
+(`D:\Media\English Movies`, `D:\Media\Web Series`, ...) becomes a category by itself. Both ways work
+together.
+
+Inside `MEDIA_PATH`, GharBox finds new folders on start, every night, and when you press **Find new
+folders** in Settings. Every category is scanned again each night, and on **Scan now**. Folder names like `english_movies` are tidied to "English Movies". Each category has a
 type, guessed from its name and changeable in Settings:
 
 | Type | Use for | How files are read |
@@ -180,8 +160,9 @@ Episodes are recognised from `S01E02`, `1x02`, `E03`, `Episode 7` or a leading n
 When an episode ends, the next one starts by itself, and Continue watching shows the next
 episode of every series you're following.
 
-A category on another drive: mount it in `docker-compose.yml` (there's a commented example
-under the `api` volumes), restart, then use **Add a folder from another drive** in Settings.
+A drive that isn't listed yet (a new USB disk, say): run `setup.ps1` again, or add `DRIVE_X=X:/` to
+`.env` and run `docker compose up -d`. A category whose drive is unplugged is hidden until it's back.
+GharBox's own data folder never shows up as media, even when its drive is shared.
 
 ### Playing anything
 

@@ -551,3 +551,18 @@ class BackupRun(Base):
     bytes_added: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     total_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
     message: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+# ------------------------------------------------------------------ text inside files
+
+class AssetText(Base):
+    """Words found in a file (PDF/Word text, or OCR of scans and pictures), for search."""
+
+    __tablename__ = "asset_texts"
+
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), primary_key=True)
+    text: Mapped[str] = mapped_column(Text, default="")
+    method: Mapped[str] = mapped_column(String(16))  # text | ocr | none | failed
+    pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    sha256: Mapped[str] = mapped_column(String(64))  # of the file it was read from
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

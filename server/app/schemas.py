@@ -187,6 +187,7 @@ class LibraryOut(ORM):
     last_scan_at: datetime | None
     item_count: int = 0  # movies + series
     available: bool = True  # folder currently reachable
+    display_path: str = ""  # E:\Movies\English
 
 
 class MediaOut(ORM):
@@ -822,3 +823,31 @@ class SnapshotOut(BaseModel):
     id: str
     time: str
     paths: list[str]
+
+
+# ------------------------------------------------------------------ search and scans
+
+class SearchHit(BaseModel):
+    asset: "AssetOut"
+    snippet: str | None = None
+    in_text: bool = False  # found in the words inside the file, not its name
+
+
+class ScanFinishIn(BaseModel):
+    title: str = Field(min_length=1, max_length=180)
+    folder: str = "/Scans"
+
+
+class FolderPick(BaseModel):
+    path: str
+    label: str           # E:\\Movies\\English
+    name: str
+    guess: str | None = None  # the category type its name suggests
+
+
+class FolderBrowseOut(BaseModel):
+    path: str | None     # None = the list of drives
+    label: str | None
+    parent: str | None
+    guess: str | None = None  # category type this folder's own name suggests
+    folders: list[FolderPick]
