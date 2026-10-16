@@ -1,6 +1,8 @@
 """arq worker: `arq app.worker.WorkerSettings` (the `worker` container runs this)."""
 from __future__ import annotations
 
+import asyncio
+
 from arq import cron
 from arq.connections import RedisSettings
 from sqlalchemy import select
@@ -30,6 +32,8 @@ async def nightly(ctx) -> None:
         await purge_expired_trash(session)
         await discover(session)
         await purge_old_offline_copies(session)
+        from .services.audio_convert import purge_unused
+        await asyncio.to_thread(purge_unused)
         ids = (await session.scalars(select(Library.id))).all()
     for lib_id in ids:
         await scan_library(ctx, lib_id)

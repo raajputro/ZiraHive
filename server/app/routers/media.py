@@ -5,17 +5,18 @@ from pathlib import Path
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request
 from fastapi.responses import FileResponse
-from sqlalchemy import and_, case, func, select, update
+from sqlalchemy import and_, case, delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
-from ..models import Library, MediaItem, Series, User, WatchProgress, utcnow
+from ..models import Book, Library, MediaItem, MusicAlbum, Series, Track, User, WatchProgress, utcnow
 from ..schemas import (LibraryIn, LibraryOrderIn, LibraryOut, LibraryUpdateIn, MediaOut,
                        ProgressIn, SeasonOut, SeriesOut, TitleOut)
 from ..security import admin_user, create_token, current_user
 from ..services import activity, jobs, storage
 from ..services.libraries import discover
+from ..services.shelf_scan import SHELF_KINDS
 from ..services.ranged import ranged_file_response
 from ..services.ratings import allowed, effective_age
 
@@ -128,10 +129,15 @@ async def _library_out(session: AsyncSession, libs: list[Library]) -> list[Libra
         select(Series.library_id, func.count(func.distinct(Series.id)))
         .join(MediaItem, MediaItem.series_id == Series.id)
         .where(MediaItem.missing.is_(False)).group_by(Series.library_id))).all())
+    albums = dict((await session.execute(
+        select(Track.library_id, func.count(func.distinct(Track.album_id)))
+        .where(Track.missing.is_(False)).group_by(Track.library_id))).all())
+    books = dict((await session.execute(select(Book.library_id, func.count()).where(
+        Book.missing.is_(False)).group_by(Book.library_id))).all())
     out = []
     for lib in libs:
         o = LibraryOut.model_validate(lib)
-        o.item_count = movies.get(lib.id, 0) + series.get(lib.id, 0)
+        o.item_count = movies.get(lib.id, 0) + series.get(lib.id, 0) + albums.get(lib.id, 0) + books.get(lib.id, 0)
         o.available = Path(lib.path).is_dir()
         out.append(o)
     return out
@@ -187,9 +193,14 @@ async def update_library(library_id: str, body: LibraryUpdateIn, _: User = Depen
         lib.age_rating = None if body.age_rating < 0 else body.age_rating
     rescan = body.kind is not None and body.kind != lib.kind
     if rescan:
-        lib.kind = body.kind
-        # Make the next scan re-read every file so movies/episodes are sorted again.
-        await session.execute(update(MediaItem).where(MediaItem.library_id == lib.id).values(mtime=0))
+        old, lib.kind = lib.kind, body.kind
+        if old in SHELF_KINDS or body.kind in SHELF_KINDS:
+            # Music, books and videos are kept apart: start this category over.
+            for model in (Track, MusicAlbum, Book, MediaItem, Series):
+                await session.execute(delete(model).where(model.library_id == lib.id))
+        else:
+            # Make the next scan re-read every file so movies/episodes are sorted again.
+            await session.execute(update(MediaItem).where(MediaItem.library_id == lib.id).values(mtime=0))
     await session.commit()
     if rescan:
         await jobs.enqueue("scan_library", lib.id)

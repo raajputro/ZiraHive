@@ -152,7 +152,7 @@ class PhotoPage(BaseModel):
     next_cursor: str | None
 
 
-_KIND = r"^(movies|shows|mixed)$"
+_KIND = r"^(movies|shows|mixed|music|audiobooks|books|comics)$"
 
 
 class LibraryIn(BaseModel):
@@ -558,3 +558,158 @@ class ChatOut(BaseModel):
     username: str
     text: str
     created_at: datetime
+
+
+# ------------------------------------------------------------------ music
+
+class MusicAlbumOut(ORM):
+    id: str
+    library_id: str
+    title: str
+    artist: str
+    year: int | None
+    genre: str | None
+    cover_ready: bool
+    added_at: datetime
+    track_count: int = 0
+    duration: float = 0
+
+
+class TrackOut(ORM):
+    id: str
+    library_id: str
+    album_id: str | None
+    title: str
+    artist: str | None
+    album_title: str | None
+    track_no: int | None
+    disc_no: int | None
+    year: int | None
+    genre: str | None
+    duration: float | None
+    codec: str | None
+    playable: bool
+    favorite: bool = False
+    plays: int = 0
+    cover_ready: bool = False  # the album's cover
+
+
+class MusicAlbumDetailOut(MusicAlbumOut):
+    tracks: list[TrackOut] = []
+
+
+class ArtistOut(BaseModel):
+    name: str
+    album_count: int
+    track_count: int
+    cover_album_id: str | None
+
+
+class ArtistDetailOut(BaseModel):
+    name: str
+    albums: list[MusicAlbumOut]
+    tracks: list[TrackOut]  # most played first
+
+
+class PlaylistIn(BaseModel):
+    name: str = Field(min_length=1, max_length=128)
+    track_ids: list[str] = []
+
+
+class PlaylistUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    track_ids: list[str] | None = None  # replaces the order and contents
+
+
+class PlaylistAddIn(BaseModel):
+    track_ids: list[str] = Field(min_length=1, max_length=2000)
+
+
+class PlaylistOut(ORM):
+    id: str
+    name: str
+    created_at: datetime
+    updated_at: datetime
+    track_count: int = 0
+    duration: float = 0
+    cover_album_ids: list[str] = []
+
+
+class PlaylistDetailOut(PlaylistOut):
+    tracks: list[TrackOut] = []
+
+
+class FavoriteIn(BaseModel):
+    favorite: bool
+
+
+class MusicHomeOut(BaseModel):
+    recent_albums: list[MusicAlbumOut]
+    recently_played: list[TrackOut]
+    most_played: list[TrackOut]
+    playlists: list[PlaylistOut]
+    favorite_count: int
+
+
+class AudioReadyOut(BaseModel):
+    ready: bool
+    failed: bool = False
+
+
+# ------------------------------------------------------- audiobooks, ebooks, comics
+
+class BookProgressOut(BaseModel):
+    position: float = 0
+    locator: str | None = None
+    fraction: float = 0
+    finished: bool = False
+    updated_at: datetime | None = None
+
+
+class BookOut(ORM):
+    id: str
+    library_id: str
+    kind: str
+    format: str
+    title: str
+    author: str | None
+    narrator: str | None
+    series_name: str | None
+    series_index: float | None
+    year: int | None
+    cover_ready: bool
+    size: int
+    duration: float | None
+    pages: int | None
+    added_at: datetime
+    progress: BookProgressOut | None = None
+
+
+class AudioPartOut(BaseModel):
+    index: int
+    title: str
+    start: float
+    duration: float
+    playable: bool
+
+
+class ChapterOut(BaseModel):
+    title: str
+    start: float
+
+
+class BookDetailOut(BookOut):
+    description: str | None
+    language: str | None
+    parts: list[AudioPartOut] = []
+    chapters: list[ChapterOut] = []
+    rtl: bool = False
+    downloadable: bool = False
+    next_in_series: str | None = None
+
+
+class BookProgressIn(BaseModel):
+    position: float = Field(ge=0)
+    locator: str | None = Field(default=None, max_length=2000)
+    fraction: float = Field(ge=0, le=1)
+    finished: bool | None = None

@@ -41,13 +41,25 @@
 - Each viewer keeps their own quality, audio and subtitles; age limits apply to every guest
 - Two-browser Playwright test with a WebM sample that open-source Chromium can play
 
+## Batch 4: listen and read (done)
+- New category types: Music, Audiobooks, Books (EPUB, PDF) and Comics (CBZ, CBR, CB7, CBT, page folders)
+- Music: albums from tags or folders, embedded or folder cover art, artists, songs, favourites, play
+  counts, Recently played, Most played, playlists with ordering
+- One player for the whole app: queue, shuffle, repeat, sleep timer, Media Session (lock screen, headsets)
+- Audiobooks: single files with chapters (M4B) or folders of parts, speed 0.75× to 2×, position saved
+  across devices, Continue listening
+- Unplayable audio (WMA, ALAC, APE, AIFF) converted once to MP3; automatic fallback when a browser fails
+- Ebooks: EPUB with epub.js (themes, text size, font, contents, exact position), PDF with pdf.js
+- Comics: server-scaled cached pages, ComicInfo.xml, series from names, right-to-left manga, webtoon scroll
+- Age limits per category; continue reading; next in series
+- The end-to-end tests send the production Content-Security-Policy, so anything it would block fails the tests
+
 ## Later for playback
 - Remux instead of re-encode when only the audio needs converting
 - Picture-based subtitles (PGS) burned in; automatic intro detection by audio fingerprint
 - Chromecast and DLNA
 
-## Batches 4 to 7
-- Batch 4: music, audiobooks, ebooks and comics
+## Batches 5 to 7
 - Batch 5: encrypted vault, encrypted offsite backup, Bangla interface, PC sync client
 - Batch 6: document scanner and OCR in the browser, Chromecast and DLNA
 - Batch 7: passkeys, plugins, linking two GharBox servers; voice chat in watch parties

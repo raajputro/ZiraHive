@@ -13,3 +13,5 @@ pillow>=10.4
 pillow-heif>=0.18
 pyotp>=2.9
 segno>=1.6
+mutagen>=1.47
+pypdf>=5.0

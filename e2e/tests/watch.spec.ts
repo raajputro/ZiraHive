@@ -2,7 +2,8 @@ import { expect, test } from "@playwright/test";
 
 test("watch categories, series page and player", async ({ page }) => {
   const libs = await (await page.request.get("/api/libraries")).json();
-  const withTitles = libs.filter((l: { item_count: number }) => l.item_count > 0);
+  // music and book categories live under Listen and Read, not Watch
+  const withTitles = libs.filter((l: { item_count: number; kind: string }) => l.item_count > 0 && ["movies", "shows", "mixed"].includes(l.kind));
   test.skip(withTitles.length === 0, "No media folders on this server (CI creates sample media)");
 
   await page.goto("/watch");

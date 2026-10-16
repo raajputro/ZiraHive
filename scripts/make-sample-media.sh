@@ -37,4 +37,8 @@ clip "$OUT/Animation/Avatar The Last Airbender/Book 1/Avatar.S01E01.mp4"
 mkdir -p "$OUT/Animation/Big Garden (2021)"
 ffmpeg -y -v error -f lavfi -i "testsrc2=duration=60:size=640x360:rate=24" -f lavfi -i "sine=duration=60" \
   -c:v libvpx-vp9 -b:v 300k -deadline realtime -cpu-used 8 -c:a libopus -shortest "$OUT/Animation/Big Garden (2021)/Big Garden (2021).webm"
+
+
+# Music, audiobooks, ebooks and comics (needs Python 3 with Pillow: pip install pillow)
+python3 "$(dirname "$0")/sample_shelf.py" "$OUT"
 echo "Sample media written to $OUT"

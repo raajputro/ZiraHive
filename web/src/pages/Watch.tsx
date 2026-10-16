@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, NavLink, useParams } from "react-router-dom";
 import { Search, ChevronRight } from "lucide-react";
-import { api, url, episodeCode, formatDuration, type Library, type Media, type Title } from "../api";
+import { api, url, episodeCode, formatDuration, VIDEO_KINDS, type Library, type Media, type Title } from "../api";
 import { useAuth } from "../App";
 
 /** Category tabs shared by every Watch page: Home, English Movies, Web Series, ... */
@@ -12,7 +12,7 @@ export function WatchTabs({ libraries, query, onQuery }:
       <nav className="lib-tabs" aria-label="Categories">
         <NavLink to="/watch" end>Home</NavLink>
         <NavLink to="/watch/parties">Watch parties</NavLink>
-        {libraries.filter((l) => l.available && l.item_count > 0).map((l) => (
+        {libraries.filter((l) => l.available && l.item_count > 0 && VIDEO_KINDS.includes(l.kind)).map((l) => (
           <NavLink key={l.id} to={`/watch/c/${l.id}`}>{l.name}</NavLink>
         ))}
       </nav>
@@ -66,7 +66,7 @@ function ContinueCard({ m }: { m: Media }) {
 
 function useLibraries() {
   const [libs, setLibs] = useState<Library[] | null>(null);
-  useEffect(() => { api.libraries().then(setLibs).catch(() => setLibs([])); }, []);
+  useEffect(() => { api.libraries().then((all) => setLibs(all.filter((l) => VIDEO_KINDS.includes(l.kind)))).catch(() => setLibs([])); }, []);
   return libs;
 }
 

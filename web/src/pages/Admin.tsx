@@ -65,6 +65,10 @@ const KIND_LABEL: Record<LibraryKind, string> = {
   movies: "Movies",
   shows: "Series",
   mixed: "Movies and series",
+  music: "Music",
+  audiobooks: "Audiobooks",
+  books: "Books (EPUB, PDF)",
+  comics: "Comics and manga",
 };
 
 function Libraries() {

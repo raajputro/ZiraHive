@@ -349,3 +349,128 @@ class PartyMessage(Base):
     username: Mapped[str] = mapped_column(String(64))
     text: Mapped[str] = mapped_column(Text)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+# ------------------------------------------------------------------ music
+
+class MusicAlbum(Base):
+    """One album: the tracks in one folder that share an album name."""
+
+    __tablename__ = "music_albums"
+    __table_args__ = (UniqueConstraint("library_id", "key"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    library_id: Mapped[str] = mapped_column(ForeignKey("libraries.id", ondelete="CASCADE"), index=True)
+    key: Mapped[str] = mapped_column(String(1024))  # folder + album name, for matching on rescans
+    title: Mapped[str] = mapped_column(String(512))
+    artist: Mapped[str] = mapped_column(String(512), default="Unknown artist")
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    genre: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    cover_ready: Mapped[bool] = mapped_column(Boolean, default=False)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Track(Base):
+    __tablename__ = "tracks"
+    __table_args__ = (UniqueConstraint("library_id", "rel_path"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    library_id: Mapped[str] = mapped_column(ForeignKey("libraries.id", ondelete="CASCADE"), index=True)
+    album_id: Mapped[str | None] = mapped_column(
+        ForeignKey("music_albums.id", ondelete="SET NULL"), nullable=True, index=True)
+    rel_path: Mapped[str] = mapped_column(Text)
+    title: Mapped[str] = mapped_column(String(512))
+    artist: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    album_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    track_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    disc_no: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    genre: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    duration: Mapped[float | None] = mapped_column(Float, nullable=True)
+    codec: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    playable: Mapped[bool] = mapped_column(Boolean, default=True)  # browsers can play it as it is
+    size: Mapped[int] = mapped_column(BigInteger, default=0)
+    mtime: Mapped[float] = mapped_column(Float, default=0)
+    missing: Mapped[bool] = mapped_column(Boolean, default=False)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class TrackStat(Base):
+    """Per person: favourite, play count, last played."""
+
+    __tablename__ = "track_stats"
+    __table_args__ = (UniqueConstraint("user_id", "track_id"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    track_id: Mapped[str] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"), index=True)
+    favorite: Mapped[bool] = mapped_column(Boolean, default=False)
+    plays: Mapped[int] = mapped_column(Integer, default=0)
+    last_played: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True, index=True)
+
+
+class Playlist(Base):
+    __tablename__ = "playlists"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class PlaylistTrack(Base):
+    __tablename__ = "playlist_tracks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    playlist_id: Mapped[str] = mapped_column(ForeignKey("playlists.id", ondelete="CASCADE"), index=True)
+    track_id: Mapped[str] = mapped_column(ForeignKey("tracks.id", ondelete="CASCADE"))
+    position: Mapped[int] = mapped_column(Integer, default=0)
+
+
+# ------------------------------------------------------- audiobooks, ebooks, comics
+
+class Book(Base):
+    """An audiobook (one file or a folder of parts), an ebook (EPUB, PDF) or a comic
+    (CBZ, CBR, CB7, CBT, or a folder of page images)."""
+
+    __tablename__ = "books"
+    __table_args__ = (UniqueConstraint("library_id", "rel_path"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    library_id: Mapped[str] = mapped_column(ForeignKey("libraries.id", ondelete="CASCADE"), index=True)
+    rel_path: Mapped[str] = mapped_column(Text)  # the file, or the folder for multi-part books
+    kind: Mapped[str] = mapped_column(String(16))  # audiobook | ebook | comic
+    format: Mapped[str] = mapped_column(String(16))  # epub pdf cbz cbr cb7 cbt images audio
+    title: Mapped[str] = mapped_column(String(512))
+    author: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    narrator: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    series_name: Mapped[str | None] = mapped_column(String(512), nullable=True, index=True)
+    series_index: Mapped[float | None] = mapped_column(Float, nullable=True)
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    language: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    description: Mapped[str | None] = mapped_column(Text, nullable=True)
+    cover_ready: Mapped[bool] = mapped_column(Boolean, default=False)
+    size: Mapped[int] = mapped_column(BigInteger, default=0)
+    mtime: Mapped[float] = mapped_column(Float, default=0)
+    duration: Mapped[float | None] = mapped_column(Float, nullable=True)  # audiobooks
+    pages: Mapped[int | None] = mapped_column(Integer, nullable=True)  # comics and PDFs
+    # audiobooks: [{"rel": ..., "duration": ..., "playable": bool}]; comics: page entry names
+    parts_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    chapters_json: Mapped[str | None] = mapped_column(Text, nullable=True)  # [{"title", "start"}]
+    missing: Mapped[bool] = mapped_column(Boolean, default=False)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class BookProgress(Base):
+    __tablename__ = "book_progress"
+    __table_args__ = (UniqueConstraint("user_id", "book_id"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    book_id: Mapped[str] = mapped_column(ForeignKey("books.id", ondelete="CASCADE"), index=True)
+    position: Mapped[float] = mapped_column(Float, default=0)  # seconds, or page number
+    locator: Mapped[str | None] = mapped_column(Text, nullable=True)  # EPUB location (CFI)
+    fraction: Mapped[float] = mapped_column(Float, default=0)  # 0..1
+    finished: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

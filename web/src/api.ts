@@ -45,7 +45,41 @@ export interface Activity {
 }
 export interface FolderListing { folder: string; folders: string[]; assets: Asset[] }
 export interface PhotoPage { items: Asset[]; next_cursor: string | null }
-export type LibraryKind = "movies" | "shows" | "mixed";
+export type LibraryKind = "movies" | "shows" | "mixed" | "music" | "audiobooks" | "books" | "comics";
+export const VIDEO_KINDS: LibraryKind[] = ["movies", "shows", "mixed"];
+
+// ------------------------------------------------------------------ music
+export interface MusicAlbum {
+  id: string; library_id: string; title: string; artist: string; year: number | null; genre: string | null;
+  cover_ready: boolean; added_at: string; track_count: number; duration: number;
+}
+export interface Track {
+  id: string; library_id: string; album_id: string | null; title: string; artist: string | null; album_title: string | null;
+  track_no: number | null; disc_no: number | null; year: number | null; genre: string | null; duration: number | null;
+  codec: string | null; playable: boolean; favorite: boolean; plays: number; cover_ready: boolean;
+}
+export interface MusicAlbumDetail extends MusicAlbum { tracks: Track[] }
+export interface Artist { name: string; album_count: number; track_count: number; cover_album_id: string | null }
+export interface ArtistDetail { name: string; albums: MusicAlbum[]; tracks: Track[] }
+export interface Playlist { id: string; name: string; created_at: string; updated_at: string; track_count: number; duration: number; cover_album_ids: string[] }
+export interface PlaylistDetail extends Playlist { tracks: Track[] }
+export interface MusicHome { recent_albums: MusicAlbum[]; recently_played: Track[]; most_played: Track[]; playlists: Playlist[]; favorite_count: number }
+
+// ------------------------------------------------------- audiobooks, ebooks, comics
+export type BookKind = "audiobook" | "ebook" | "comic";
+export interface BookProgress { position: number; locator: string | null; fraction: number; finished: boolean; updated_at: string | null }
+export interface Book {
+  id: string; library_id: string; kind: BookKind; format: string; title: string; author: string | null; narrator: string | null;
+  series_name: string | null; series_index: number | null; year: number | null; cover_ready: boolean; size: number;
+  duration: number | null; pages: number | null; added_at: string; progress: BookProgress | null;
+}
+export interface AudioPart { index: number; title: string; start: number; duration: number; playable: boolean }
+export interface Chapter { title: string; start: number }
+export interface BookDetail extends Book {
+  description: string | null; language: string | null; parts: AudioPart[]; chapters: Chapter[]; rtl: boolean;
+  downloadable: boolean; next_in_series: string | null;
+}
+export interface BookProgressIn { position: number; fraction: number; locator?: string | null; finished?: boolean }
 export interface Library {
   id: string; name: string; path: string; kind: LibraryKind; sort_order: number; age_rating: number | null;
   last_scan_at: string | null; item_count: number; available: boolean;
@@ -135,6 +169,35 @@ const q = (params: Record<string, string | number | undefined | null>) => {
 };
 
 export const api = {
+  // music
+  musicHome: () => request<MusicHome>("GET", "/api/music/home"),
+  musicAlbums: (params: { library_id?: string; q?: string; artist?: string; sort?: "added" | "title" | "artist" | "year"; limit?: number } = {}) =>
+    request<MusicAlbum[]>("GET", `/api/music/albums${q(params)}`),
+  musicAlbum: (id: string) => request<MusicAlbumDetail>("GET", `/api/music/albums/${id}`),
+  artists: () => request<Artist[]>("GET", "/api/music/artists"),
+  artist: (name: string) => request<ArtistDetail>("GET", `/api/music/artist${q({ name })}`),
+  songs: (params: { q?: string; favorites?: boolean; sort?: "title" | "artist" | "added" | "album"; limit?: number } = {}) =>
+    request<Track[]>("GET", `/api/music/tracks${q({ ...params, favorites: params.favorites ? "true" : undefined })}`),
+  prepareTrack: (id: string, force = false) => request<{ ready: boolean; failed: boolean }>("GET", `/api/music/tracks/${id}/prepare${force ? "?force=true" : ""}`),
+  trackPlayed: (id: string) => request<void>("POST", `/api/music/tracks/${id}/played`),
+  setFavorite: (id: string, favorite: boolean) => request<void>("PUT", `/api/music/tracks/${id}/favorite`, { favorite }),
+  playlists: () => request<Playlist[]>("GET", "/api/music/playlists"),
+  playlist: (id: string) => request<PlaylistDetail>("GET", `/api/music/playlists/${id}`),
+  createPlaylist: (name: string, track_ids: string[] = []) => request<PlaylistDetail>("POST", "/api/music/playlists", { name, track_ids }),
+  updatePlaylist: (id: string, change: { name?: string; track_ids?: string[] }) => request<PlaylistDetail>("PATCH", `/api/music/playlists/${id}`, change),
+  addToPlaylist: (id: string, track_ids: string[]) => request<PlaylistDetail>("POST", `/api/music/playlists/${id}/tracks`, { track_ids }),
+  deletePlaylist: (id: string) => request<void>("DELETE", `/api/music/playlists/${id}`),
+  // audiobooks, ebooks, comics
+  books: (params: { kind?: BookKind | "reading"; library_id?: string; q?: string; series?: string; sort?: "added" | "title" | "author" | "series"; limit?: number } = {}) =>
+    request<Book[]>("GET", `/api/books${q(params)}`),
+  continueBooks: (kind?: BookKind | "reading") => request<Book[]>("GET", `/api/books/continue${q({ kind })}`),
+  book: (id: string) => request<BookDetail>("GET", `/api/books/${id}`),
+  prepareBookPart: (id: string, part: number, force = false) =>
+    request<{ ready: boolean; failed: boolean }>("GET", `/api/books/${id}/audio/${part}/prepare${force ? "?force=true" : ""}`),
+  saveBookProgress: (id: string, p: BookProgressIn, keepalive = false) =>
+    request<BookProgress>("PUT", `/api/books/${id}/progress`, p, keepalive ? { keepalive: true } : {}),
+  resetBookProgress: (id: string) => request<void>("DELETE", `/api/books/${id}/progress`),
+
   setupStatus: () => request<{ needs_setup: boolean }>("GET", "/api/setup/status"),
   setup: (username: string, password: string) => request<{ user: User }>("POST", "/api/setup", { username, password }),
   login: (username: string, password: string, code?: string) =>
@@ -259,6 +322,12 @@ export const url = {
   hls: (m: { id: string }, quality: string, audio: number) => `/api/media/${m.id}/hls/${quality}/${audio}/index.m3u8`,
   subtitle: (m: { id: string }, subId: string) => `/api/media/${m.id}/subtitles/${subId}.vtt`,
   offlineFile: (c: { id: string }) => `/api/offline/${c.id}/file`,
+  albumCover: (a: { id: string }) => `/api/music/albums/${a.id}/cover`,
+  trackStream: (t: { id: string }, converted = false) => `/api/music/tracks/${t.id}/stream${converted ? "?converted=true" : ""}`,
+  bookCover: (b: { id: string }) => `/api/books/${b.id}/cover`,
+  bookFile: (b: { id: string }, download = false) => `/api/books/${b.id}/file${download ? "?download=true" : ""}`,
+  bookAudio: (b: { id: string }, part: number, converted = false) => `/api/books/${b.id}/audio/${part}${converted ? "?converted=true" : ""}`,
+  bookPage: (b: { id: string }, page: number, width: number) => `/api/books/${b.id}/pages/${page}?w=${width}`,
 };
 
 export function formatBytes(n: number): string {

@@ -234,11 +234,15 @@ def _episode_label(ep: EpisodeInfo, rel: str) -> str:
 
 
 async def scan(library_id: str) -> dict:
+    from . import shelf_scan
+
     stats = {"added": 0, "updated": 0, "missing": 0, "total": 0}
     async with sessionmaker()() as session:
         lib = await session.get(Library, library_id)
         if lib is None:
             return stats
+        if lib.kind in shelf_scan.SHELF_KINDS:
+            return await shelf_scan.scan(library_id)
         root = Path(lib.path)
         existing = {m.rel_path: m for m in (await session.scalars(
             select(MediaItem).where(MediaItem.library_id == lib.id))).all()}

@@ -4,6 +4,10 @@
     D:/Media/hindi_movies     -> "Hindi Movies"    (movies)
     D:/Media/Web Series       -> "Web Series"      (shows)
     D:/Media/Animation        -> "Animation"       (mixed: movies and series together)
+    D:/Media/Music            -> "Music"           (music)
+    D:/Media/Audiobooks       -> "Audiobooks"      (audiobooks)
+    D:/Media/Ebooks           -> "Ebooks"          (books: EPUB and PDF)
+    D:/Media/Comics           -> "Comics"          (comics: CBZ, CBR, folders of pages)
 """
 from __future__ import annotations
 
@@ -19,6 +23,10 @@ from ..models import Library
 
 log = logging.getLogger(__name__)
 
+_AUDIOBOOKS = re.compile(r"audio ?books?|\bgolpo\b|story ?tapes?", re.I)
+_MUSIC = re.compile(r"music|songs?\b|\bgaan\b|sangeet|sangit|\bgeet|qawwali|\bmp3\b|albums?\b|playlist", re.I)
+_COMICS = re.compile(r"comic|manga|manhwa|webtoon|graphic novel", re.I)
+_BOOKS = re.compile(r"books?\b|ebook|novel|\bpdfs?\b|reading|library|\bboi\b", re.I)
 _SHOWS = re.compile(r"series|\bshows?\b|\btv\b|drama|sitcom|season|natok|serial", re.I)
 _MIXED = re.compile(r"anim|cartoon|kids|children|anime", re.I)
 _SMALL = {"and", "of", "the", "a", "an", "in", "on"}
@@ -39,6 +47,9 @@ def pretty_name(folder: str) -> str:
 
 
 def guess_kind(name: str) -> str:
+    for kind, pattern in (("audiobooks", _AUDIOBOOKS), ("music", _MUSIC), ("comics", _COMICS), ("books", _BOOKS)):
+        if pattern.search(name):
+            return kind
     if _SHOWS.search(name):
         return "shows"
     if _MIXED.search(name):

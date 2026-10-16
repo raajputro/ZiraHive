@@ -127,3 +127,17 @@ def version_target(username: str, asset_id: str, filename: str) -> tuple[Path, s
 
 def preview_path(asset_id: str) -> Path:
     return get_settings().cache_dir / "previews" / f"{asset_id}.webp"
+
+
+def cover_path(kind: str, item_id: str) -> Path:
+    """Album and book covers: covers/album-<id>.webp, covers/book-<id>.webp"""
+    return get_settings().cache_dir / "covers" / f"{kind}-{item_id}.webp"
+
+
+def audio_cache_path(key: str) -> Path:
+    """Audio converted once to MP3 for browsers (WMA, ALAC, APE, ...)."""
+    return get_settings().cache_dir / "audio" / f"{key}.mp3"
+
+
+def page_cache_path(book_id: str, page: int, width: int) -> Path:
+    return get_settings().cache_dir / "pages" / book_id / f"{page}-{width}"

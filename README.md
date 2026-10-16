@@ -21,6 +21,13 @@ your PC, phone and TV.
   invite family or friends. Everyone's video stays in step, anyone (or only the host) can pause and
   skip, the party waits when someone's video is loading, and there's chat, emoji reactions and
   "next episode for everyone". Each person still picks their own quality, audio and subtitles
+- **Listen**: music by album, artist and song, favourites, playlists, shuffle and repeat, and a
+  player that keeps going while you browse, with lock-screen and headset controls on phones.
+  Audiobooks remember where you stopped, with chapters, speed and a sleep timer. WMA, ALAC and
+  other formats browsers can't play are converted once, by themselves
+- **Read**: EPUB and PDF books and comics (CBZ, CBR, CB7, or a folder of page pictures) in the
+  browser, with your place saved on every device. Light, sepia and dark pages, text size, a contents
+  list, right-to-left for manga and a scrolling mode for webtoons
 - **Kids**: give a profile an age limit and it only sees titles rated for that age
 - **Family**: several accounts with their own private space, admin and member roles, and
   storage limits
@@ -30,8 +37,8 @@ your PC, phone and TV.
   disk, and on your phone through the free ntfy app
 - **Admin dashboard**: who is watching what, background jobs, and free space on every disk
 
-> Status: milestone 1, batches 1 to 3 and remote access. Next up: music, audiobooks, ebooks and
-> comics. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: milestone 1, batches 1 to 4 and remote access. Next up: an encrypted vault, encrypted
+> offsite backup, a Bangla interface and a PC sync client. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it fits together
 
@@ -127,6 +134,17 @@ D:/Media/
   Animation/
     Kung Fu Panda (2008).mkv
     Avatar The Last Airbender/Book 1/Avatar.S01E01.mkv
+  Music/
+    Shonar Band/Monsoon Songs (2021)/01 - Rain on Tin.mp3
+  Audiobooks/
+    The River Journey.m4b
+    Rabindra Thakur/Short Stories/01 The Postmaster.mp3, 02 Kabuliwala.mp3, ...
+  Ebooks/
+    Nadi Writer/The River Journey.epub
+    Cooking with Mustard Oil.pdf
+  Comics/
+    Sky Rider/Sky Rider 001.cbz
+    Hero Academy/Chapter 001/001.jpg, 002.jpg, ...
 ```
 
 GharBox finds new folders on start, every night, and when you press **Find new folders** in
@@ -138,6 +156,14 @@ type, guessed from its name and changeable in Settings:
 | Movies | English, Hindi, Bangla movies | every file is a movie |
 | Series | Web Series, TV Shows, Natok | every file is an episode, grouped by the show's folder |
 | Movies and series | Animation, Kids | files named like `S01E02` are episodes, the rest are movies |
+| Music | Music, Bangla Songs, Rabindra Sangeet | every audio file is a song; songs in one folder with the same album tag are an album |
+| Audiobooks | Audiobooks | one file is one book; a folder of files (CD1/CD2 folders too) is one book in parts |
+| Books | Ebooks, Novels | EPUB and PDF; series from Calibre's metadata |
+| Comics | Comics, Manga | CBZ, CBR, CB7, CBT, or a folder of page pictures; series and issue from the name or ComicInfo.xml |
+
+Music uses the tags inside the files (title, artist, album, track number, year, cover picture). Files
+without tags still work: the song name comes from the file name, the album from its folder and the
+artist from the folder above, and a `cover.jpg` or `folder.jpg` next to the songs becomes the cover.
 
 Episodes are recognised from `S01E02`, `1x02`, `E03`, `Episode 7` or a leading number
 (`01 - Pilot.mkv`), with the season taken from the name or a `Season 2` / `Book 2` folder.
@@ -166,6 +192,26 @@ under the `api` volumes), restart, then use **Add a folder from another drive** 
   once for all episodes. When the credits start, the next episode counts down from 10 and plays.
 - **NVIDIA GPU**: converting on the CPU works, but a GPU makes it effortless. Uncomment the `deploy`
   block under `api` (and `worker`) in `docker-compose.yml`. Settings > Server shows which is used.
+
+### Listening and reading
+
+- **The player** sits along the bottom and keeps playing while you look at photos or files. Tap it
+  for the big view with the queue (music) or chapters (audiobooks). On phones the lock screen and
+  Bluetooth headsets can pause, skip and seek.
+- **Audiobooks** save your place every few seconds and when you pause, so you can stop on the phone
+  and carry on from the PC. Speed goes from 0.75× to 2×; the sleep timer stops after some minutes
+  or at the end of the chapter.
+- **Formats**: MP3, AAC/M4A/M4B, FLAC, Ogg and Opus play as they are. WMA, ALAC, APE and AIFF are
+  converted to MP3 the first time they play (a few seconds for a song). If a browser can't play a
+  file it should (some Linux browsers have no AAC), GharBox converts that one too.
+- **Books** open on the page you left, on any device. EPUB text size, font and page colour are up to
+  you; PDFs show one page at a time, sharp on phones. **Download** saves the original file for an
+  e-reader.
+- **Comics** load pages sized for your screen (smaller with Low-data mode) and remember the page.
+  Manga marked right-to-left in ComicInfo.xml open that way; you can switch any comic in the reading
+  settings, and choose **Scroll down** for webtoons.
+- Reading CBR/CB7 comics and showing PDF covers use `bsdtar` and `pdftoppm`, which the Docker image
+  includes.
 
 ### Age limits for kids
 

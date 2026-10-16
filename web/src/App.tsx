@@ -1,9 +1,11 @@
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Images, Folder, Clapperboard, Trash2, Settings, LogOut } from "lucide-react";
+import { Images, Folder, Clapperboard, Headphones, BookOpen, Trash2, Settings, LogOut } from "lucide-react";
 import { api, ApiError, type User } from "./api";
 import { UploadProvider } from "./uploads";
 import { PrefsProvider } from "./prefs";
+import { AudioProvider } from "./audio";
+import NowPlaying from "./components/NowPlaying";
 import NotificationBell from "./components/Notifications";
 import PhotosPage from "./pages/Photos";
 import AlbumsPage, { AlbumPage } from "./pages/Albums";
@@ -15,6 +17,10 @@ import PlayerRoute from "./pages/Player";
 import PartyRoute from "./pages/Party";
 import PartiesPage from "./pages/Parties";
 import TrashPage from "./pages/Trash";
+import { AlbumDetailPage, AlbumsPage as MusicAlbumsPage, ArtistDetailPage, ArtistsPage, AudiobookPage, AudiobooksPage, ListenHome,
+  PlaylistDetailPage, PlaylistsPage, SongsPage } from "./pages/Listen";
+import { ReadHome, ReadLibraryPage, ReadSeriesPage } from "./pages/Read";
+import ReaderRoute from "./pages/Reader";
 import AdminPage from "./pages/Admin";
 
 interface AuthCtx { user: User; signOut: () => void; refreshUser: () => void }
@@ -50,6 +56,7 @@ function SignedInApp() {
   return (
     <AuthContext.Provider value={{ user, signOut, refreshUser }}>
       <UploadProvider>
+        <AudioProvider>
         <BrowserRouter>
           <Shell>
             <Routes>
@@ -65,12 +72,27 @@ function SignedInApp() {
               <Route path="/watch/parties" element={<PartiesPage />} />
               <Route path="/party/:id" element={<PartyRoute />} />
               <Route path="/movies" element={<Navigate to="/watch" replace />} />
+              <Route path="/listen" element={<ListenHome />} />
+              <Route path="/listen/albums" element={<MusicAlbumsPage />} />
+              <Route path="/listen/album/:id" element={<AlbumDetailPage />} />
+              <Route path="/listen/artists" element={<ArtistsPage />} />
+              <Route path="/listen/artist" element={<ArtistDetailPage />} />
+              <Route path="/listen/songs" element={<SongsPage />} />
+              <Route path="/listen/playlists" element={<PlaylistsPage />} />
+              <Route path="/listen/playlist/:id" element={<PlaylistDetailPage />} />
+              <Route path="/listen/audiobooks" element={<AudiobooksPage />} />
+              <Route path="/listen/book/:id" element={<AudiobookPage />} />
+              <Route path="/read" element={<ReadHome />} />
+              <Route path="/read/c/:id" element={<ReadLibraryPage />} />
+              <Route path="/read/series" element={<ReadSeriesPage />} />
+              <Route path="/read/book/:id" element={<ReaderRoute />} />
               <Route path="/trash" element={<TrashPage />} />
               <Route path="/settings" element={<AdminPage />} />
               <Route path="*" element={<Navigate to="/photos" replace />} />
             </Routes>
           </Shell>
         </BrowserRouter>
+        </AudioProvider>
       </UploadProvider>
     </AuthContext.Provider>
   );
@@ -79,21 +101,23 @@ function SignedInApp() {
 function Shell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
-  const cinema = pathname.startsWith("/watch") || pathname.startsWith("/play") || pathname.startsWith("/party");
+  const cinema = ["/watch", "/play", "/party", "/listen"].some((p) => pathname.startsWith(p));
   useEffect(() => { document.documentElement.dataset.room = cinema ? "cinema" : "home"; }, [cinema]);
   const links = [
     { to: "/photos", label: "Photos", icon: Images },
     { to: "/files", label: "Files", icon: Folder },
     { to: "/watch", label: "Watch", icon: Clapperboard },
-    { to: "/trash", label: "Trash", icon: Trash2 },
-    { to: "/settings", label: "Settings", icon: Settings },
+    { to: "/listen", label: "Listen", icon: Headphones },
+    { to: "/read", label: "Read", icon: BookOpen },
+    { to: "/trash", label: "Trash", icon: Trash2, desktop: true },
+    { to: "/settings", label: "Settings", icon: Settings, desktop: true },
   ];
   return (
     <div className="shell">
       <nav className="rail" aria-label="Main">
         <div className="brand"><span lang="bn">ঘর</span> GharBox</div>
-        {links.map(({ to, label, icon: Icon }) => (
-          <NavLink key={to} to={to}><Icon size={19} aria-hidden /> <span>{label}</span></NavLink>
+        {links.map(({ to, label, icon: Icon, desktop }) => (
+          <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}><Icon size={19} aria-hidden /> <span>{label}</span></NavLink>
         ))}
         <div className="rail-foot">
           <span className="who">{user.username}</span>
@@ -103,9 +127,12 @@ function Shell({ children }: { children: ReactNode }) {
       </nav>
       <div className="mobile-top">
         <span className="brand-inline"><span lang="bn">ঘর</span> GharBox</span>
+        <NavLink to="/trash" className="icon" aria-label="Trash"><Trash2 size={19} /></NavLink>
+        <NavLink to="/settings" className="icon" aria-label="Settings"><Settings size={19} /></NavLink>
         <NotificationBell />
       </div>
       <main>{children}</main>
+      <NowPlaying />
     </div>
   );
 }
