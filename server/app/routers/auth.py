@@ -252,6 +252,9 @@ async def update_user(user_id: str, body: UserUpdateIn, request: Request,
     if user is None:
         raise HTTPException(404, "User not found")
     changes = []
+    if body.max_age is not None:
+        user.max_age = None if body.max_age < 0 else body.max_age
+        changes.append(f"age limit={user.max_age or 'none'}")
     if body.is_admin is not None and body.is_admin != user.is_admin:
         if user.id == admin.id and not body.is_admin:
             raise HTTPException(400, "You can't remove your own admin role")

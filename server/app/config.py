@@ -37,6 +37,12 @@ class Settings(BaseSettings):
     max_chunk_mb: int = 64
     cors_origins: str = "http://localhost:5173"
 
+    # Video encoding: "auto" uses an NVIDIA GPU when one works in the container, else the CPU.
+    # "nvenc" or "none" force it.
+    hw_accel: str = "auto"
+    max_transcodes: int = 3  # films converting at the same time
+    offline_days: int = 14  # offline copies unused this long are deleted
+
     ffmpeg_bin: str = "ffmpeg"
     ffprobe_bin: str = "ffprobe"
 

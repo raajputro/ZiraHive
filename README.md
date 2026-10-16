@@ -14,7 +14,10 @@ your PC, phone and TV.
   a view-only mode. Visitors don't need an account
 - **Watch**: one category per folder (English Movies, Hindi Movies, Bangla Movies, Web Series,
   Animation, ...). Movies get titles, years and posters; web series get seasons, episodes and
-  "next episode". Streams with seeking and remembers where each person stopped
+  "next episode". Every format plays in the browser: anything the browser can't play is converted
+  on the fly. Pick the quality (down to 360p for mobile data), the audio language and subtitles,
+  skip intros, and download a smaller copy to watch offline
+- **Kids**: give a profile an age limit and it only sees titles rated for that age
 - **Family**: several accounts with their own private space, admin and member roles, and
   storage limits
 - **Security**: two-factor sign-in with recovery codes, "sign out everywhere", password changes
@@ -140,6 +143,34 @@ episode of every series you're following.
 A category on another drive: mount it in `docker-compose.yml` (there's a commented example
 under the `api` volumes), restart, then use **Add a folder from another drive** in Settings.
 
+### Playing anything
+
+- **Files the browser can play** (MP4 with H.264, WebM) play as they are, with seeking.
+- **Everything else** (MKV with AC-3/DTS sound, HEVC, AVI, ...) is converted while you watch.
+  The seek bar still shows the whole film and you can jump anywhere; GharBox converts from that
+  point. Conversion pauses when it's far ahead of you and stops when nobody is watching.
+- **Quality**: Original, 1080p, 720p, 480p or 360p. With **Low-data mode** on (Settings > Your
+  account) videos start at 480p.
+- **Audio and subtitles**: every audio track is listed by language (handy for dual-audio Hindi and
+  Bangla releases). Subtitles come from inside the file or from a file next to it with the same name:
+  `Movie.srt`, `Movie.en.srt`, `Movie.bn.srt`. Picture-based subtitles (Blu-ray PGS) aren't shown yet.
+- **Watch offline**: under the player, **Make a copy** creates a smaller MP4 (480p is about 1 to 1.5 GB for a
+  two-hour film). You get a notification when it's ready, then **Save file** downloads it to your phone or
+  laptop. Copies nobody has used for 14 days are deleted.
+- **Skip intro and next episode**: files with chapters called Intro or Credits get the buttons
+  automatically. For a series without chapters, an admin opens the series and sets **Intro and credits**
+  once for all episodes. When the credits start, the next episode counts down from 10 and plays.
+- **NVIDIA GPU**: converting on the CPU works, but a GPU makes it effortless. Uncomment the `deploy`
+  block under `api` (and `worker`) in `docker-compose.yml`. Settings > Server shows which is used.
+
+### Age limits for kids
+
+1. **Settings > People**, edit the child's account, choose **Only rated 7+ or younger** (or 13+).
+2. Give titles an age. With a TMDB key, movies and series get their certificate automatically
+   (India's CBFC first, then the US and UK). For whole categories, pick **Suits 7+** next to e.g.
+   Animation in **Settings > Server**. An admin can also set any single title on its page.
+3. Titles without any age are hidden from limited profiles, to be safe.
+
 ### Movie files
 
 - Name files like `Movie Name (2019).mkv`, or the common `Movie.Name.2019.1080p.mkv` style;
@@ -202,7 +233,7 @@ GharBox is tested at three levels:
 
 | What | Where | Run |
 |---|---|---|
-| API tests (pytest, 53 tests) | `server/tests` | `cd server; pytest` |
+| API tests (pytest, 68 tests) | `server/tests` | `cd server; pytest` |
 | End-to-end tests in a real browser (Playwright) | `e2e/tests` | see below |
 | Load test (Locust) | `loadtest/locustfile.py` | see the file's header |
 
@@ -218,8 +249,11 @@ npx playwright test          # npx playwright show-report for the HTML report
 ```
 
 They cover folders and trash, version history, password-protected links opened by a visitor,
-albums shared with a family member, two-factor sign-in with recovery codes, the Watch pages and
-the phone layout. They create their own uniquely named test data, so they're safe to run against
+albums shared with a family member, two-factor sign-in with recovery codes, the Watch pages, the
+phone layout, and the player: converting a film the browser can't play, skip intro, switching audio
+and subtitles, offline copies and the next-episode countdown. The player tests need real Google
+Chrome (`npx playwright install chrome`), because the open-source Chromium can't decode H.264; they
+skip themselves otherwise. They create their own uniquely named test data, so they're safe to run against
 your real server, though the test users and folders stay afterwards.
 
 GitHub Actions (`.github/workflows/ci.yml`) runs the API tests, builds the web app and the Docker

@@ -93,10 +93,48 @@ async def process_asset(_ctx: Any, asset_id: str) -> None:
         await session.commit()
 
 
+async def make_offline_copy(_ctx: Any, copy_id: str) -> None:
+    """Encode a smaller MP4 for offline viewing, reporting progress as it goes."""
+    from pathlib import Path
+
+    from ..models import Library, MediaItem, OfflineCopy, User
+    from . import transcode
+    from .events import notify
+
+    async with sessionmaker()() as session:
+        copy = await session.get(OfflineCopy, copy_id)
+        if copy is None or copy.status not in ("queued", "failed"):
+            return
+        item = await session.get(MediaItem, copy.media_id)
+        lib = await session.get(Library, item.library_id) if item else None
+        if item is None or lib is None:
+            return
+        copy.status, copy.progress = "working", 0
+        await session.commit()
+
+        async def progress(p: float) -> None:
+            copy.progress = round(p, 3)
+            await session.commit()
+
+        dest = transcode.offline_path(item.id, copy.quality)
+        try:
+            await transcode.make_mp4(Path(lib.path) / item.rel_path, dest, copy.quality, item.height,
+                                     item.duration, progress)
+            copy.status, copy.progress, copy.size = "ready", 1.0, dest.stat().st_size
+            who = await session.get(User, copy.requested_by) if copy.requested_by else None
+            if who:
+                await notify(session, who, "offline", f"{item.title} is ready to download",
+                             "Open it and press Download for offline.", link=f"/play/{item.id}")
+        except Exception as exc:
+            log.warning("offline copy of %s failed: %s", item.title, exc)
+            copy.status, copy.error = "failed", str(exc)[-300:]
+        await session.commit()
+
+
 async def scan_library(_ctx: Any, library_id: str) -> dict:
     from .scanner import scan
 
     return await scan(library_id)
 
 
-JOBS = {"process_asset": process_asset, "scan_library": scan_library}
+JOBS = {"process_asset": process_asset, "scan_library": scan_library, "make_offline_copy": make_offline_copy}

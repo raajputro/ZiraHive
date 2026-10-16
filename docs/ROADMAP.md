@@ -23,10 +23,18 @@
 - Admin dashboard: active streams, job queue, disks
 - Playwright end-to-end suite, Locust load test, GitHub Actions CI with Docker build
 
-## Milestone 2: play anything
-- FFmpeg transcoding to HLS, with NVIDIA NVENC when available
-- Subtitles (embedded and .srt), audio track choice
-- Offline: download a smaller copy of a movie to watch without internet
+## Batch 2: play anything (done)
+- On-the-fly HLS conversion with on-demand segments, seeking anywhere, pause when ahead, idle stop
+- NVIDIA NVENC when available, CPU otherwise; limit on simultaneous conversions; shown on the dashboard
+- Quality choice 1080p to 360p, low-data default; audio track choice; text subtitles (embedded and sidecar)
+- Offline copies (MP4) with progress and notification, auto-cleanup
+- Skip intro and next-episode countdown from chapters or per-series markers
+- Age limits per profile; ratings from TMDB certificates, per title and per category
+
+## Later for playback
+- Remux instead of re-encode when only the audio needs converting
+- Picture-based subtitles (PGS) burned in; automatic intro detection by audio fingerprint
+- Chromecast and DLNA
 
 ## Milestone 3: together
 - Watch parties: rooms, invite links, synced play/pause/seek over WebSocket, chat

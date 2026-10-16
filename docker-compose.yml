@@ -19,6 +19,9 @@ x-server-env: &server-env
   GHARBOX_TMDB_API_KEY: ${GHARBOX_TMDB_API_KEY:-}
   GHARBOX_PUBLIC_URL: ${GHARBOX_PUBLIC_URL:-}
   GHARBOX_API_DOCS: "false"
+  GHARBOX_HW_ACCEL: ${GHARBOX_HW_ACCEL:-auto}
+  GHARBOX_MAX_TRANSCODES: ${GHARBOX_MAX_TRANSCODES:-3}
+  NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
   GHARBOX_CORS_ORIGINS: ""
 
 x-server-volumes: &server-volumes
@@ -52,6 +55,14 @@ services:
     restart: unless-stopped
     environment: *server-env
     volumes: *server-volumes
+    # NVIDIA GPU for converting video while you watch (much faster than the CPU).
+    # Needs an NVIDIA card, a current Windows driver and Docker Desktop with WSL 2.
+    # Uncomment these lines, then `docker compose up -d`. Settings > Server shows "NVIDIA GPU"
+    # next to anything being converted when it works.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu, video, compute, utility] }]
     depends_on:
       postgres:
         condition: service_healthy
@@ -71,12 +82,12 @@ services:
         condition: service_healthy
       redis:
         condition: service_started
-    # NVIDIA GPU for faster thumbnails now and hardware transcoding later.
-    # Uncomment if you have an NVIDIA card and the NVIDIA driver for WSL2.
+    # NVIDIA GPU for offline copies: same as for `api` above.
+    # environment: same as api, plus the line below
     # deploy:
     #   resources:
     #     reservations:
-    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu, video] }]
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu, video, compute, utility] }]
 
   postgres:
     # pgvector is included now so AI search can be added later without a migration of images.

@@ -32,6 +32,8 @@ class User(Base):
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     ntfy_url: Mapped[str | None] = mapped_column(String(512), nullable=True)  # push notifications
+    # Kids' profiles: only titles rated for this age or younger are shown. None = no limit.
+    max_age: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class Folder(Base):
@@ -108,6 +110,8 @@ class Library(Base):
     path: Mapped[str] = mapped_column(Text, unique=True)
     kind: Mapped[str] = mapped_column(String(16), default="movies")
     sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
+    # Default age rating for titles here that have none of their own (e.g. Animation = 7)
+    age_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
     last_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -127,6 +131,12 @@ class Series(Base):
     poster_ready: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     tmdb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    certification: Mapped[str | None] = mapped_column(String(16), nullable=True)  # from TMDB
+    age_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)  # admin's choice
+    # Skip-intro markers that apply to every episode (seconds); credits = seconds before the end
+    intro_start: Mapped[float | None] = mapped_column(Float, nullable=True)
+    intro_end: Mapped[float | None] = mapped_column(Float, nullable=True)
+    credits_before_end: Mapped[float | None] = mapped_column(Float, nullable=True)
 
 
 class MediaItem(Base):
@@ -157,6 +167,14 @@ class MediaItem(Base):
     season: Mapped[int | None] = mapped_column(Integer, nullable=True)
     episode: Mapped[int | None] = mapped_column(Integer, nullable=True)
     episode_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # audio / subtitle tracks and chapters found by ffprobe (JSON)
+    tracks_json: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # markers found in the file's chapters (seconds)
+    intro_start: Mapped[float | None] = mapped_column(Float, nullable=True)
+    intro_end: Mapped[float | None] = mapped_column(Float, nullable=True)
+    credits_start: Mapped[float | None] = mapped_column(Float, nullable=True)
+    certification: Mapped[str | None] = mapped_column(String(16), nullable=True)
+    age_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
 
 class WatchProgress(Base):
@@ -270,3 +288,21 @@ class Notification(Base):
     link: Mapped[str | None] = mapped_column(String(512), nullable=True)
     read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+class OfflineCopy(Base):
+    """A smaller MP4 of a movie or episode, made to download and watch without internet."""
+
+    __tablename__ = "offline_copies"
+    __table_args__ = (UniqueConstraint("media_id", "quality"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    media_id: Mapped[str] = mapped_column(ForeignKey("media_items.id", ondelete="CASCADE"), index=True)
+    quality: Mapped[str] = mapped_column(String(8))
+    status: Mapped[str] = mapped_column(String(16), default="queued")  # queued|working|ready|failed
+    progress: Mapped[float] = mapped_column(Float, default=0, server_default="0")
+    size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    requested_by: Mapped[str | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

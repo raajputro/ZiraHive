@@ -37,6 +37,7 @@ class UserOut(ORM):
     quota_bytes: int | None
     created_at: datetime
     totp_enabled: bool = False
+    max_age: int | None = None
 
 
 class MeOut(UserOut):
@@ -49,6 +50,7 @@ class UserAdminOut(UserOut):
 
 
 class UserUpdateIn(BaseModel):
+    max_age: int | None = Field(default=None, ge=-1, le=18)  # -1 = no limit
     is_admin: bool | None = None
     quota_gb: float | None = Field(default=None, ge=0)
     clear_quota: bool = False
@@ -162,6 +164,7 @@ class LibraryIn(BaseModel):
 class LibraryUpdateIn(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=128)
     kind: str | None = Field(default=None, pattern=_KIND)
+    age_rating: int | None = Field(default=None, ge=-1, le=18)  # -1 clears it
 
 
 class LibraryOrderIn(BaseModel):
@@ -174,6 +177,7 @@ class LibraryOut(ORM):
     path: str
     kind: str
     sort_order: int = 0
+    age_rating: int | None = None
     last_scan_at: datetime | None
     item_count: int = 0  # movies + series
     available: bool = True  # folder currently reachable
@@ -203,6 +207,10 @@ class MediaOut(ORM):
     episode: int | None = None
     episode_title: str | None = None
     next_id: str | None = None  # next episode, when this is an episode
+    intro_start: float | None = None
+    intro_end: float | None = None
+    credits_start: float | None = None
+    age: int | None = None  # effective age rating
 
 
 class TitleOut(BaseModel):
@@ -220,6 +228,7 @@ class TitleOut(BaseModel):
     browser_playable: bool = False
     episode_count: int = 0
     watched_count: int = 0
+    age: int | None = None
 
 
 class SeasonOut(BaseModel):
@@ -237,6 +246,11 @@ class SeriesOut(BaseModel):
     episode_count: int
     seasons: list[SeasonOut]
     up_next: MediaOut | None
+    age: int | None = None
+    age_rating: int | None = None  # the admin's own choice, if any
+    intro_start: float | None = None
+    intro_end: float | None = None
+    credits_before_end: float | None = None
 
 
 class ProgressIn(BaseModel):
@@ -414,8 +428,18 @@ class DiskOut(BaseModel):
     free: int
 
 
+class TranscodeOut(BaseModel):
+    title: str
+    quality: str
+    encoder: str
+    paused: bool
+    running: bool
+    viewers: list[str]
+
+
 class ActivityOut(BaseModel):
     streams: list[StreamOut]
+    transcodes: list[TranscodeOut] = []
     jobs_queued: int | None
     jobs_mode: str
     disks: list[DiskOut]
@@ -428,3 +452,52 @@ class SecurityCheck(BaseModel):
     title: str
     fix: str | None
     level: str  # high | medium | info
+
+
+class RatingIn(BaseModel):
+    age_rating: int | None = Field(default=None, ge=0, le=18)  # None clears the admin's choice
+
+
+class MarkersIn(BaseModel):
+    intro_start: float | None = Field(default=None, ge=0)
+    intro_end: float | None = Field(default=None, ge=0)
+    credits_before_end: float | None = Field(default=None, ge=0)
+
+
+class AudioTrack(BaseModel):
+    index: int
+    label: str
+    language: str | None
+    codec: str | None
+    default: bool = False
+
+
+class SubtitleTrack(BaseModel):
+    id: str
+    label: str
+    language: str | None
+    usable: bool
+    forced: bool = False
+
+
+class TracksOut(BaseModel):
+    audio: list[AudioTrack]
+    subtitles: list[SubtitleTrack]
+    qualities: list[str]
+    direct_play: bool
+    encoder: str
+
+
+class OfflineIn(BaseModel):
+    quality: str = Field(default="480p", pattern=r"^(1080p|720p|480p|360p)$")
+
+
+class OfflineOut(ORM):
+    id: str
+    media_id: str
+    quality: str
+    status: str
+    progress: float
+    size: int | None
+    error: str | None
+    created_at: datetime

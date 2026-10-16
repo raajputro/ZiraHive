@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
 import { RefreshCw, Trash2, Pencil, ArrowUp, ArrowDown, FolderSearch, ShieldCheck, Bell, Smartphone, Check, AlertTriangle } from "lucide-react";
-import { api, ApiError, formatBytes, type Activity, type AdminUser, type AuditEvent, type Library, type LibraryKind,
+import { api, ApiError, formatBytes, AGE_LABEL, AGE_OPTIONS, type Activity, type AdminUser, type AuditEvent, type Library, type LibraryKind,
   type Me, type SecurityItem, type Stats } from "../api";
 import { useAuth } from "../App";
 import { usePrefs } from "../prefs";
@@ -128,6 +128,12 @@ function Libraries() {
                 onChange={(e) => void run(() => api.updateLibrary(l.id, { kind: e.target.value as LibraryKind }),
                   `${l.name} is now ${KIND_LABEL[e.target.value as LibraryKind].toLowerCase()}. Re-scanning.`)}>
                 {(Object.keys(KIND_LABEL) as LibraryKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+              </select>
+              <label className="sr" htmlFor={`age-${l.id}`}>Who {l.name} suits</label>
+              <select id={`age-${l.id}`} value={l.age_rating ?? ""} title="Age for titles here that have no rating of their own"
+                onChange={(e) => void run(() => api.updateLibrary(l.id, { age_rating: e.target.value === "" ? -1 : Number(e.target.value) }))}>
+                <option value="">Age: not set</option>
+                {AGE_OPTIONS.map((a) => <option key={a} value={a}>Suits {AGE_LABEL[a]}</option>)}
               </select>
               <button className="icon" title="Rename" aria-label={`Rename ${l.name}`} onClick={() => rename(l)}><Pencil size={16} /></button>
               <button className="icon" title="Scan now" aria-label={`Scan ${l.name}`}
@@ -320,6 +326,14 @@ function ActivityPanel() {
           {a.streams.map((s) => <li key={s.username + s.media_id}><div><strong>{s.username}</strong> is watching {s.title}</div></li>)}
         </ul>
       )}
+      {a.transcodes.length > 0 && (
+        <ul className="rows">
+          {a.transcodes.map((t) => (
+            <li key={t.title + t.quality}><div>Converting <strong>{t.title}</strong> to {t.quality} for {t.viewers.join(", ")}<br />
+              <span className="muted small">{t.encoder === "h264_nvenc" ? "NVIDIA GPU" : "CPU"}{t.paused ? ", paused (far enough ahead)" : ""}{!t.running ? ", finished" : ""}</span></div></li>
+          ))}
+        </ul>
+      )}
       <p className="muted small">Background jobs waiting: {a.jobs_queued ?? "unknown"} ({a.jobs_mode}). Thumbnail and poster cache: {formatBytes(a.cache_bytes)}.
         Running since {new Date(a.started_at).toLocaleString()}.</p>
       <h3 className="sub">Disks</h3>
@@ -403,7 +417,8 @@ function Users() {
         {users.map((u) => (
           <li key={u.id}>
             <div>
-              <strong>{u.username}</strong> {u.is_admin && <span className="tag">admin</span>} {u.totp_enabled && <span className="tag">2FA</span>}<br />
+              <strong>{u.username}</strong> {u.is_admin && <span className="tag">admin</span>} {u.totp_enabled && <span className="tag">2FA</span>}
+              {u.max_age != null && <span className="tag">up to {AGE_LABEL[u.max_age]}</span>}<br />
               <span className="muted small">{formatBytes(u.used_bytes)} used{u.quota_bytes ? ` of ${formatBytes(u.quota_bytes)}` : ", no limit"}</span>
             </div>
             <button className="icon" aria-label={`Edit ${u.username}`} title="Edit" onClick={() => setEditing(u)}><Pencil size={16} /></button>
@@ -428,6 +443,7 @@ function Users() {
 
 function EditUser({ user, isMe, onClose, onSaved }: { user: AdminUser; isMe: boolean; onClose: () => void; onSaved: () => void }) {
   const [admin, setAdmin] = useState(user.is_admin);
+  const [maxAge, setMaxAge] = useState<string>(user.max_age == null ? "" : String(user.max_age));
   const [quota, setQuota] = useState(user.quota_bytes ? String(+(user.quota_bytes / 1024 ** 3).toFixed(2)) : "");
   const [newPassword, setNewPassword] = useState("");
   const [reset2fa, setReset2fa] = useState(false);
@@ -437,7 +453,7 @@ function EditUser({ user, isMe, onClose, onSaved }: { user: AdminUser; isMe: boo
     if (newPassword && newPassword.length < 8) { setError("Use at least 8 characters for the password."); return; }
     try {
       await api.updateUser(user.id, {
-        is_admin: admin, ...(quota.trim() ? { quota_gb: Number(quota) } : { clear_quota: true }),
+        is_admin: admin, max_age: maxAge === "" ? -1 : Number(maxAge), ...(quota.trim() ? { quota_gb: Number(quota) } : { clear_quota: true }),
         new_password: newPassword || undefined, reset_2fa: reset2fa || undefined,
       });
       onSaved();
@@ -447,6 +463,13 @@ function EditUser({ user, isMe, onClose, onSaved }: { user: AdminUser; isMe: boo
     <Dialog title={`Edit ${user.username}`} onClose={onClose}>
       <form className="stack-form" onSubmit={save}>
         <label className="check"><input type="checkbox" checked={admin} disabled={isMe} onChange={(e) => setAdmin(e.target.checked)} /> Admin (can manage people, categories and the server)</label>
+        <label>Movies and series they can see
+          <select value={maxAge} onChange={(e) => setMaxAge(e.target.value)} disabled={isMe}>
+            <option value="">Everything</option>
+            {AGE_OPTIONS.filter((a) => a < 18).map((a) => <option key={a} value={a}>Only rated {AGE_LABEL[a]}{a ? " or younger" : ""}</option>)}
+          </select>
+        </label>
+        {maxAge !== "" && <p className="muted small">Titles without a rating are hidden from this profile. Give whole categories an age in Settings, Server.</p>}
         <label>Storage limit in GB<input type="number" min="0" step="any" value={quota} onChange={(e) => setQuota(e.target.value)} placeholder="No limit" /></label>
         <label>New password<input type="password" value={newPassword} onChange={(e) => setNewPassword(e.target.value)} autoComplete="new-password" placeholder="Leave empty to keep it" /></label>
         {user.totp_enabled && (

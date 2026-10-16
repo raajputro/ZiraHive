@@ -9,7 +9,7 @@ from . import db
 from .config import get_settings
 from .models import Library
 from .routers.files import purge_expired_trash
-from .services.jobs import process_asset, scan_library
+from .services.jobs import make_offline_copy, process_asset, scan_library
 from .services.libraries import discover
 
 
@@ -29,9 +29,25 @@ async def nightly(ctx) -> None:
     async with db.sessionmaker()() as session:
         await purge_expired_trash(session)
         await discover(session)
+        await purge_old_offline_copies(session)
         ids = (await session.scalars(select(Library.id))).all()
     for lib_id in ids:
         await scan_library(ctx, lib_id)
+
+
+async def purge_old_offline_copies(session) -> int:
+    from datetime import timedelta
+
+    from .models import OfflineCopy, utcnow
+    from .services.transcode import offline_path
+
+    cutoff = utcnow() - timedelta(days=get_settings().offline_days)
+    old = (await session.scalars(select(OfflineCopy).where(OfflineCopy.last_used_at < cutoff))).all()
+    for copy in old:
+        offline_path(copy.media_id, copy.quality).unlink(missing_ok=True)
+        await session.delete(copy)
+    await session.commit()
+    return len(old)
 
 
 async def disk_check(ctx) -> None:
@@ -60,7 +76,7 @@ async def disk_check(ctx) -> None:
 
 
 class WorkerSettings:
-    functions = [process_asset, scan_library]
+    functions = [process_asset, scan_library, make_offline_copy]
     cron_jobs = [cron(nightly, hour={3}, minute={0}), cron(disk_check, minute={17})]
     on_startup = startup
     on_shutdown = shutdown

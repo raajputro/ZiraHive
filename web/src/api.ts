@@ -1,6 +1,6 @@
 // Typed client for the GharBox API. Auth uses the httpOnly cookie set at login.
 
-export interface User { id: string; username: string; is_admin: boolean; quota_bytes: number | null; created_at: string; totp_enabled: boolean }
+export interface User { id: string; username: string; is_admin: boolean; quota_bytes: number | null; created_at: string; totp_enabled: boolean; max_age: number | null }
 export interface Me extends User { ntfy_url: string | null; used_bytes: number }
 export interface AdminUser extends User { used_bytes: number }
 export interface Asset {
@@ -33,6 +33,7 @@ export interface Notice { id: string; kind: string; title: string; body: string 
 export interface AuditEvent { id: string; username: string | null; action: string; detail: string | null; ip: string | null; created_at: string }
 export interface Activity {
   streams: { username: string; media_id: string; title: string; last_seen: string }[];
+  transcodes: { title: string; quality: string; encoder: string; paused: boolean; running: boolean; viewers: string[] }[];
   jobs_queued: number | null; jobs_mode: string; cache_bytes: number; started_at: string;
   disks: { label: string; path: string; total: number; free: number }[];
 }
@@ -40,7 +41,7 @@ export interface FolderListing { folder: string; folders: string[]; assets: Asse
 export interface PhotoPage { items: Asset[]; next_cursor: string | null }
 export type LibraryKind = "movies" | "shows" | "mixed";
 export interface Library {
-  id: string; name: string; path: string; kind: LibraryKind; sort_order: number;
+  id: string; name: string; path: string; kind: LibraryKind; sort_order: number; age_rating: number | null;
   last_scan_at: string | null; item_count: number; available: boolean;
 }
 export interface Media {
@@ -50,17 +51,30 @@ export interface Media {
   added_at: string; browser_playable: boolean; position: number; finished: boolean;
   series_id: string | null; series_title: string | null; season: number | null; episode: number | null;
   episode_title: string | null; next_id: string | null;
+  intro_start: number | null; intro_end: number | null; credits_start: number | null; age: number | null;
+}
+export type Quality = "original" | "1080p" | "720p" | "480p" | "360p";
+export interface Tracks {
+  audio: { index: number; label: string; language: string | null; codec: string | null; default: boolean }[];
+  subtitles: { id: string; label: string; language: string | null; usable: boolean; forced: boolean }[];
+  qualities: Exclude<Quality, "original">[]; direct_play: boolean; encoder: string;
+}
+export interface OfflineCopy {
+  id: string; media_id: string; quality: string; status: "queued" | "working" | "ready" | "failed";
+  progress: number; size: number | null; error: string | null; created_at: string;
 }
 export interface Title {
   type: "movie" | "series"; id: string; library_id: string; title: string; year: number | null;
   poster_ready: boolean; added_at: string; duration: number | null; position: number; finished: boolean;
-  browser_playable: boolean; episode_count: number; watched_count: number;
+  browser_playable: boolean; episode_count: number; watched_count: number; age: number | null;
 }
 export interface SeriesDetail {
   id: string; library_id: string; title: string; year: number | null; overview: string | null;
   poster_ready: boolean; episode_count: number;
   seasons: { season: number | null; episodes: Media[] }[];
   up_next: Media | null;
+  age: number | null; age_rating: number | null;
+  intro_start: number | null; intro_end: number | null; credits_before_end: number | null;
 }
 export interface Stats {
   users: number; assets: number; asset_bytes: number; photos: number; videos: number;
@@ -159,7 +173,7 @@ export const api = {
   audit: (before?: string) => request<AuditEvent[]>("GET", `/api/admin/audit${q({ before, limit: 100 })}`),
   activity: () => request<Activity>("GET", "/api/admin/activity"),
   security: () => request<SecurityItem[]>("GET", "/api/admin/security"),
-  updateUser: (id: string, change: { is_admin?: boolean; quota_gb?: number; clear_quota?: boolean; new_password?: string; reset_2fa?: boolean }) =>
+  updateUser: (id: string, change: { max_age?: number; is_admin?: boolean; quota_gb?: number; clear_quota?: boolean; new_password?: string; reset_2fa?: boolean }) =>
     request<AdminUser>("PATCH", `/api/users/${id}`, change),
 
   files: (folder: string) => request<FolderListing>("GET", `/api/files${q({ folder })}`),
@@ -175,7 +189,7 @@ export const api = {
 
   libraries: () => request<Library[]>("GET", "/api/libraries"),
   addLibrary: (name: string, path: string, kind: LibraryKind) => request<Library>("POST", "/api/libraries", { name, path, kind }),
-  updateLibrary: (id: string, change: { name?: string; kind?: LibraryKind }) => request<Library>("PATCH", `/api/libraries/${id}`, change),
+  updateLibrary: (id: string, change: { name?: string; kind?: LibraryKind; age_rating?: number }) => request<Library>("PATCH", `/api/libraries/${id}`, change),
   reorderLibraries: (ids: string[]) => request<Library[]>("PUT", "/api/libraries/order", { ids }),
   discoverLibraries: () => request<Library[]>("POST", "/api/libraries/discover"),
   titles: (params: { library_id?: string; q?: string; sort?: "added" | "title" | "year"; limit?: number }) =>
@@ -186,6 +200,14 @@ export const api = {
   media: (search?: string) => request<Media[]>("GET", `/api/media${q({ q: search })}`),
   continueWatching: () => request<Media[]>("GET", "/api/media/continue"),
   mediaItem: (id: string) => request<Media>("GET", `/api/media/${id}`),
+  tracks: (id: string) => request<Tracks>("GET", `/api/media/${id}/tracks`),
+  offlineCopies: (id: string) => request<OfflineCopy[]>("GET", `/api/media/${id}/offline`),
+  requestOffline: (id: string, quality: string) => request<OfflineCopy>("POST", `/api/media/${id}/offline`, { quality }),
+  deleteOffline: (copyId: string) => request<void>("DELETE", `/api/offline/${copyId}`),
+  setMediaRating: (id: string, age_rating: number | null) => request<void>("PUT", `/api/media/${id}/rating`, { age_rating }),
+  setSeriesRating: (id: string, age_rating: number | null) => request<void>("PUT", `/api/series/${id}/rating`, { age_rating }),
+  setSeriesMarkers: (id: string, m: { intro_start: number | null; intro_end: number | null; credits_before_end: number | null }) =>
+    request<SeriesDetail>("PUT", `/api/series/${id}/markers`, m),
   streamLink: (id: string) => request<{ path: string }>("GET", `/api/media/${id}/link`),
   saveProgress: (id: string, position: number, duration?: number) =>
     request<void>("PUT", `/api/media/${id}/progress`, { position, duration }),
@@ -219,6 +241,9 @@ export const url = {
   seriesPoster: (s: { id: string }) => `/api/series/${s.id}/poster`,
   titlePoster: (t: Title) => (t.type === "series" ? `/api/series/${t.id}/poster` : `/api/media/${t.id}/poster`),
   stream: (m: Media) => `/api/media/${m.id}/stream`,
+  hls: (m: { id: string }, quality: string, audio: number) => `/api/media/${m.id}/hls/${quality}/${audio}/index.m3u8`,
+  subtitle: (m: { id: string }, subId: string) => `/api/media/${m.id}/subtitles/${subId}.vtt`,
+  offlineFile: (c: { id: string }) => `/api/offline/${c.id}/file`,
 };
 
 export function formatBytes(n: number): string {
@@ -232,6 +257,24 @@ export function formatBytes(n: number): string {
 export function episodeCode(m: { season: number | null; episode: number | null }): string {
   if (m.episode == null) return m.season != null ? `Season ${m.season}` : "";
   return `S${m.season ?? 1} E${m.episode}`;
+}
+
+export const AGE_LABEL: Record<number, string> = { 0: "All ages", 7: "7+", 13: "13+", 16: "16+", 18: "18+" };
+export const AGE_OPTIONS = [0, 7, 13, 16, 18];
+
+/** "1:23" or "1:02:03" for a number of seconds. */
+export function clock(sec: number): string {
+  const s = Math.max(0, Math.round(sec));
+  const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60), r = s % 60;
+  return h ? `${h}:${String(m).padStart(2, "0")}:${String(r).padStart(2, "0")}` : `${m}:${String(r).padStart(2, "0")}`;
+}
+
+/** Parses "1:23", "1:02:03" or "83" into seconds; empty means no value, undefined means invalid. */
+export function parseClock(text: string): number | null | undefined {
+  const t = text.trim();
+  if (!t) return null;
+  if (!/^\d+(:\d{1,2}){0,2}$/.test(t)) return undefined;
+  return t.split(":").reduce((acc, part) => acc * 60 + Number(part), 0);
 }
 
 export function formatDuration(sec: number | null): string {

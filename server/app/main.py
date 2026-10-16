@@ -11,8 +11,8 @@ from sqlalchemy import select
 from . import db
 from .config import get_settings
 from .models import Library
-from .routers import admin, albums, auth, files, media, shares, uploads
-from .services import jobs
+from .routers import admin, albums, auth, files, media, playback, shares, uploads
+from .services import jobs, transcode
 from .services.libraries import discover
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -45,8 +45,10 @@ async def lifespan(_: FastAPI):
     await db.create_all()
     await jobs.init_queue()
     await bootstrap_libraries()
+    transcode.manager.start_janitor()
     log.info("GharBox %s ready (data: %s)", VERSION, settings.data_dir.resolve())
     yield
+    await transcode.manager.shutdown()
     await jobs.close_queue()
     await db.dispose()
 
@@ -70,7 +72,7 @@ def create_app() -> FastAPI:
                            allow_methods=["*"], allow_headers=["*"],
                            expose_headers=["Upload-Offset", "Content-Range"])
     for r in (auth.router, uploads.router, files.router, albums.router, shares.router,
-              media.router, admin.router):
+              media.router, playback.router, admin.router):
         app.include_router(r)
 
     @app.get("/api/health", tags=["system"])

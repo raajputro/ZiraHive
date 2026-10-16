@@ -17,6 +17,7 @@ from ..security import admin_user, create_token, current_user
 from ..services import activity, jobs, storage
 from ..services.libraries import discover
 from ..services.ranged import ranged_file_response
+from ..services.ratings import allowed, effective_age
 
 router = APIRouter(prefix="/api", tags=["media"])
 
@@ -42,15 +43,53 @@ def _aware(dt: datetime | None) -> datetime:
 
 
 def _out(item: MediaItem, progress: WatchProgress | None, series: Series | None = None,
-         next_id: str | None = None) -> MediaOut:
+         next_id: str | None = None, gate: "Gate | None" = None) -> MediaOut:
     out = MediaOut.model_validate(item)
     out.browser_playable = browser_playable(item)
     if progress:
         out.position, out.finished = progress.position, progress.finished
     if series:
         out.series_title = series.title
+        # markers from the file's chapters win; otherwise the series-wide ones
+        if out.intro_end is None and series.intro_end is not None:
+            out.intro_start, out.intro_end = series.intro_start or 0, series.intro_end
+        if out.credits_start is None and series.credits_before_end and item.duration:
+            out.credits_start = max(item.duration - series.credits_before_end, 0)
     out.next_id = next_id
+    if gate:
+        out.age = gate.item_age(item)
     return out
+
+
+class Gate:
+    """Age-limit checks for one request. Profiles without a limit pass everything."""
+
+    def __init__(self, user: User, libs: dict[str, Library], series: dict[str, Series]):
+        self.max_age, self.libs, self.series = user.max_age, libs, series
+
+    def _lib_age(self, library_id: str) -> int | None:
+        lib = self.libs.get(library_id)
+        return lib.age_rating if lib else None
+
+    def series_age(self, s: Series) -> int | None:
+        return effective_age(series_age=s.age_rating, series_cert=s.certification, library_age=self._lib_age(s.library_id))
+
+    def item_age(self, item: MediaItem) -> int | None:
+        s = self.series.get(item.series_id) if item.series_id else None
+        return effective_age(item.age_rating, item.certification, s.age_rating if s else None,
+                             s.certification if s else None, self._lib_age(item.library_id))
+
+    def ok_item(self, item: MediaItem) -> bool:
+        return allowed(self.max_age, self.item_age(item))
+
+    def ok_series(self, s: Series) -> bool:
+        return allowed(self.max_age, self.series_age(s))
+
+
+async def gate_for(session: AsyncSession, user: User) -> Gate:
+    libs = {lib.id: lib for lib in (await session.scalars(select(Library))).all()}
+    series = {s.id: s for s in (await session.scalars(select(Series))).all()}
+    return Gate(user, libs, series)
 
 
 def _episode_order(item: MediaItem):
@@ -144,6 +183,8 @@ async def update_library(library_id: str, body: LibraryUpdateIn, _: User = Depen
         raise HTTPException(404, "Category not found")
     if body.name:
         lib.name = body.name
+    if body.age_rating is not None:
+        lib.age_rating = None if body.age_rating < 0 else body.age_rating
     rescan = body.kind is not None and body.kind != lib.kind
     if rescan:
         lib.kind = body.kind
@@ -212,13 +253,18 @@ async def list_titles(library_id: str | None = None, q: str | None = None,
         movie_q = movie_q.where(MediaItem.title.ilike(f"%{q}%"))
         series_q = series_q.where(Series.title.ilike(f"%{q}%"))
     titles: list[TitleOut] = []
+    gate = await gate_for(session, user)
     for m, p in (await session.execute(movie_q)).all():
-        titles.append(TitleOut(type="movie", id=m.id, library_id=m.library_id, title=m.title,
+        if not gate.ok_item(m):
+            continue
+        titles.append(TitleOut(type="movie", age=gate.item_age(m), id=m.id, library_id=m.library_id, title=m.title,
                                year=m.year, poster_ready=m.poster_ready, added_at=_aware(m.added_at),
                                duration=m.duration, position=p.position if p else 0,
                                finished=p.finished if p else False, browser_playable=browser_playable(m)))
     for s, n, latest, watched in (await session.execute(series_q)).all():
-        titles.append(TitleOut(type="series", id=s.id, library_id=s.library_id, title=s.title,
+        if not gate.ok_series(s):
+            continue
+        titles.append(TitleOut(type="series", age=gate.series_age(s), id=s.id, library_id=s.library_id, title=s.title,
                                year=s.year, poster_ready=s.poster_ready, added_at=_aware(latest),
                                episode_count=n, watched_count=int(watched or 0)))
     if sort == "title":
@@ -243,17 +289,23 @@ async def _get_series(series_id: str, session: AsyncSession) -> Series:
 async def get_series(series_id: str, user: User = Depends(current_user),
                      session: AsyncSession = Depends(get_session)):
     series = await _get_series(series_id, session)
-    episodes = await _episodes(session, series.id)
+    gate = await gate_for(session, user)
+    if not gate.ok_series(series):
+        raise HTTPException(404, "Series not found")
+    episodes = [e for e in await _episodes(session, series.id) if gate.ok_item(e)]
     progress = await _progress_map(session, user.id, [e.id for e in episodes])
     seasons: dict[int | None, list[MediaOut]] = {}
     for i, e in enumerate(episodes):
         nxt = episodes[i + 1].id if i + 1 < len(episodes) else None
-        seasons.setdefault(e.season, []).append(_out(e, progress.get(e.id), series, nxt))
+        seasons.setdefault(e.season, []).append(_out(e, progress.get(e.id), series, nxt, gate))
     return SeriesOut(id=series.id, library_id=series.library_id, title=series.title, year=series.year,
                      overview=series.overview, poster_ready=series.poster_ready,
                      episode_count=len(episodes),
                      seasons=[SeasonOut(season=k, episodes=v) for k, v in seasons.items()],
-                     up_next=_up_next(episodes, progress, series))
+                     up_next=_up_next(episodes, progress, series),
+                     age=gate.series_age(series), age_rating=series.age_rating,
+                     intro_start=series.intro_start, intro_end=series.intro_end,
+                     credits_before_end=series.credits_before_end)
 
 
 def _up_next(episodes: list[MediaItem], progress: dict[str, WatchProgress],
@@ -275,9 +327,11 @@ def _up_next(episodes: list[MediaItem], progress: dict[str, WatchProgress],
 
 
 @router.get("/series/{series_id}/poster")
-async def series_poster(series_id: str, _: User = Depends(current_user),
+async def series_poster(series_id: str, user: User = Depends(current_user),
                         session: AsyncSession = Depends(get_session)):
     series = await _get_series(series_id, session)
+    if not (await gate_for(session, user)).ok_series(series):
+        raise HTTPException(404, "No poster")
     path = storage.series_poster_path(series.id)
     if not series.poster_ready or not path.exists():
         raise HTTPException(404, "No poster")
@@ -300,7 +354,8 @@ async def list_media(library_id: str | None = None, q: str | None = None,
     if q:
         stmt = stmt.where(MediaItem.title.ilike(f"%{q}%"))
     rows = (await session.execute(stmt.order_by(MediaItem.title))).all()
-    return [_out(m, p) for m, p in rows]
+    gate = await gate_for(session, user)
+    return [_out(m, p, gate=gate) for m, p in rows if gate.ok_item(m)]
 
 
 @router.get("/media/continue", response_model=list[MediaOut])
@@ -313,9 +368,12 @@ async def continue_watching(user: User = Depends(current_user),
         .order_by(WatchProgress.updated_at.desc()).limit(200))).all()
     out: list[MediaOut] = []
     seen_series: set[str] = set()
+    gate = await gate_for(session, user)
     for item, prog in rows:
         if len(out) >= 20:
             break
+        if not gate.ok_item(item):
+            continue
         if item.series_id is None:
             if not prog.finished and prog.position > 30:
                 out.append(_out(item, prog))
@@ -338,9 +396,11 @@ async def continue_watching(user: User = Depends(current_user),
     return out
 
 
-async def _get_media(media_id: str, session: AsyncSession) -> MediaItem:
+async def _get_media(media_id: str, session: AsyncSession, user: User | None = None) -> MediaItem:
     item = await session.get(MediaItem, media_id)
     if item is None:
+        raise HTTPException(404, "Not found")
+    if user is not None and user.max_age is not None and not (await gate_for(session, user)).ok_item(item):
         raise HTTPException(404, "Not found")
     return item
 
@@ -348,7 +408,7 @@ async def _get_media(media_id: str, session: AsyncSession) -> MediaItem:
 @router.get("/media/{media_id}", response_model=MediaOut)
 async def get_media(media_id: str, user: User = Depends(current_user),
                     session: AsyncSession = Depends(get_session)):
-    item = await _get_media(media_id, session)
+    item = await _get_media(media_id, session, user)
     progress = await session.scalar(select(WatchProgress).where(
         WatchProgress.user_id == user.id, WatchProgress.media_id == media_id))
     series, next_id = None, None
@@ -356,13 +416,13 @@ async def get_media(media_id: str, user: User = Depends(current_user),
         series = await session.get(Series, item.series_id)
         nxt = _next_after(await _episodes(session, item.series_id), item.id)
         next_id = nxt.id if nxt else None
-    return _out(item, progress, series, next_id)
+    return _out(item, progress, series, next_id, await gate_for(session, user))
 
 
 @router.get("/media/{media_id}/poster")
-async def media_poster(media_id: str, _: User = Depends(current_user),
+async def media_poster(media_id: str, user: User = Depends(current_user),
                        session: AsyncSession = Depends(get_session)):
-    item = await _get_media(media_id, session)
+    item = await _get_media(media_id, session, user)
     path = storage.poster_path(item.id)
     if not item.poster_ready or not path.exists():
         raise HTTPException(404, "No poster")
@@ -374,7 +434,7 @@ async def media_poster(media_id: str, _: User = Depends(current_user),
 async def stream_media(media_id: str, request: Request, user: User = Depends(current_user),
                        session: AsyncSession = Depends(get_session)):
     """Direct play: the original file, with Range support so players can seek."""
-    item = await _get_media(media_id, session)
+    item = await _get_media(media_id, session, user)
     activity.stream_seen(user.id, user.username, item.id, item.title)
     lib = await session.get(Library, item.library_id)
     root = Path(lib.path).resolve()
@@ -389,14 +449,14 @@ async def stream_media(media_id: str, request: Request, user: User = Depends(cur
 async def stream_link(media_id: str, user: User = Depends(current_user),
                       session: AsyncSession = Depends(get_session)) -> dict:
     """A signed URL (valid 24 h) for players that can't log in, e.g. VLC on a TV."""
-    await _get_media(media_id, session)
+    await _get_media(media_id, session, user)
     return {"path": f"/api/media/{media_id}/stream?token={create_token(user, days=1)}"}
 
 
 @router.put("/media/{media_id}/progress", status_code=204)
 async def save_progress(media_id: str, body: ProgressIn, user: User = Depends(current_user),
                         session: AsyncSession = Depends(get_session)):
-    item = await _get_media(media_id, session)
+    item = await _get_media(media_id, session, user)
     duration = body.duration or item.duration
     prog = await session.scalar(select(WatchProgress).where(
         WatchProgress.user_id == user.id, WatchProgress.media_id == media_id))

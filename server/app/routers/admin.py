@@ -15,7 +15,7 @@ from ..models import Asset, AuditEvent, Library, MediaItem, Notification, User, 
 from ..schemas import (ActivityOut, AuditOut, BackupReportIn, DiskOut, NotificationList,
                        NotificationOut, SecurityCheck, StatsOut, StreamOut)
 from ..security import admin_user, current_user, is_https
-from ..services import activity, jobs
+from ..services import activity, jobs, transcode
 from ..services.events import notify
 
 router = APIRouter(prefix="/api", tags=["admin"])
@@ -73,6 +73,7 @@ async def activity_now(_: User = Depends(admin_user), session: AsyncSession = De
         disks.append(DiskOut(label=label, path=path, total=usage.total, free=usage.free))
     return ActivityOut(
         streams=[StreamOut(**s) for s in activity.active_streams()],
+        transcodes=transcode.manager.status(),
         jobs_queued=await jobs.queued_count(), jobs_mode="redis worker" if settings.redis_url else "in-process",
         disks=disks, cache_bytes=_dir_size(settings.cache_dir), started_at=activity.STARTED_AT)
 

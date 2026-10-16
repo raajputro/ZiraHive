@@ -253,7 +253,34 @@ main { min-width: 0; }
 .player-page { padding: 16px clamp(12px, 3vw, 40px) 80px; }
 .back { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; color: var(--muted); font-weight: 500; margin-bottom: 12px; }
 .back:hover { color: var(--ink); }
-.player-frame { background: #000; border-radius: var(--radius-m); overflow: hidden; }
+.player-frame { position: relative; background: #000; border-radius: var(--radius-m); overflow: hidden; }
+.overlay-btn {
+  position: absolute; right: 18px; bottom: 70px; z-index: 2; background: rgba(15, 20, 35, .82); color: #fff;
+  border: 1px solid rgba(255, 255, 255, .35); padding: 10px 16px; font-size: 1rem;
+}
+.overlay-btn:hover { background: rgba(15, 20, 35, .95); border-color: #fff; }
+.overlay-next {
+  position: absolute; right: 18px; bottom: 70px; z-index: 2; display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  background: rgba(15, 20, 35, .9); color: #fff; padding: 12px 14px; border-radius: var(--radius-m);
+}
+.overlay-next span { font-weight: 600; margin-right: 4px; }
+.player-controls { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 12px; }
+.player-controls label { display: grid; gap: 3px; font-size: .8rem; }
+.offline { margin-top: 26px; padding-top: 18px; border-top: 1px solid var(--line); max-width: 640px; }
+.offline h2 { font-size: 1.05rem; margin-bottom: 4px; }
+.offline h2 svg { vertical-align: -2px; margin-right: 4px; }
+.offline-row { display: flex; align-items: center; gap: 12px; margin: 10px 0; }
+.offline-row .disk { flex: 1; max-width: 240px; }
+.offline-row .button { padding: 6px 12px; }
+.offline .inline-form { margin-top: 10px; }
+.offline .inline-form label { flex: 0 0 160px; }
+.rating-control { display: inline-grid; gap: 3px; margin-top: 16px; font-size: .85rem; }
+.admin-row { display: flex; flex-wrap: wrap; align-items: flex-end; gap: 12px; margin-top: 4px; }
+.admin-row .rating-control { margin-top: 0; }
+.more { margin-top: 22px; }
+.more summary { cursor: pointer; color: var(--muted); display: inline-flex; align-items: center; gap: 6px; }
+.more code { display: block; margin: 8px 0; padding: 6px 8px; }
+.error.small { font-size: .85rem; }
 .player-frame video { display: block; width: 100%; max-height: 78vh; background: #000; }
 .player-info { max-width: 72ch; padding-top: 18px; }
 .player-info h1 { font-size: 2rem; margin-bottom: 4px; }

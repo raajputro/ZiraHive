@@ -19,7 +19,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /mobile\.spec\.ts/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /(mobile|player)\.spec\.ts/ },
+    // Video needs real Chrome: the open-source Chromium build can't decode H.264.
+    // npx playwright install chrome
+    {
+      name: "player",
+      testMatch: /player\.spec\.ts/,
+      use: { ...devices["Desktop Chrome"], channel: "chrome", launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
+    },
     { name: "phone", use: { ...devices["Pixel 7"] }, testMatch: /mobile\.spec\.ts/ },
   ],
 });

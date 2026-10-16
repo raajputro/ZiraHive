@@ -78,7 +78,7 @@ jobs:
         working-directory: e2e
         run: |
           npm ci
-          npx playwright install --with-deps chromium
+          npx playwright install --with-deps chromium chrome
           sleep 10   # let the worker finish scanning the sample media
           npx playwright test
       - if: failure()

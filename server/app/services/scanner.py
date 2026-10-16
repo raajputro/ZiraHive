@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
 import os
 import re
@@ -17,6 +18,8 @@ from ..config import get_settings
 from ..db import sessionmaker
 from ..models import Library, MediaItem, Series
 from . import media_tools, storage
+from .ratings import pick_certification
+from .tracks import markers_from_chapters, probe_tracks
 
 log = logging.getLogger(__name__)
 
@@ -163,6 +166,20 @@ async def _tmdb_lookup(client: httpx.AsyncClient, title: str, year: int | None,
         return None
 
 
+async def _tmdb_certification(client: httpx.AsyncClient, tmdb_id: int, kind: str) -> str | None:
+    key = get_settings().tmdb_api_key
+    if not key:
+        return None
+    path = f"movie/{tmdb_id}/release_dates" if kind == "movie" else f"tv/{tmdb_id}/content_ratings"
+    try:
+        r = await client.get(f"https://api.themoviedb.org/3/{path}", params={"api_key": key}, timeout=15)
+        r.raise_for_status()
+        return pick_certification(r.json().get("results") or [], kind)
+    except Exception as exc:
+        log.info("TMDB certification lookup failed: %s", exc)
+        return None
+
+
 async def _fetch_poster(client: httpx.AsyncClient, poster: str, dest: Path) -> bool:
     try:
         r = await client.get(f"https://image.tmdb.org/t/p/w500{poster}", timeout=30)
@@ -197,6 +214,7 @@ class _SeriesCache:
             meta = await _tmdb_lookup(self.client, ep.series_title, ep.series_year, "tv")
             if meta:
                 series.tmdb_id = meta.get("id")
+                series.certification = await _tmdb_certification(self.client, series.tmdb_id, "tv")
                 series.title = meta.get("name") or series.title
                 series.overview = meta.get("overview")
                 fa = meta.get("first_air_date") or ""
@@ -243,6 +261,7 @@ async def scan(library_id: str) -> dict:
                     continue
                 full = root / rel
                 info = await asyncio.to_thread(media_tools.probe, full)
+                tracks = await asyncio.to_thread(probe_tracks, full)
                 if item is None:
                     item = MediaItem(library_id=lib.id, rel_path=rel, title=Path(rel).stem)
                     session.add(item)
@@ -264,6 +283,7 @@ async def scan(library_id: str) -> dict:
                         meta = await _tmdb_lookup(client, item.title, item.year)
                         if meta:
                             item.tmdb_id = meta.get("id")
+                            item.certification = await _tmdb_certification(client, item.tmdb_id, "movie")
                             item.title = meta.get("title") or item.title
                             item.overview = meta.get("overview")
                             rd = meta.get("release_date") or ""
@@ -276,6 +296,10 @@ async def scan(library_id: str) -> dict:
                 item.container, item.video_codec, item.audio_codec = (
                     info.container, info.video_codec, info.audio_codec)
                 item.width, item.height, item.duration = info.width, info.height, info.duration
+                item.tracks_json = json.dumps(tracks)
+                marks = markers_from_chapters(tracks["chapters"], info.duration)
+                item.intro_start, item.intro_end, item.credits_start = (
+                    marks["intro_start"], marks["intro_end"], marks["credits_start"])
                 if not item.poster_ready:
                     at = (info.duration or 0) * 0.1
                     item.poster_ready = await asyncio.to_thread(
