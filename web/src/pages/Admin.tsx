@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { RefreshCw, Trash2 } from "lucide-react";
-import { api, ApiError, formatBytes, type Library, type Stats, type User } from "../api";
+import { RefreshCw, Trash2, Pencil, ArrowUp, ArrowDown, FolderSearch } from "lucide-react";
+import { api, ApiError, formatBytes, type Library, type LibraryKind, type Stats, type User } from "../api";
 import { useAuth } from "../App";
 
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString() : "never");
@@ -32,7 +32,7 @@ function StatsPanel() {
         <div><dt>Photos</dt><dd>{s.photos}</dd></div>
         <div><dt>Videos</dt><dd>{s.videos}</dd></div>
         <div><dt>Documents</dt><dd>{s.documents}</dd></div>
-        <div><dt>Movies</dt><dd>{s.media_items}</dd></div>
+        <div><dt>Movies and episodes</dt><dd>{s.media_items}</dd></div>
         <div><dt>People</dt><dd>{s.users}</dd></div>
         <div><dt>Background jobs</dt><dd>{s.jobs_mode}</dd></div>
       </dl>
@@ -40,42 +40,97 @@ function StatsPanel() {
   );
 }
 
+const KIND_LABEL: Record<LibraryKind, string> = {
+  movies: "Movies",
+  shows: "Series",
+  mixed: "Movies and series",
+};
+
 function Libraries() {
   const [libs, setLibs] = useState<Library[]>([]);
-  const [name, setName] = useState("Movies");
-  const [path, setPath] = useState("/media/movies");
+  const [name, setName] = useState("");
+  const [path, setPath] = useState("");
+  const [kind, setKind] = useState<LibraryKind>("movies");
   const [msg, setMsg] = useState("");
   const refresh = useCallback(() => { api.libraries().then(setLibs).catch(() => undefined); }, []);
   useEffect(refresh, [refresh]);
 
-  const add = async (e: FormEvent) => {
-    e.preventDefault();
-    try { await api.addLibrary(name, path); setMsg("Library added. Scanning has started."); refresh(); }
-    catch (err) { setMsg(err instanceof ApiError ? err.message : "Couldn't add the library"); }
+  const run = async (fn: () => Promise<unknown>, done?: string) => {
+    try { await fn(); if (done) setMsg(done); refresh(); }
+    catch (err) { setMsg(err instanceof ApiError ? err.message : "That didn't work"); }
   };
+  const findFolders = () => run(async () => {
+    const found = await api.discoverLibraries();
+    setMsg(found.length
+      ? `Added ${found.map((l) => l.name).join(", ")}. Scanning has started.`
+      : "No new folders found. Each category needs its own folder inside your media folder.");
+  });
+  const move = (i: number, delta: number) => {
+    const ids = libs.map((l) => l.id);
+    const [moved] = ids.splice(i, 1);
+    ids.splice(i + delta, 0, moved);
+    void run(() => api.reorderLibraries(ids));
+  };
+  const rename = (l: Library) => {
+    const next = prompt("Category name", l.name);
+    if (next?.trim() && next !== l.name) void run(() => api.updateLibrary(l.id, { name: next.trim() }));
+  };
+  const add = (e: FormEvent) => {
+    e.preventDefault();
+    void run(async () => { await api.addLibrary(name, path, kind); setName(""); setPath(""); }, "Category added. Scanning has started.");
+  };
+
   return (
     <section className="panel">
-      <h2>Movie folders</h2>
+      <h2>Watch categories</h2>
+      <p className="muted small">Every folder inside your media folder becomes a category, such as English Movies, Hindi Movies,
+        Bangla Movies, Web Series or Animation. They show on the Watch page in this order.</p>
+      <div className="panel-actions">
+        <button onClick={findFolders}><FolderSearch size={16} /> Find new folders</button>
+      </div>
       {libs.length > 0 && (
         <ul className="rows">
-          {libs.map((l) => (
+          {libs.map((l, i) => (
             <li key={l.id}>
-              <div><strong>{l.name}</strong> <code>{l.path}</code><br />
-                <span className="muted">{l.item_count} titles, last scanned {when(l.last_scan_at)}</span></div>
+              <div className="order">
+                <button className="icon" aria-label={`Move ${l.name} up`} disabled={i === 0} onClick={() => move(i, -1)}><ArrowUp size={15} /></button>
+                <button className="icon" aria-label={`Move ${l.name} down`} disabled={i === libs.length - 1} onClick={() => move(i, 1)}><ArrowDown size={15} /></button>
+              </div>
+              <div>
+                <strong>{l.name}</strong> <code>{l.path}</code><br />
+                <span className={l.available ? "muted" : "error"}>
+                  {l.available ? `${l.item_count} titles, last scanned ${when(l.last_scan_at)}` : "Folder not found. Is the drive connected?"}
+                </span>
+              </div>
+              <label className="sr" htmlFor={`kind-${l.id}`}>Type of {l.name}</label>
+              <select id={`kind-${l.id}`} value={l.kind} title="Changing the type re-sorts movies and episodes"
+                onChange={(e) => void run(() => api.updateLibrary(l.id, { kind: e.target.value as LibraryKind }),
+                  `${l.name} is now ${KIND_LABEL[e.target.value as LibraryKind].toLowerCase()}. Re-scanning.`)}>
+                {(Object.keys(KIND_LABEL) as LibraryKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+              </select>
+              <button className="icon" title="Rename" aria-label={`Rename ${l.name}`} onClick={() => rename(l)}><Pencil size={16} /></button>
               <button className="icon" title="Scan now" aria-label={`Scan ${l.name}`}
-                onClick={() => api.scanLibrary(l.id).then(() => setMsg(`Scanning ${l.name}. New titles appear in a minute.`))}><RefreshCw size={16} /></button>
+                onClick={() => void run(() => api.scanLibrary(l.id), `Scanning ${l.name}. New titles appear in a minute.`)}><RefreshCw size={16} /></button>
               <button className="icon" title="Remove (files are not deleted)" aria-label={`Remove ${l.name}`}
-                onClick={() => confirm(`Remove "${l.name}" from GharBox? Your movie files stay where they are.`) && api.removeLibrary(l.id).then(refresh)}><Trash2 size={16} /></button>
+                onClick={() => confirm(`Remove "${l.name}" from GharBox? Your files stay where they are.`) && void run(() => api.removeLibrary(l.id))}><Trash2 size={16} /></button>
             </li>
           ))}
         </ul>
       )}
-      <form className="inline-form" onSubmit={add}>
-        <label>Name<input value={name} onChange={(e) => setName(e.target.value)} required /></label>
-        <label>Folder inside the server<input value={path} onChange={(e) => setPath(e.target.value)} required /></label>
-        <button>Add folder</button>
-      </form>
-      <p className="muted small">With Docker, a folder on your PC must be mounted first. MOVIES_PATH in .env appears here as /media/movies.</p>
+      <details className="add-folder">
+        <summary>Add a folder from another drive</summary>
+        <form className="inline-form" onSubmit={add}>
+          <label>Name<input value={name} onChange={(e) => setName(e.target.value)} placeholder="Korean Dramas" required /></label>
+          <label>Folder inside the server<input value={path} onChange={(e) => setPath(e.target.value)} placeholder="/media-e/korean" required /></label>
+          <label>Type
+            <select value={kind} onChange={(e) => setKind(e.target.value as LibraryKind)}>
+              {(Object.keys(KIND_LABEL) as LibraryKind[]).map((k) => <option key={k} value={k}>{KIND_LABEL[k]}</option>)}
+            </select>
+          </label>
+          <button>Add category</button>
+        </form>
+        <p className="muted small">With Docker, mount the drive in docker-compose.yml first. See the README.</p>
+      </details>
       {msg && <p role="status">{msg}</p>}
     </section>
   );

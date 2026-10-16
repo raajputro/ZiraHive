@@ -9,12 +9,29 @@ export interface Asset {
 }
 export interface FolderListing { folder: string; folders: string[]; assets: Asset[] }
 export interface PhotoPage { items: Asset[]; next_cursor: string | null }
-export interface Library { id: string; name: string; path: string; kind: string; last_scan_at: string | null; item_count: number }
+export type LibraryKind = "movies" | "shows" | "mixed";
+export interface Library {
+  id: string; name: string; path: string; kind: LibraryKind; sort_order: number;
+  last_scan_at: string | null; item_count: number; available: boolean;
+}
 export interface Media {
   id: string; library_id: string; title: string; year: number | null; overview: string | null;
   size: number; container: string | null; video_codec: string | null; audio_codec: string | null;
   width: number | null; height: number | null; duration: number | null; poster_ready: boolean;
   added_at: string; browser_playable: boolean; position: number; finished: boolean;
+  series_id: string | null; series_title: string | null; season: number | null; episode: number | null;
+  episode_title: string | null; next_id: string | null;
+}
+export interface Title {
+  type: "movie" | "series"; id: string; library_id: string; title: string; year: number | null;
+  poster_ready: boolean; added_at: string; duration: number | null; position: number; finished: boolean;
+  browser_playable: boolean; episode_count: number; watched_count: number;
+}
+export interface SeriesDetail {
+  id: string; library_id: string; title: string; year: number | null; overview: string | null;
+  poster_ready: boolean; episode_count: number;
+  seasons: { season: number | null; episodes: Media[] }[];
+  up_next: Media | null;
 }
 export interface Stats {
   users: number; assets: number; asset_bytes: number; photos: number; videos: number;
@@ -74,7 +91,13 @@ export const api = {
   photos: (cursor?: string | null) => request<PhotoPage>("GET", `/api/photos${q({ cursor, limit: 200 })}`),
 
   libraries: () => request<Library[]>("GET", "/api/libraries"),
-  addLibrary: (name: string, path: string) => request<Library>("POST", "/api/libraries", { name, path }),
+  addLibrary: (name: string, path: string, kind: LibraryKind) => request<Library>("POST", "/api/libraries", { name, path, kind }),
+  updateLibrary: (id: string, change: { name?: string; kind?: LibraryKind }) => request<Library>("PATCH", `/api/libraries/${id}`, change),
+  reorderLibraries: (ids: string[]) => request<Library[]>("PUT", "/api/libraries/order", { ids }),
+  discoverLibraries: () => request<Library[]>("POST", "/api/libraries/discover"),
+  titles: (params: { library_id?: string; q?: string; sort?: "added" | "title" | "year"; limit?: number }) =>
+    request<Title[]>("GET", `/api/titles${q(params)}`),
+  series: (id: string) => request<SeriesDetail>("GET", `/api/series/${id}`),
   removeLibrary: (id: string) => request<void>("DELETE", `/api/libraries/${id}`),
   scanLibrary: (id: string) => request<void>("POST", `/api/libraries/${id}/scan`),
   media: (search?: string) => request<Media[]>("GET", `/api/media${q({ q: search })}`),
@@ -100,7 +123,9 @@ export const api = {
 export const url = {
   thumb: (a: Asset) => `/api/assets/${a.id}/thumb`,
   file: (a: Asset, download = false) => `/api/assets/${a.id}/file${download ? "?download=true" : ""}`,
-  poster: (m: Media) => `/api/media/${m.id}/poster`,
+  poster: (m: { id: string }) => `/api/media/${m.id}/poster`,
+  seriesPoster: (s: { id: string }) => `/api/series/${s.id}/poster`,
+  titlePoster: (t: Title) => (t.type === "series" ? `/api/series/${t.id}/poster` : `/api/media/${t.id}/poster`),
   stream: (m: Media) => `/api/media/${m.id}/stream`,
 };
 
@@ -110,6 +135,11 @@ export function formatBytes(n: number): string {
   let v = n / 1024, i = 0;
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
   return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
+}
+
+export function episodeCode(m: { season: number | null; episode: number | null }): string {
+  if (m.episode == null) return m.season != null ? `Season ${m.season}` : "";
+  return `S${m.season ?? 1} E${m.episode}`;
 }
 
 export function formatDuration(sec: number | null): string {

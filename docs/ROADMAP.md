@@ -8,12 +8,13 @@
 - Photos: EXIF dates, thumbnails (JPEG, PNG, HEIC, video), timeline
 - Movies: library scan, name/year parsing, ffprobe metadata, posters (TMDB optional),
   direct play with seeking, resume position, continue watching
+- Watch categories: one per folder (auto-discovered), movies / series / mixed types, ordering
+- Web series: seasons and episodes, series pages, next episode autoplay, up next
 - Phone app: camera roll backup with dedup, Live Photos, resume
 
 ## Milestone 2: play anything
 - FFmpeg transcoding to HLS, with NVIDIA NVENC when available
 - Subtitles (embedded and .srt), audio track choice
-- TV series libraries (seasons and episodes)
 - Offline downloads to phone
 
 ## Milestone 3: together

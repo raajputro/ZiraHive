@@ -10,6 +10,7 @@ from .config import get_settings
 from .models import Library
 from .routers.files import purge_expired_trash
 from .services.jobs import process_asset, scan_library
+from .services.libraries import discover
 
 
 async def startup(ctx) -> None:
@@ -24,9 +25,10 @@ async def shutdown(ctx) -> None:
 
 
 async def nightly(ctx) -> None:
-    """Rescan every library and empty trash older than 30 days."""
+    """Pick up new category folders, rescan every library, empty trash older than 30 days."""
     async with db.sessionmaker()() as session:
         await purge_expired_trash(session)
+        await discover(session)
         ids = (await session.scalars(select(Library.id))).all()
     for lib_id in ids:
         await scan_library(ctx, lib_id)

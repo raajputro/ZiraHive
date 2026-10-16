@@ -107,3 +107,7 @@ def thumb_path(asset_id: str) -> Path:
 
 def poster_path(media_id: str) -> Path:
     return get_settings().cache_dir / "posters" / f"{media_id}.webp"
+
+
+def series_poster_path(series_id: str) -> Path:
+    return get_settings().cache_dir / "posters" / f"series-{series_id}.webp"

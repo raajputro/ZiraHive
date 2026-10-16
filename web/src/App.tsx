@@ -5,8 +5,9 @@ import { api, ApiError, type User } from "./api";
 import { UploadProvider } from "./uploads";
 import PhotosPage from "./pages/Photos";
 import FilesPage from "./pages/Files";
-import MoviesPage from "./pages/Movies";
-import PlayerPage from "./pages/Player";
+import WatchHome, { LibraryPage } from "./pages/Watch";
+import SeriesPage from "./pages/Series";
+import PlayerRoute from "./pages/Player";
 import TrashPage from "./pages/Trash";
 import AdminPage from "./pages/Admin";
 
@@ -41,8 +42,11 @@ export default function App() {
               <Route path="/" element={<Navigate to="/photos" replace />} />
               <Route path="/photos" element={<PhotosPage />} />
               <Route path="/files/*" element={<FilesPage />} />
-              <Route path="/movies" element={<MoviesPage />} />
-              <Route path="/watch/:id" element={<PlayerPage />} />
+              <Route path="/watch" element={<WatchHome />} />
+              <Route path="/watch/c/:id" element={<LibraryPage />} />
+              <Route path="/watch/series/:id" element={<SeriesPage />} />
+              <Route path="/play/:id" element={<PlayerRoute />} />
+              <Route path="/movies" element={<Navigate to="/watch" replace />} />
               <Route path="/trash" element={<TrashPage />} />
               <Route path="/settings" element={<AdminPage />} />
               <Route path="*" element={<Navigate to="/photos" replace />} />
@@ -57,12 +61,12 @@ export default function App() {
 function Shell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
-  const cinema = pathname.startsWith("/movies") || pathname.startsWith("/watch");
+  const cinema = pathname.startsWith("/watch") || pathname.startsWith("/play");
   useEffect(() => { document.documentElement.dataset.room = cinema ? "cinema" : "home"; }, [cinema]);
   const links = [
     { to: "/photos", label: "Photos", icon: Images },
     { to: "/files", label: "Files", icon: Folder },
-    { to: "/movies", label: "Movies", icon: Clapperboard },
+    { to: "/watch", label: "Watch", icon: Clapperboard },
     { to: "/trash", label: "Trash", icon: Trash2 },
     { to: "/settings", label: "Settings", icon: Settings },
   ];

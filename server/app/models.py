@@ -4,7 +4,7 @@ import uuid
 from datetime import datetime, timezone
 
 from sqlalchemy import (BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String,
-                        Text, UniqueConstraint, Index)
+                        Text, UniqueConstraint, Index, false)
 from sqlalchemy.orm import Mapped, mapped_column
 
 from .db import Base
@@ -88,14 +88,38 @@ class UploadSession(Base):
 
 
 class Library(Base):
+    """One category on the Watch page, e.g. 'English Movies' or 'Web Series'.
+
+    kind: movies = every file is a movie; shows = every file is an episode;
+          mixed = files named like S01E02 are episodes, the rest are movies (good for Animation).
+    """
+
     __tablename__ = "libraries"
 
     id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
     name: Mapped[str] = mapped_column(String(128))
     path: Mapped[str] = mapped_column(Text, unique=True)
     kind: Mapped[str] = mapped_column(String(16), default="movies")
+    sort_order: Mapped[int] = mapped_column(Integer, default=0, server_default="0")
     last_scan_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Series(Base):
+    """A web series / TV show inside a library. Its episodes are MediaItems."""
+
+    __tablename__ = "series"
+    __table_args__ = (UniqueConstraint("library_id", "key"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    library_id: Mapped[str] = mapped_column(ForeignKey("libraries.id", ondelete="CASCADE"), index=True)
+    key: Mapped[str] = mapped_column(String(512))  # normalised title, for matching
+    title: Mapped[str] = mapped_column(String(512))
+    year: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    overview: Mapped[str | None] = mapped_column(Text, nullable=True)
+    poster_ready: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    tmdb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
 
 class MediaItem(Base):
@@ -120,6 +144,12 @@ class MediaItem(Base):
     tmdb_id: Mapped[int | None] = mapped_column(Integer, nullable=True)
     missing: Mapped[bool] = mapped_column(Boolean, default=False)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # set when this file is an episode of a series
+    series_id: Mapped[str | None] = mapped_column(
+        ForeignKey("series.id", ondelete="SET NULL"), nullable=True, index=True)
+    season: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    episode: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    episode_title: Mapped[str | None] = mapped_column(String(512), nullable=True)
 
 
 class WatchProgress(Base):

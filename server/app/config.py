@@ -20,7 +20,10 @@ class Settings(BaseSettings):
     secret_key: str = ""  # empty -> generated once and stored in data_dir
     access_token_days: int = 30
 
-    # Media libraries created on first start, "Name:/path[:kind],Name2:/path2"
+    # Every top-level folder in here becomes a category on the Watch page
+    # (e.g. /media/English Movies, /media/Web Series). Docker mounts MEDIA_PATH here.
+    media_root: str = ""
+    # Extra libraries outside media_root: "Name:/path[:kind],Name2:/path2"
     media_libraries: str = ""
     tmdb_api_key: str = ""
 
@@ -70,7 +73,7 @@ class Settings(BaseSettings):
             name, _, rest = part.partition(":")
             path, kind = rest, "movies"
             # allow an optional ":kind" suffix, but keep Windows-like "C:/x" intact
-            if rest.rsplit(":", 1)[-1] in ("movies", "shows", "videos"):
+            if rest.rsplit(":", 1)[-1] in ("movies", "shows", "mixed"):
                 path, kind = rest.rsplit(":", 1)
             if name and path:
                 out.append((name.strip(), path.strip(), kind))

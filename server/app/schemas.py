@@ -104,10 +104,22 @@ class PhotoPage(BaseModel):
     next_cursor: str | None
 
 
+_KIND = r"^(movies|shows|mixed)$"
+
+
 class LibraryIn(BaseModel):
     name: str = Field(min_length=1, max_length=128)
     path: str = Field(min_length=1)
-    kind: str = Field(default="movies", pattern=r"^(movies|shows|videos)$")
+    kind: str = Field(default="movies", pattern=_KIND)
+
+
+class LibraryUpdateIn(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=128)
+    kind: str | None = Field(default=None, pattern=_KIND)
+
+
+class LibraryOrderIn(BaseModel):
+    ids: list[str]
 
 
 class LibraryOut(ORM):
@@ -115,8 +127,10 @@ class LibraryOut(ORM):
     name: str
     path: str
     kind: str
+    sort_order: int = 0
     last_scan_at: datetime | None
-    item_count: int = 0
+    item_count: int = 0  # movies + series
+    available: bool = True  # folder currently reachable
 
 
 class MediaOut(ORM):
@@ -137,6 +151,46 @@ class MediaOut(ORM):
     browser_playable: bool = False
     position: float = 0
     finished: bool = False
+    series_id: str | None = None
+    series_title: str | None = None
+    season: int | None = None
+    episode: int | None = None
+    episode_title: str | None = None
+    next_id: str | None = None  # next episode, when this is an episode
+
+
+class TitleOut(BaseModel):
+    """One card on the Watch page: a movie or a whole series."""
+    type: str  # "movie" | "series"
+    id: str
+    library_id: str
+    title: str
+    year: int | None
+    poster_ready: bool
+    added_at: datetime
+    duration: float | None = None
+    position: float = 0
+    finished: bool = False
+    browser_playable: bool = False
+    episode_count: int = 0
+    watched_count: int = 0
+
+
+class SeasonOut(BaseModel):
+    season: int | None
+    episodes: list[MediaOut]
+
+
+class SeriesOut(BaseModel):
+    id: str
+    library_id: str
+    title: str
+    year: int | None
+    overview: str | None
+    poster_ready: bool
+    episode_count: int
+    seasons: list[SeasonOut]
+    up_next: MediaOut | None
 
 
 class ProgressIn(BaseModel):

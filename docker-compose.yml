@@ -12,14 +12,19 @@ x-server-env: &server-env
   GHARBOX_DATABASE_URL: postgresql+asyncpg://gharbox:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/gharbox
   GHARBOX_REDIS_URL: redis://redis:6379
   GHARBOX_SECRET_KEY: ${GHARBOX_SECRET_KEY:-}
-  GHARBOX_MEDIA_LIBRARIES: ${GHARBOX_MEDIA_LIBRARIES:-Movies:/media/movies}
+  # Every folder inside MEDIA_PATH (English Movies, Web Series, ...) becomes a Watch category.
+  GHARBOX_MEDIA_ROOT: /media
+  GHARBOX_MEDIA_LIBRARIES: ${GHARBOX_MEDIA_LIBRARIES:-}
   GHARBOX_TMDB_API_KEY: ${GHARBOX_TMDB_API_KEY:-}
   GHARBOX_CORS_ORIGINS: ""
 
 x-server-volumes: &server-volumes
   - ${GHARBOX_DATA_PATH:-./gharbox-data}:/data
-  # Read-only, so GharBox can never modify or delete your movies.
-  - ${MOVIES_PATH:-./movies}:/media/movies:ro
+  # Your media folder, read-only so GharBox can never modify or delete it.
+  - ${MEDIA_PATH:-./media}:/media:ro
+  # A category on another drive: mount it outside /media, then add it in
+  # Settings > Watch categories > Add a folder from another drive.
+  # - E:/Korean Dramas:/media-e/korean-dramas:ro
 
 services:
   web:

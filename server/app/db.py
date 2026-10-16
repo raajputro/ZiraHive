@@ -2,9 +2,14 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator
 
-from sqlalchemy import event
+import logging
+
+from sqlalchemy import event, inspect
 from sqlalchemy.ext.asyncio import AsyncEngine, AsyncSession, async_sessionmaker, create_async_engine
 from sqlalchemy.orm import DeclarativeBase
+
+
+log = logging.getLogger(__name__)
 
 
 class Base(DeclarativeBase):
@@ -42,7 +47,37 @@ async def create_all() -> None:
 
     assert _engine is not None
     async with _engine.begin() as conn:
+        if conn.dialect.name == "postgresql":
+            # api and worker start at the same time; let only one create/upgrade tables.
+            await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(424242)")
         await conn.run_sync(Base.metadata.create_all)
+        await conn.run_sync(add_missing_columns)
+
+
+def add_missing_columns(conn) -> None:
+    """Upgrade an existing database in place: add columns and indexes that newer versions
+    of GharBox define but the database doesn't have yet. New tables are already handled by
+    create_all. (Renames and type changes will need proper migrations; see ROADMAP.)"""
+    insp = inspect(conn)
+    for table in Base.metadata.sorted_tables:
+        if not insp.has_table(table.name):
+            continue
+        existing = {c["name"] for c in insp.get_columns(table.name)}
+        for col in table.columns:
+            if col.name in existing:
+                continue
+            ddl = f'ALTER TABLE {table.name} ADD COLUMN {col.name} {col.type.compile(dialect=conn.dialect)}'
+            if col.server_default is not None:
+                arg = col.server_default.arg
+                default = (f"'{arg}'" if isinstance(arg, str) else
+                           str(arg.compile(dialect=conn.dialect, compile_kwargs={"literal_binds": True})))
+                ddl += f" DEFAULT {default}"
+            conn.exec_driver_sql(ddl)
+            log.info("database upgraded: added %s.%s", table.name, col.name)
+        index_names = {i["name"] for i in inspect(conn).get_indexes(table.name)}
+        for index in table.indexes:
+            if index.name not in index_names:
+                index.create(conn, checkfirst=True)
 
 
 async def dispose() -> None:

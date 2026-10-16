@@ -12,6 +12,7 @@ from .config import get_settings
 from .models import Library
 from .routers import admin, auth, files, media, uploads
 from .services import jobs
+from .services.libraries import discover
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("gharbox")
@@ -20,8 +21,11 @@ VERSION = "0.1.0"
 
 
 async def bootstrap_libraries() -> None:
-    """Create the libraries listed in GHARBOX_MEDIA_LIBRARIES on first start."""
+    """Add a category for every folder in the media folder, plus any listed in
+    GHARBOX_MEDIA_LIBRARIES, and scan the new ones."""
     async with db.sessionmaker()() as session:
+        for lib in await discover(session):
+            await jobs.enqueue("scan_library", lib.id)
         for name, path, kind in get_settings().parsed_libraries():
             if not await session.scalar(select(Library.id).where(Library.path == path)):
                 lib = Library(name=name, path=path, kind=kind)

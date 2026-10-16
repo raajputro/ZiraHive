@@ -51,6 +51,7 @@ def jpeg_bytes(color=(200, 50, 50), taken="2023:12:24 18:30:00", size=(800, 600)
 
 
 def make_video(path: Path, seconds: int = 2) -> Path:
+    path.parent.mkdir(parents=True, exist_ok=True)
     subprocess.run(["ffmpeg", "-y", "-v", "error", "-f", "lavfi", "-i",
                     f"testsrc=duration={seconds}:size=320x240:rate=15", "-f", "lavfi", "-i",
                     f"sine=duration={seconds}", "-c:v", "libx264", "-pix_fmt", "yuv420p",

@@ -6,8 +6,9 @@ photos, documents and movies never leave your home.
 - **Backup**: phone camera roll and any files, with duplicate detection and resumable uploads
 - **Photos**: timeline grouped by date, thumbnails for photos (including iPhone HEIC) and videos
 - **Files**: folders, rename, move, download, a 30-day trash
-- **Movies**: point it at your movie folder; it finds titles and years, makes posters, streams
-  with seeking, and remembers where each person stopped
+- **Watch**: one category per folder (English Movies, Hindi Movies, Bangla Movies, Web Series,
+  Animation, ...). Movies get titles, years and posters; web series get seasons, episodes and
+  "next episode". Streams with seeking and remembers where each person stopped
 - **Family**: several accounts, each with their own private space and optional storage quota
 
 > Status: milestone 1. Next up: transcoding (play any format in the browser), group watch
@@ -39,7 +40,7 @@ You need **Docker Desktop** (free for personal use) with the WSL 2 backend.
    - `POSTGRES_PASSWORD`: letters and numbers. Make one with
      `python -c "import secrets; print(secrets.token_hex(24))"`
    - `GHARBOX_DATA_PATH`: where backups go, for example `D:/GharBoxData` (use forward slashes)
-   - `MOVIES_PATH`: your movie folder, for example `D:/Movies`
+   - `MEDIA_PATH`: your media folder, for example `D:/Media` (see [Watch categories](#watch-categories))
 
 2. Start everything:
 
@@ -79,7 +80,47 @@ if GharBox is not running.
 The backup app lives in [mobile/](mobile/README.md) (Flutter, Android and iPhone). Until it's
 installed, you can upload from your phone's browser at the address from step 4.
 
-## Movies
+## Watch categories
+
+Make one folder per category inside your media folder. Each one becomes a tab and a row on the
+Watch page, in the order you choose in Settings:
+
+```
+D:/Media/
+  English Movies/
+    Inception (2010)/Inception (2010).mkv
+    The.Matrix.1999.1080p.BluRay.mkv
+  Hindi Movies/
+  Bangla Movies/
+  Web Series/
+    Mirzapur/
+      Season 1/Mirzapur.S01E01.mkv
+      Season 2/Mirzapur.S02E01.mkv
+    Karnaphuli/Karnaphuli.S01E01.mp4
+  Animation/
+    Kung Fu Panda (2008).mkv
+    Avatar The Last Airbender/Book 1/Avatar.S01E01.mkv
+```
+
+GharBox finds new folders on start, every night, and when you press **Find new folders** in
+Settings. Folder names like `english_movies` are tidied to "English Movies". Each category has a
+type, guessed from its name and changeable in Settings:
+
+| Type | Use for | How files are read |
+|---|---|---|
+| Movies | English, Hindi, Bangla movies | every file is a movie |
+| Series | Web Series, TV Shows, Natok | every file is an episode, grouped by the show's folder |
+| Movies and series | Animation, Kids | files named like `S01E02` are episodes, the rest are movies |
+
+Episodes are recognised from `S01E02`, `1x02`, `E03`, `Episode 7` or a leading number
+(`01 - Pilot.mkv`), with the season taken from the name or a `Season 2` / `Book 2` folder.
+When an episode ends, the next one starts by itself, and Continue watching shows the next
+episode of every series you're following.
+
+A category on another drive: mount it in `docker-compose.yml` (there's a commented example
+under the `api` volumes), restart, then use **Add a folder from another drive** in Settings.
+
+### Movie files
 
 - Name files like `Movie Name (2019).mkv`, or the common `Movie.Name.2019.1080p.mkv` style;
   both are recognised. Samples and trailers are skipped.
@@ -87,7 +128,7 @@ installed, you can upload from your phone's browser at the address from step 4.
   GharBox uses a frame from the movie as the poster.
 - Browsers play MP4/WebM with H.264, VP9 or AV1. Other files (for example HEVC in MKV)
   show a copyable link you can open in VLC on your PC, phone or TV until transcoding lands.
-- Libraries rescan every night at 03:00, or press the scan button in Settings.
+- Categories rescan every night at 03:00, or press the scan button in Settings.
 
 ## Watching from outside your home
 
@@ -107,7 +148,7 @@ many ISPs in Bangladesh use CGNAT, which blocks incoming connections; the VPN ro
 cd server
 python -m venv .venv; .venv\Scripts\activate
 pip install -r requirements-dev.txt
-pytest                                   # 20 API tests
+pytest                                   # 35 API tests
 uvicorn app.main:app --reload --port 8000   # SQLite + in-process jobs, no Docker needed
 
 # web (Node 20+), in a second terminal
