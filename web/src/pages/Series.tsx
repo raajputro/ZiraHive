@@ -7,6 +7,7 @@ import { useAuth } from "../App";
 import Dialog from "../components/Dialog";
 import { RatingControl } from "./Player";
 
+import { t as tr } from "../i18n";
 export default function SeriesPage() {
   const { id } = useParams();
   const [s, setS] = useState<SeriesDetail | null>(null);
@@ -34,7 +35,7 @@ export default function SeriesPage() {
 
   return (
     <div className="page cinema-page">
-      <Link to={`/watch/c/${s.library_id}`} className="back"><ArrowLeft size={18} /> Back</Link>
+      <Link to={`/watch/c/${s.library_id}`} className="back"><ArrowLeft size={18} />{" "}{tr("Back")}</Link>
       <header className="series-head">
         <div className="series-poster">
           {s.poster_ready ? <img src={url.seriesPoster(s)} alt="" /> : <span className="poster-blank">{s.title}</span>}
@@ -49,26 +50,26 @@ export default function SeriesPage() {
           {next && label && (
             <div className="admin-row">
               <Link to={`/play/${next.id}`} className="button primary play-btn"><Play size={18} fill="currentColor" /> {label}</Link>
-              <button className="play-btn" onClick={() => setTogether(true)}><PartyPopper size={17} /> Watch together</button>
+              <button className="play-btn" onClick={() => setTogether(true)}><PartyPopper size={17} />{" "}{tr("Watch together")}</button>
             </div>
           )}
           {together && next && <PartyDialog mediaId={next.id} title={`${s.title} ${episodeCode(next)}`} onClose={() => setTogether(false)} />}
-          {!next && <p className="muted">You've watched every episode.</p>}
+          {!next && <p className="muted">{tr("You've watched every episode.")}</p>}
           {user.is_admin && (
             <div className="admin-row">
-              <RatingControl value={s.age_rating} onChange={(v) => api.setSeriesRating(s.id, v)} label="Suitable for" />
-              <button onClick={() => setMarkers(true)}><Timer size={16} /> Intro and credits</button>
+              <RatingControl value={s.age_rating} onChange={(v) => api.setSeriesRating(s.id, v)} label={tr("Suitable for")} />
+              <button onClick={() => setMarkers(true)}><Timer size={16} />{" "}{tr("Intro and credits")}</button>
             </div>
           )}
         </div>
       </header>
 
       {s.seasons.length > 1 && (
-        <div className="lib-tabs season-tabs" role="tablist" aria-label="Seasons">
+        <div className="lib-tabs season-tabs" role="tablist" aria-label={tr("Seasons")}>
           {s.seasons.map((x) => (
             <button key={String(x.season)} role="tab" aria-selected={x.season === current.season}
               className={x.season === current.season ? "active" : ""} onClick={() => setSeason(x.season)}>
-              {x.season != null ? `Season ${x.season}` : "Other"}
+              {x.season != null ? tr("Season {season}", { season: x.season }) : tr("Other")}
             </button>
           ))}
         </div>
@@ -90,7 +91,7 @@ export default function SeriesPage() {
                   <span className="episode-title">{e.episode_title ?? e.title}</span>
                   <span className="muted small">{formatDuration(e.duration)}</span>
                 </div>
-                {e.finished && <Check size={18} className="watched" aria-label="Watched" />}
+                {e.finished && <Check size={18} className="watched" aria-label={tr("Watched")} />}
               </Link>
             </li>
           );
@@ -109,24 +110,23 @@ function MarkersDialog({ series, onClose, onSaved }: { series: SeriesDetail; onC
   const save = async (e: FormEvent) => {
     e.preventDefault();
     const [a, b, c] = [parseClock(start), parseClock(end), parseClock(credits)];
-    if (a === undefined || b === undefined || c === undefined) { setError("Write times like 1:30 or 0:45."); return; }
-    if ((a != null || b != null) && b == null) { setError("Add where the intro ends."); return; }
+    if (a === undefined || b === undefined || c === undefined) { setError(tr("Write times like 1:30 or 0:45.")); return; }
+    if ((a != null || b != null) && b == null) { setError(tr("Add where the intro ends.")); return; }
     try { onSaved(await api.setSeriesMarkers(series.id, { intro_start: b != null ? a ?? 0 : null, intro_end: b, credits_before_end: c })); }
-    catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't save"); }
+    catch (err) { setError(err instanceof ApiError ? err.message : tr("Couldn't save")); }
   };
   return (
-    <Dialog title={`Intro and credits for ${series.title}`} onClose={onClose}>
-      <p className="muted small">These apply to every episode. Episodes whose files have chapters named Intro or Credits use those instead.
-        Leave a field empty to turn it off.</p>
+    <Dialog title={tr("Intro and credits for {title}", { title: series.title })} onClose={onClose}>
+      <p className="muted small">{tr("These apply to every episode. Episodes whose files have chapters named Intro or Credits use those instead. Leave a field empty to turn it off.")}</p>
       <form className="stack-form" onSubmit={save}>
         <div className="inline-form">
-          <label>Intro starts at<input value={start} onChange={(e) => setStart(e.target.value)} placeholder="0:30" inputMode="numeric" /></label>
-          <label>Intro ends at<input value={end} onChange={(e) => setEnd(e.target.value)} placeholder="1:45" inputMode="numeric" /></label>
+          <label>{tr("Intro starts at")}<input value={start} onChange={(e) => setStart(e.target.value)} placeholder="0:30" inputMode="numeric" /></label>
+          <label>{tr("Intro ends at")}<input value={end} onChange={(e) => setEnd(e.target.value)} placeholder="1:45" inputMode="numeric" /></label>
         </div>
-        <label>End credits last<input value={credits} onChange={(e) => setCredits(e.target.value)} placeholder="1:10" inputMode="numeric" /></label>
-        <p className="muted small">When the credits start, the next episode counts down and plays by itself.</p>
+        <label>{tr("End credits last")}<input value={credits} onChange={(e) => setCredits(e.target.value)} placeholder="1:10" inputMode="numeric" /></label>
+        <p className="muted small">{tr("When the credits start, the next episode counts down and plays by itself.")}</p>
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary">Save</button>
+        <button className="primary">{tr("Save")}</button>
       </form>
     </Dialog>
   );

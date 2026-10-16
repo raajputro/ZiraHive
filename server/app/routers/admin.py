@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 import shutil
-from datetime import datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, Query, Request
@@ -97,7 +97,7 @@ async def security_check(request: Request, _: User = Depends(admin_user),
     admins = (await session.scalars(select(User).where(User.is_admin.is_(True)))).all()
     weak = [a.username for a in admins if not a.totp_enabled]
     add(not weak, "Every admin uses two-factor sign-in",
-        f"Turn on two-factor for: {', '.join(weak)} (Settings > Your account).")
+        "Turn on two-factor for: {} (Settings > Your account).".format(", ".join(weak)))
     add(len(settings.resolved_secret()) >= 32, "Sign-in tokens use a strong secret key",
         "Set GHARBOX_SECRET_KEY in .env to a long random value (or leave it empty to auto-generate).")
     add(not settings.api_docs, "The developer API page is off",
@@ -116,6 +116,23 @@ async def security_check(request: Request, _: User = Depends(admin_user),
     usage = shutil.disk_usage(settings.data_dir)
     add(usage.free / usage.total > 0.1, "There's room for new backups",
         "The backup disk is over 90% full. Empty the trash or add a bigger disk.", "medium")
+
+    from datetime import timedelta
+
+    from ..models import BackupConfig, BackupRun, utcnow
+    cfg = await session.get(BackupConfig, "main")
+    last = await session.scalar(select(BackupRun).where(BackupRun.kind == "backup", BackupRun.status != "running")
+                                .order_by(BackupRun.started_at.desc()).limit(1))
+    if cfg is None or not cfg.enabled:
+        add(False, "There's a copy away from this PC",
+            "Turn on Offsite backup below, so a broken disk, theft or fire doesn't take your photos with it.", "medium")
+    elif last is None or last.status == "failed":
+        add(False, "The offsite backup works",
+            last.message if last and last.message else "No backup has finished yet. Press Back up now below.")
+    else:
+        when = last.started_at if last.started_at.tzinfo else last.started_at.replace(tzinfo=timezone.utc)
+        add(utcnow() - when < timedelta(days=3), "The offsite backup is up to date",
+            "The last good backup is more than 3 days old. Check that the backup disk is connected.", "medium")
     return checks
 
 

@@ -3,7 +3,8 @@ import { Copy, Trash2, Check } from "lucide-react";
 import { api, ApiError, hasPublicBase, url, type Share, type ShareTarget } from "../api";
 import Dialog from "./Dialog";
 
-const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
+import { locale, t as tr } from "../i18n";
+const dateFmt = new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short", year: "numeric" });
 
 /** Make a link for a file, folder or album, and manage the links that already exist for it. */
 export default function ShareDialog({ type, id, label, onClose }:
@@ -20,7 +21,7 @@ export default function ShareDialog({ type, id, label, onClose }:
 
   const copy = async (s: Share) => {
     try { await navigator.clipboard.writeText(url.shareLink(s)); setCopied(s.id); setTimeout(() => setCopied(""), 2000); }
-    catch { setError("Copy didn't work here. Select the link and copy it by hand."); }
+    catch { setError(tr("Copy didn't work here. Select the link and copy it by hand.")); }
   };
   const create = async (e: FormEvent) => {
     e.preventDefault();
@@ -31,51 +32,48 @@ export default function ShareDialog({ type, id, label, onClose }:
       setPassword("");
       await refresh();
       void copy(s);
-    } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't make the link"); }
+    } catch (err) { setError(err instanceof ApiError ? err.message : tr("Couldn't make the link")); }
   };
   const remove = async (s: Share) => { await api.deleteShare(s.id); await refresh(); };
 
   return (
-    <Dialog title={`Share ${label}`} onClose={onClose}>
-      <p className="muted small">Anyone with the link can open it, even without a GharBox account.</p>
+    <Dialog title={tr("Share {label}", { label: label })} onClose={onClose}>
+      <p className="muted small">{tr("Anyone with the link can open it, even without a GharBox account.")}</p>
       {!hasPublicBase() && (
-        <p className="notice small">These links only open on your home network and on Tailscale, because no public share
-          address is set up yet. See docs/REMOTE_ACCESS.md.</p>
+        <p className="notice small">{tr("These links only open on your home network and on Tailscale, because no public share address is set up yet. See docs/REMOTE_ACCESS.md.")}</p>
       )}
       {links.length > 0 && (
         <ul className="share-list">
           {links.map((s) => (
             <li key={s.id}>
-              <input readOnly value={url.shareLink(s)} onFocus={(e) => e.currentTarget.select()} aria-label="Share link" />
-              <button className="icon" onClick={() => void copy(s)} aria-label="Copy link" title="Copy link">
+              <input readOnly value={url.shareLink(s)} onFocus={(e) => e.currentTarget.select()} aria-label={tr("Share link")} />
+              <button className="icon" onClick={() => void copy(s)} aria-label={tr("Copy link")} title={tr("Copy link")}>
                 {copied === s.id ? <Check size={16} /> : <Copy size={16} />}
               </button>
-              <button className="icon" onClick={() => void remove(s)} aria-label="Delete link" title="Delete link"><Trash2 size={16} /></button>
+              <button className="icon" onClick={() => void remove(s)} aria-label={tr("Delete link")} title={tr("Delete link")}><Trash2 size={16} /></button>
               <span className="muted small">
-                {[s.has_password ? "password" : "no password",
-                  s.expires_at ? `expires ${dateFmt.format(new Date(s.expires_at))}` : "never expires",
-                  s.allow_download ? null : "view only", `${s.views} views`].filter(Boolean).join(", ")}
+                {[s.has_password ? tr("password") : tr("no password"),
+                  s.expires_at ? tr("expires {date}", { date: dateFmt.format(new Date(s.expires_at)) }) : tr("never expires"),
+                  s.allow_download ? null : tr("view only"), tr("{n} views", { n: s.views })].filter(Boolean).join(", ")}
               </span>
             </li>
           ))}
         </ul>
       )}
       <form className="stack-form" onSubmit={create}>
-        <label>Password (optional)
-          <input type="text" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" placeholder="Leave empty for no password" />
+        <label>{tr("Password (optional)")}<input type="text" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="off" placeholder={tr("Leave empty for no password")} />
         </label>
-        <label>Link stops working
-          <select value={expires} onChange={(e) => setExpires(e.target.value)}>
-            <option value="1">after 1 day</option>
-            <option value="7">after 7 days</option>
-            <option value="30">after 30 days</option>
-            <option value="365">after a year</option>
-            <option value="">never</option>
+        <label>{tr("Link stops working")}<select value={expires} onChange={(e) => setExpires(e.target.value)}>
+            <option value="1">{tr("after 1 day")}</option>
+            <option value="7">{tr("after 7 days")}</option>
+            <option value="30">{tr("after 30 days")}</option>
+            <option value="365">{tr("after a year")}</option>
+            <option value="">{tr("never")}</option>
           </select>
         </label>
-        <label className="check"><input type="checkbox" checked={download} onChange={(e) => setDownload(e.target.checked)} /> Allow downloads</label>
+        <label className="check"><input type="checkbox" checked={download} onChange={(e) => setDownload(e.target.checked)} />{" "}{tr("Allow downloads")}</label>
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary">Create and copy link</button>
+        <button className="primary">{tr("Create and copy link")}</button>
       </form>
     </Dialog>
   );

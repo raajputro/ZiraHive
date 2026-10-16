@@ -2,8 +2,9 @@ import { useEffect, useRef, type MutableRefObject, type RefObject } from "react"
 import Hls from "hls.js";
 import { url, type Media, type Quality, type Tracks } from "./api";
 
+import { t as tr } from "./i18n";
 export const QUALITY_LABEL: Record<Quality, string> = {
-  original: "Original", "1080p": "1080p", "720p": "720p", "480p": "480p (saves data)", "360p": "360p (lowest data)",
+  original: tr("Original"), "1080p": "1080p", "720p": "720p", "480p": tr("480p (saves data)"), "360p": tr("360p (lowest data)"),
 };
 
 /** Low-data mode starts at 480p; otherwise play the file as it is when the browser can. */
@@ -51,9 +52,9 @@ export function useVideoSource(video: RefObject<HTMLVideoElement>, opts: {
           console.warn("video stream:", data.type, data.details, data.fatal ? "(fatal)" : "", data.error?.message ?? "");
           if (!data.fatal) return;
           const onError = latest.current.onError;
-          if (data.response?.code === 503) onError("The server is busy converting other videos. Try again in a minute, or choose Original.");
-          else if (String(data.details).toLowerCase().includes("codec")) onError("This browser can't play H.264 video. Use Chrome, Edge, Firefox or Safari.");
-          else onError("This video couldn't be converted. Try another quality.");
+          if (data.response?.code === 503) onError(tr("The server is busy converting other videos. Try again in a minute, or choose Original."));
+          else if (String(data.details).toLowerCase().includes("codec")) onError(tr("This browser can't play H.264 video. Use Chrome, Edge, Firefox or Safari."));
+          else onError(tr("This video couldn't be converted. Try another quality."));
         });
         hls.current = h;
       } else {
@@ -94,23 +95,20 @@ export function TrackMenus({ tracks, quality, setQuality, audio, setAudio, subti
   const qualities: Quality[] = [...(tracks.direct_play ? ["original" as Quality] : []), ...tracks.qualities];
   return (
     <>
-      <label>Quality
-        <select value={quality} onChange={(e) => setQuality(e.target.value as Quality)}>
+      <label>{tr("Quality")}<select value={quality} onChange={(e) => setQuality(e.target.value as Quality)}>
           {qualities.map((q) => <option key={q} value={q}>{QUALITY_LABEL[q]}</option>)}
         </select>
       </label>
       {tracks.audio.length > 1 && (
-        <label>Audio
-          <select value={audio} onChange={(e) => setAudio(Number(e.target.value))}>
+        <label>{tr("Audio")}<select value={audio} onChange={(e) => setAudio(Number(e.target.value))}>
             {tracks.audio.map((a) => <option key={a.index} value={a.index}>{a.label}</option>)}
           </select>
         </label>
       )}
       {tracks.subtitles.some((s) => s.usable) && (
-        <label>Subtitles
-          <select value={subtitle} onChange={(e) => setSubtitle(e.target.value)}>
-            <option value="off">Off</option>
-            {tracks.subtitles.filter((s) => s.usable).map((s) => <option key={s.id} value={s.id}>{s.label}{s.forced ? " (forced)" : ""}</option>)}
+        <label>{tr("Subtitles")}<select value={subtitle} onChange={(e) => setSubtitle(e.target.value)}>
+            <option value="off">{tr("Off")}</option>
+            {tracks.subtitles.filter((s) => s.usable).map((s) => <option key={s.id} value={s.id}>{s.label}{s.forced ? tr(" (forced)") : ""}</option>)}
           </select>
         </label>
       )}

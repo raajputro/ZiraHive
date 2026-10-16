@@ -6,6 +6,7 @@ import { useAuth } from "../App";
 import { usePrefs } from "../prefs";
 import { defaultAudio, defaultQuality, SubtitleTracks, TrackMenus, useSubtitle, useVideoSource } from "../video";
 
+import { locale, t as tr } from "../i18n";
 export default function PartyRoute() {
   const { id } = useParams();
   return id ? <PartyRoom key={id} id={id} /> : null;
@@ -20,7 +21,7 @@ type Line = { id: string; kind: "chat"; username: string; text: string } | { id:
 interface Floating { id: number; emoji: string; username: string; left: number }
 
 const REACTIONS = ["😂", "❤️", "👏", "😮", "😢", "🔥", "🎉", "👍"];
-const when = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
+const when = new Intl.DateTimeFormat(locale(), { weekday: "short", day: "numeric", month: "short", hour: "numeric", minute: "2-digit" });
 
 function PartyRoom({ id }: { id: string }) {
   const { user } = useAuth();
@@ -147,7 +148,7 @@ function PartyRoom({ id }: { id: string }) {
       setAudio(defaultAudio(t));
       setQuality((q) => q && (q === "original" ? t.direct_play : t.qualities.includes(q as never)) ? q : defaultQuality(t, lowData));
       setMedia(m);
-    }).catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load the video"));
+    }).catch((e) => setError(e instanceof ApiError ? e.message : tr("Couldn't load the video")));
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [remote?.media_id]);
 
@@ -195,21 +196,21 @@ function PartyRoom({ id }: { id: string }) {
 
   const answer = async (rsvp: "going" | "declined") => setParty(await api.rsvp(id, rsvp));
   const changeSettings = async (change: { control?: "host" | "everyone"; wait_for_all?: boolean }) => setParty(await api.updateParty(id, change));
-  const end = async () => { if (confirm("End the watch party for everyone?")) setParty(await api.endParty(id)); };
+  const end = async () => { if (confirm(tr("End the watch party for everyone?"))) setParty(await api.endParty(id)); };
 
-  if (error && !party) return <div className="page cinema-page"><p className="error">{error}</p><Link to="/watch/parties">Watch parties</Link></div>;
+  if (error && !party) return <div className="page cinema-page"><p className="error">{error}</p><Link to="/watch/parties">{tr("Watch parties")}</Link></div>;
   if (!party) return <div className="page cinema-page" aria-busy="true" />;
   if (conn === "ended" || party.ended_at) {
     return (
       <div className="page cinema-page">
         <h1>{party.title}</h1>
-        <p className="muted">This watch party has ended.</p>
-        <Link to="/watch/parties" className="button">Watch parties</Link>
+        <p className="muted">{tr("This watch party has ended.")}</p>
+        <Link to="/watch/parties" className="button">{tr("Watch parties")}</Link>
       </div>
     );
   }
   if (conn === "refused") {
-    return <div className="page cinema-page"><h1>{party.title}</h1><p className="error">You can't join this party. The title may not be available to your profile.</p></div>;
+    return <div className="page cinema-page"><h1>{party.title}</h1><p className="error">{tr("You can't join this party. The title may not be available to your profile.")}</p></div>;
   }
 
   const hostOnly = remote?.control === "host" && !party.is_host;
@@ -217,21 +218,19 @@ function PartyRoom({ id }: { id: string }) {
 
   return (
     <div className="party-page">
-      <Link to="/watch/parties" className="back"><ArrowLeft size={18} /> Watch parties</Link>
+      <Link to="/watch/parties" className="back"><ArrowLeft size={18} />{" "}{tr("Watch parties")}</Link>
       <div className="party-layout">
         <section className="party-main">
           <header className="party-head">
             <h1>{party.title}</h1>
             <span className={`conn ${conn}`}>{conn === "live" ? <Wifi size={15} /> : <WifiOff size={15} />}
-              {conn === "live" ? `${people.length} watching` : conn === "connecting" ? "Connecting" : "Reconnecting"}</span>
+              {conn === "live" ? tr("{length} watching", { length: people.length }) : conn === "connecting" ? tr("Connecting") : tr("Reconnecting")}</span>
           </header>
           {future && (
-            <div className="party-banner">
-              Starts {when.format(new Date(party.scheduled_at!))}. You can come in early and chat.
-              {party.my_rsvp && (
+            <div className="party-banner">{tr("Starts")}{" "}{when.format(new Date(party.scheduled_at!))}{tr(". You can come in early and chat.")}{party.my_rsvp && (
                 <span className="rsvp">
-                  <button className={party.my_rsvp === "going" ? "primary" : ""} onClick={() => void answer("going")}>Going</button>
-                  <button className={party.my_rsvp === "declined" ? "primary" : ""} onClick={() => void answer("declined")}>Can't make it</button>
+                  <button className={party.my_rsvp === "going" ? "primary" : ""} onClick={() => void answer("going")}>{tr("Going")}</button>
+                  <button className={party.my_rsvp === "declined" ? "primary" : ""} onClick={() => void answer("declined")}>{tr("Can't make it")}</button>
                 </span>
               )}
             </div>
@@ -246,10 +245,10 @@ function PartyRoom({ id }: { id: string }) {
               {floating.map((f) => <span key={f.id} className="float" style={{ left: `${f.left}%` }}>{f.emoji}<small>{f.username}</small></span>)}
             </div>
             {needsTap && (
-              <button className="overlay-btn tap" onClick={tapToJoin}><Play size={18} fill="currentColor" /> Tap to join the party</button>
+              <button className="overlay-btn tap" onClick={tapToJoin}><Play size={18} fill="currentColor" />{" "}{tr("Tap to join the party")}</button>
             )}
             {remote && remote.waiting_for.length > 0 && (
-              <div className="overlay-wait" role="status">Waiting for {remote.waiting_for.join(", ")} to load…</div>
+              <div className="overlay-wait" role="status">{tr("Waiting for")}{" "}{remote.waiting_for.join(", ")}{" "}{tr("to load…")}</div>
             )}
           </div>
           <div className="player-controls">
@@ -258,66 +257,65 @@ function PartyRoom({ id }: { id: string }) {
                 subtitle={subtitle} setSubtitle={setSubtitle} />
             )}
             {party.is_host && media?.next_id && (
-              <button onClick={() => send({ type: "media", media_id: media.next_id })}><SkipForward size={16} /> Next episode for everyone</button>
+              <button onClick={() => send({ type: "media", media_id: media.next_id })}><SkipForward size={16} />{" "}{tr("Next episode for everyone")}</button>
             )}
           </div>
           {media?.series_id && <p className="episode-code">{media.series_title}, {episodeCode(media)}</p>}
-          {hostOnly && <p className="muted small">{party.host} controls playback in this party.</p>}
-          {remote?.by && <p className="muted small">Last change by {remote.by}.</p>}
+          {hostOnly && <p className="muted small">{party.host}{" "}{tr("controls playback in this party.")}</p>}
+          {remote?.by && <p className="muted small">{tr("Last change by")}{" "}{remote.by}.</p>}
           {error && <p className="error" role="alert">{error}</p>}
         </section>
 
         <aside className="party-side">
           <section>
-            <h2><Users size={16} aria-hidden /> People</h2>
+            <h2><Users size={16} aria-hidden />{" "}{tr("People")}</h2>
             <ul className="people">
               {people.map((p) => (
                 <li key={p.user_id}>
                   <span className={`dot ${p.buffering ? "loading" : "on"}`} aria-hidden />
-                  {p.username}{p.host && <span className="tag">host</span>}
-                  {p.buffering && <span className="muted small"> loading</span>}
-                  {p.devices > 1 && <span className="muted small"> {p.devices} devices</span>}
+                  {p.username}{p.host && <span className="tag">{tr("host")}</span>}
+                  {p.buffering && <span className="muted small">{" "}{tr("loading")}</span>}
+                  {p.devices > 1 && <span className="muted small"> {p.devices}{" "}{tr("devices")}</span>}
                 </li>
               ))}
               {party.members.filter((m) => !people.some((p) => p.user_id === m.user_id)).map((m) => (
                 <li key={m.user_id} className="away">
                   <span className="dot" aria-hidden />{m.username}
-                  <span className="muted small"> {m.rsvp === "going" ? "coming" : m.rsvp === "declined" ? "not coming" : "invited"}</span>
+                  <span className="muted small"> {m.rsvp === "going" ? "coming" : m.rsvp === "declined" ? tr("not coming") : "invited"}</span>
                 </li>
               ))}
             </ul>
           </section>
 
           <section className="chat">
-            <h2>Chat</h2>
+            <h2>{tr("Chat")}</h2>
             <div className="chat-lines" aria-live="polite">
-              {lines.length === 0 && <p className="muted small">Say hello. Messages stay with the party.</p>}
+              {lines.length === 0 && <p className="muted small">{tr("Say hello. Messages stay with the party.")}</p>}
               {lines.map((l) => l.kind === "chat"
                 ? <p key={l.id} className={l.username === user.username ? "mine" : ""}><strong>{l.username}</strong> {l.text}</p>
                 : <p key={l.id} className="notice-line">{l.text}</p>)}
               <div ref={chatEnd} />
             </div>
-            <div className="reaction-bar" role="group" aria-label="Reactions">
-              {REACTIONS.map((r) => <button key={r} className="icon" onClick={() => send({ type: "react", emoji: r })} aria-label={`React ${r}`}>{r}</button>)}
+            <div className="reaction-bar" role="group" aria-label={tr("Reactions")}>
+              {REACTIONS.map((r) => <button key={r} className="icon" onClick={() => send({ type: "react", emoji: r })} aria-label={tr("React {r}", { r: r })}>{r}</button>)}
             </div>
             <form className="chat-form" onSubmit={sendChat}>
-              <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder="Message" maxLength={500} aria-label="Chat message" />
-              <button className="icon" aria-label="Send"><Send size={17} /></button>
+              <input value={draft} onChange={(e) => setDraft(e.target.value)} placeholder={tr("Message")} maxLength={500} aria-label={tr("Chat message")} />
+              <button className="icon" aria-label={tr("Send")}><Send size={17} /></button>
             </form>
           </section>
 
           {party.is_host && (
             <section className="host-tools">
-              <h2>Host</h2>
-              <label>Who can pause and skip
-                <select value={party.control} onChange={(e) => void changeSettings({ control: e.target.value as "host" | "everyone" })}>
-                  <option value="everyone">Everyone</option>
-                  <option value="host">Only me</option>
+              <h2>{tr("Host")}</h2>
+              <label>{tr("Who can pause and skip")}<select value={party.control} onChange={(e) => void changeSettings({ control: e.target.value as "host" | "everyone" })}>
+                  <option value="everyone">{tr("Everyone")}</option>
+                  <option value="host">{tr("Only me")}</option>
                 </select>
               </label>
               <label className="check"><input type="checkbox" checked={party.wait_for_all}
-                onChange={(e) => void changeSettings({ wait_for_all: e.target.checked })} /> Wait for anyone whose video is loading</label>
-              <button className="danger" onClick={() => void end()}>End the party</button>
+                onChange={(e) => void changeSettings({ wait_for_all: e.target.checked })} />{" "}{tr("Wait for anyone whose video is loading")}</label>
+              <button className="danger" onClick={() => void end()}>{tr("End the party")}</button>
             </section>
           )}
         </aside>

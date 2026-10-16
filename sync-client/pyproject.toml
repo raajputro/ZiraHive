@@ -1,0 +1,24 @@
+[project]
+name = "gharbox-sync"
+version = "0.1.0"
+description = "Keeps a folder on your PC and a folder in GharBox the same, both ways."
+readme = "README.md"
+license = { text = "AGPL-3.0-or-later" }
+requires-python = ">=3.10"
+dependencies = [
+  "httpx>=0.27",
+  "keyring>=25",
+  "send2trash>=1.8",
+  "pystray>=0.19",
+  "pillow>=10.4",
+]
+
+[project.scripts]
+gharbox-sync = "gharbox_sync.cli:main"
+
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["gharbox_sync"]

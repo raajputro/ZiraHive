@@ -1,7 +1,8 @@
+import { digits, t as tr, tx } from "./i18n";
 // Typed client for the GharBox API. Auth uses the httpOnly cookie set at login.
 
-export interface User { id: string; username: string; is_admin: boolean; quota_bytes: number | null; created_at: string; totp_enabled: boolean; max_age: number | null }
-export interface Me extends User { ntfy_url: string | null; used_bytes: number }
+export interface User { id: string; username: string; is_admin: boolean; quota_bytes: number | null; created_at: string; totp_enabled: boolean; max_age: number | null; language?: string | null }
+export interface Me extends User { ntfy_url: string | null; used_bytes: number; language: string | null }
 export interface AdminUser extends User { used_bytes: number }
 export interface Asset {
   id: string; folder: string; filename: string; size: number; mime: string;
@@ -153,6 +154,7 @@ async function request<T>(method: string, path: string, body?: unknown, init: Re
       else if (Array.isArray(data.detail)) message = data.detail.map((d: { msg: string }) => d.msg).join("; ");
       else if (data.detail && typeof data.detail === "object") { message = data.detail.message; code = data.detail.code; }
     } catch { /* not JSON */ }
+    message = tx(message);  // server messages in the interface language
     if (res.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/s/"))
       window.dispatchEvent(new Event("gharbox:signed-out"));
     throw new ApiError(res.status, message, code);
@@ -168,7 +170,44 @@ const q = (params: Record<string, string | number | undefined | null>) => {
   return str ? `?${str}` : "";
 };
 
+export interface VaultInfo {
+  set_up: boolean; kdf: string | null; salt: string | null; iterations: number | null; wrapped_key: string | null;
+  recovery_wrapped_key: string | null; item_count: number; bytes: number;
+}
+export interface VaultItem { id: string; size: number; received: number; chunk_size: number; wrapped_key: string; meta: string; has_thumb: boolean; complete: boolean; created_at: string }
+
+export interface BackupRun {
+  id: string; kind: "backup" | "check"; status: "running" | "ok" | "failed"; started_at: string; finished_at: string | null;
+  snapshot_id: string | null; files_new: number | null; files_changed: number | null; bytes_added: number | null;
+  total_bytes: number | null; message: string | null;
+}
+export interface BackupInfo {
+  configured: boolean; enabled: boolean; repository: string | null; env_keys: string[]; hour: number; include_media: boolean;
+  restic: string | null; runs: BackupRun[]; password: string | null; created: boolean;
+}
+
 export const api = {
+  backup: () => request<BackupInfo>("GET", "/api/admin/backup"),
+  saveBackup: (body: { repository: string; password?: string; env?: Record<string, string>; hour: number; include_media: boolean; enabled: boolean }) =>
+    request<BackupInfo>("PUT", "/api/admin/backup", body),
+  backupNow: () => request<void>("POST", "/api/admin/backup/run"),
+  checkBackup: () => request<void>("POST", "/api/admin/backup/check"),
+  backupSnapshots: () => request<{ id: string; time: string; paths: string[] }[]>("GET", "/api/admin/backup/snapshots"),
+  backupPassword: () => request<{ password: string }>("GET", "/api/admin/backup/password"),
+  // vault (everything sent here is already encrypted)
+  vault: () => request<VaultInfo>("GET", "/api/vault"),
+  setUpVault: (body: { salt: string; iterations: number; wrapped_key: string; recovery_wrapped_key: string }) => request<VaultInfo>("POST", "/api/vault", body),
+  changeVaultKeys: (body: { password: string; salt: string; iterations: number; wrapped_key: string; recovery_wrapped_key?: string }) =>
+    request<VaultInfo>("PUT", "/api/vault/keys", body),
+  resetVault: (password: string) => request<void>("DELETE", "/api/vault", { password }),
+  vaultItems: () => request<VaultItem[]>("GET", "/api/vault/items"),
+  createVaultItem: (body: { size: number; chunk_size: number; wrapped_key: string; meta: string }) => request<VaultItem>("POST", "/api/vault/items", body),
+  vaultChunk: (id: string, offset: number, data: Uint8Array) =>
+    request<VaultItem>("PATCH", `/api/vault/items/${id}/data`, new Blob([data]), { headers: { "Upload-Offset": String(offset) } }),
+  vaultThumb: (id: string, data: Uint8Array) => request<void>("PUT", `/api/vault/items/${id}/thumb`, new Blob([data])),
+  renameVaultItem: (id: string, meta: string) => request<VaultItem>("PATCH", `/api/vault/items/${id}`, { meta }),
+  deleteVaultItem: (id: string) => request<void>("DELETE", `/api/vault/items/${id}`),
+
   // music
   musicHome: () => request<MusicHome>("GET", "/api/music/home"),
   musicAlbums: (params: { library_id?: string; q?: string; artist?: string; sort?: "added" | "title" | "artist" | "year"; limit?: number } = {}) =>
@@ -206,6 +245,7 @@ export const api = {
   logoutAll: () => request<void>("POST", "/api/auth/logout-all"),
   me: () => request<Me>("GET", "/api/auth/me"),
   saveMySettings: (ntfy_url: string) => request<Me>("PUT", "/api/auth/me/settings", { ntfy_url }),
+  saveLanguage: (language: "en" | "bn") => request<Me>("PUT", "/api/auth/me/settings", { language }),
   testNotification: () => request<void>("POST", "/api/auth/me/test-notification"),
   changePassword: (current_password: string, new_password: string) =>
     request<{ user: User }>("POST", "/api/auth/password", { current_password, new_password }),
@@ -331,19 +371,19 @@ export const url = {
 };
 
 export function formatBytes(n: number): string {
-  if (n < 1024) return `${n} B`;
+  if (n < 1024) return digits(`${n} B`);
   const units = ["KB", "MB", "GB", "TB"];
   let v = n / 1024, i = 0;
   while (v >= 1024 && i < units.length - 1) { v /= 1024; i++; }
-  return `${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`;
+  return digits(`${v.toFixed(v < 10 ? 1 : 0)} ${units[i]}`);
 }
 
 export function episodeCode(m: { season: number | null; episode: number | null }): string {
-  if (m.episode == null) return m.season != null ? `Season ${m.season}` : "";
-  return `S${m.season ?? 1} E${m.episode}`;
+  if (m.episode == null) return m.season != null ? tr("Season {n}", { n: m.season }) : "";
+  return tr("S{s} E{e}", { s: m.season ?? 1, e: m.episode });
 }
 
-export const AGE_LABEL: Record<number, string> = { 0: "All ages", 7: "7+", 13: "13+", 16: "16+", 18: "18+" };
+export const AGE_LABEL: Record<number, string> = { 0: tr("All ages"), 7: "7+", 13: "13+", 16: "16+", 18: "18+" };
 export const AGE_OPTIONS = [0, 7, 13, 16, 18];
 
 /** "1:23" or "1:02:03" for a number of seconds. */
@@ -364,5 +404,5 @@ export function parseClock(text: string): number | null | undefined {
 export function formatDuration(sec: number | null): string {
   if (!sec) return "";
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
-  return h ? `${h}h ${m}m` : `${m}:${String(s).padStart(2, "0")}`;
+  return h ? tr("{h} h {m} min", { h, m }) : digits(`${m}:${String(s).padStart(2, "0")}`);
 }

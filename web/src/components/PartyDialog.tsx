@@ -4,6 +4,7 @@ import { api, ApiError, type User } from "../api";
 import { useAuth } from "../App";
 import Dialog from "./Dialog";
 
+import { locale, t as tr } from "../i18n";
 /** Start or schedule a watch party for one movie or episode. */
 export default function PartyDialog({ mediaId, title, onClose }: { mediaId: string; title: string; onClose: () => void }) {
   const { user: me } = useAuth();
@@ -27,49 +28,47 @@ export default function PartyDialog({ mediaId, title, onClose }: { mediaId: stri
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    if (later && new Date(when).getTime() < Date.now()) { setError("Pick a time in the future."); return; }
+    if (later && new Date(when).getTime() < Date.now()) { setError(tr("Pick a time in the future.")); return; }
     try {
       const party = await api.createParty({ media_id: mediaId, invite: [...invite], control, wait_for_all: waitForAll,
         scheduled_at: later ? new Date(when).toISOString() : undefined });
-      if (later) setDone(`Invites sent for ${new Date(when).toLocaleString()}. Everyone gets a reminder 10 minutes before.`);
+      if (later) setDone(tr("Invites sent for {date}. Everyone gets a reminder 10 minutes before.", { date: new Date(when).toLocaleString(locale()) }));
       else navigate(`/party/${party.id}`);
-    } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't start the party"); }
+    } catch (err) { setError(err instanceof ApiError ? err.message : tr("Couldn't start the party")); }
   };
 
   return (
-    <Dialog title={`Watch ${title} together`} onClose={onClose}>
+    <Dialog title={tr("Watch {title} together", { title: title })} onClose={onClose}>
       {done ? (
         <>
           <p role="status">{done}</p>
-          <button className="primary" onClick={() => navigate("/watch/parties")}>See watch parties</button>
+          <button className="primary" onClick={() => navigate("/watch/parties")}>{tr("See watch parties")}</button>
         </>
       ) : (
         <form className="stack-form" onSubmit={submit}>
           <fieldset className="choice">
-            <legend>When</legend>
-            <label className="check"><input type="radio" checked={!later} onChange={() => setLater(false)} /> Now</label>
-            <label className="check"><input type="radio" checked={later} onChange={() => setLater(true)} /> Later</label>
-            {later && <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} aria-label="Date and time" required />}
+            <legend>{tr("When")}</legend>
+            <label className="check"><input type="radio" checked={!later} onChange={() => setLater(false)} />{" "}{tr("Now")}</label>
+            <label className="check"><input type="radio" checked={later} onChange={() => setLater(true)} />{" "}{tr("Later")}</label>
+            {later && <input type="datetime-local" value={when} onChange={(e) => setWhen(e.target.value)} aria-label={tr("Date and time")} required />}
           </fieldset>
           <fieldset className="choice">
-            <legend>Invite</legend>
-            {people.length === 0 && <p className="muted small">Nobody else has an account yet. Add family and friends in Settings, People.</p>}
+            <legend>{tr("Invite")}</legend>
+            {people.length === 0 && <p className="muted small">{tr("Nobody else has an account yet. Add family and friends in Settings, People.")}</p>}
             <div className="invite-grid">
               {people.map((p) => (
                 <label key={p.id} className="check"><input type="checkbox" checked={invite.has(p.id)} onChange={() => toggle(p.id)} /> {p.username}</label>
               ))}
             </div>
           </fieldset>
-          <label>Who can pause and skip
-            <select value={control} onChange={(e) => setControl(e.target.value as "everyone" | "host")}>
-              <option value="everyone">Everyone</option>
-              <option value="host">Only me</option>
+          <label>{tr("Who can pause and skip")}<select value={control} onChange={(e) => setControl(e.target.value as "everyone" | "host")}>
+              <option value="everyone">{tr("Everyone")}</option>
+              <option value="host">{tr("Only me")}</option>
             </select>
           </label>
-          <label className="check"><input type="checkbox" checked={waitForAll} onChange={(e) => setWaitForAll(e.target.checked)} />
-            Pause for everyone when someone's video is loading</label>
+          <label className="check"><input type="checkbox" checked={waitForAll} onChange={(e) => setWaitForAll(e.target.checked)} />{tr("Pause for everyone when someone's video is loading")}</label>
           {error && <p className="error" role="alert">{error}</p>}
-          <button className="primary">{later ? "Send invites" : "Start the party"}</button>
+          <button className="primary">{later ? tr("Send invites") : tr("Start the party")}</button>
         </form>
       )}
     </Dialog>

@@ -1,6 +1,7 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, url, type BookDetail, type Chapter, type Track } from "./api";
 
+import { digits, t as tr } from "./i18n";
 /** One thing in the queue: a song, or one part (file) of an audiobook. */
 export interface QueueItem {
   key: string;
@@ -58,9 +59,9 @@ const Ctx = createContext<AudioCtx | null>(null);
 export const useAudio = () => useContext(Ctx)!;
 
 export function clock(sec: number | null | undefined): string {
-  if (!sec || !isFinite(sec) || sec < 0) return "0:00";
+  if (!sec || !isFinite(sec) || sec < 0) return digits("0:00");
   const s = Math.floor(sec % 60), m = Math.floor(sec / 60) % 60, h = Math.floor(sec / 3600);
-  return h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`;
+  return digits(h ? `${h}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}` : `${m}:${String(s).padStart(2, "0")}`);
 }
 
 export function trackItem(t: Track): QueueItem {
@@ -170,9 +171,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
           const r = current.kind === "track" ? await api.prepareTrack(current.id, forced)
             : await api.prepareBookPart(current.id, current.part, forced);
           if (r.ready) load();
-          else if (r.failed) { setPreparing(false); setError("This file couldn't be converted for the browser."); }
+          else if (r.failed) { setPreparing(false); setError(tr("This file couldn't be converted for the browser.")); }
           else setTimeout(() => void ask(), 1500);
-        } catch { setPreparing(false); setError("Couldn't reach the server."); }
+        } catch { setPreparing(false); setError(tr("Couldn't reach the server.")); }
       };
       void ask();
     }
@@ -194,7 +195,7 @@ export function AudioProvider({ children }: { children: ReactNode }) {
       setReload((x) => x + 1);
       return;
     }
-    setError("This file couldn't be played.");
+    setError(tr("This file couldn't be played."));
   };
 
   // ------------------------------------------------------------------ controls

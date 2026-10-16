@@ -32,6 +32,7 @@ class User(Base):
     totp_secret: Mapped[str | None] = mapped_column(String(64), nullable=True)
     totp_enabled: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     ntfy_url: Mapped[str | None] = mapped_column(String(512), nullable=True)  # push notifications
+    language: Mapped[str | None] = mapped_column(String(8), nullable=True)  # "en" or "bn"; None = the browser's
     # Kids' profiles: only titles rated for this age or younger are shown. None = no limit.
     max_age: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
@@ -94,6 +95,8 @@ class UploadSession(Base):
     device_asset_id: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     dedupe: Mapped[bool] = mapped_column(Boolean, default=True, server_default=true())
+    # sync client: a file with this name in this folder gets new contents (old one kept as a version)
+    replace: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 class Library(Base):
@@ -474,3 +477,77 @@ class BookProgress(Base):
     fraction: Mapped[float] = mapped_column(Float, default=0)  # 0..1
     finished: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+# ------------------------------------------------------------------ vault
+
+class Vault(Base):
+    """End-to-end encrypted space. The server only keeps the master key wrapped (encrypted) with
+    the person's vault passphrase and with their recovery key; it can never open it."""
+
+    __tablename__ = "vaults"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), unique=True)
+    kdf: Mapped[str] = mapped_column(String(32), default="pbkdf2-sha256")
+    salt: Mapped[str] = mapped_column(String(64))
+    iterations: Mapped[int] = mapped_column(Integer)
+    wrapped_key: Mapped[str] = mapped_column(Text)           # master key, by the passphrase
+    recovery_wrapped_key: Mapped[str] = mapped_column(Text)  # master key, by the recovery key
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class VaultItem(Base):
+    """One encrypted file. Name, type and dates are inside `meta`, encrypted too."""
+
+    __tablename__ = "vault_items"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    size: Mapped[int] = mapped_column(BigInteger)          # encrypted size
+    received: Mapped[int] = mapped_column(BigInteger, default=0)
+    chunk_size: Mapped[int] = mapped_column(Integer)       # plaintext bytes per encrypted chunk
+    wrapped_key: Mapped[str] = mapped_column(Text)         # file key + nonce, by the master key
+    meta: Mapped[str] = mapped_column(Text)                # encrypted JSON
+    has_thumb: Mapped[bool] = mapped_column(Boolean, default=False)
+    complete: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+
+
+# ------------------------------------------------------------------ offsite backup
+
+class BackupConfig(Base):
+    """Where the encrypted offsite backup goes (one row). restic encrypts everything with
+    `password` before it leaves this PC; the storage provider only ever sees ciphertext."""
+
+    __tablename__ = "backup_config"
+
+    id: Mapped[str] = mapped_column(String(16), primary_key=True, default="main")
+    enabled: Mapped[bool] = mapped_column(Boolean, default=True)
+    repository: Mapped[str] = mapped_column(Text)       # /backup-disk/gharbox, s3:..., sftp:..., rclone:...
+    password: Mapped[str] = mapped_column(Text)         # restic repository password
+    env_json: Mapped[str] = mapped_column(Text, default="{}")  # e.g. AWS_ACCESS_KEY_ID for S3
+    hour: Mapped[int] = mapped_column(Integer, default=2)       # local hour of the daily run
+    include_media: Mapped[bool] = mapped_column(Boolean, default=False)
+    keep_daily: Mapped[int] = mapped_column(Integer, default=7)
+    keep_weekly: Mapped[int] = mapped_column(Integer, default=5)
+    keep_monthly: Mapped[int] = mapped_column(Integer, default=12)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+class BackupRun(Base):
+    __tablename__ = "backup_runs"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    kind: Mapped[str] = mapped_column(String(16), default="backup")  # backup | check
+    status: Mapped[str] = mapped_column(String(16), default="running")  # running | ok | failed
+    started_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
+    finished_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    snapshot_id: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    files_new: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    files_changed: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    bytes_added: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    total_bytes: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    message: Mapped[str | None] = mapped_column(Text, nullable=True)

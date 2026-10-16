@@ -23,3 +23,11 @@ mobile/.flutter-plugins*
 *.rdb
 *.tsbuildinfo
 _to_delete/
+
+# sync client build
+sync-client/build/
+sync-client/dist/
+sync-client/*.spec
+sync-client/gharbox-sync.ico
+sync-client/*.egg-info/
+backup-disk/

@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Download, Folder, FileText, Film, Image, File, Play, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { api, ApiError, formatBytes, formatDuration, url, type PublicAsset, type PublicListing, type PublicShare } from "../api";
 
+import { locale, t as tr } from "../i18n";
 const icons = { photo: Image, video: Film, document: FileText, other: File };
 
 /** What someone sees when they open a share link. No account needed. */
@@ -33,11 +34,11 @@ export default function PublicSharePage({ token }: { token: string }) {
       const r = await api.unlockShare(token, password);
       try { sessionStorage.setItem(`gharbox:share:${token}`, r.key); } catch { /* private mode */ }
       setKey(r.key);
-    } catch (err) { setError(err instanceof ApiError ? err.message : "Couldn't open the link"); }
+    } catch (err) { setError(err instanceof ApiError ? err.message : tr("Couldn't open the link")); }
   };
 
   if (error && !info) {
-    return <div className="public"><div className="public-card"><h1>Link not available</h1><p>{error}</p></div></div>;
+    return <div className="public"><div className="public-card"><h1>{tr("Link not available")}</h1><p>{error}</p></div></div>;
   }
   if (!info) return <div className="public" aria-busy="true" />;
 
@@ -47,10 +48,10 @@ export default function PublicSharePage({ token }: { token: string }) {
         <form onSubmit={unlock}>
           <div className="signin-mark" lang="bn" aria-hidden>ঘর</div>
           <h1>{info.title}</h1>
-          <p>{info.owner} shared this with a password.</p>
-          <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus /></label>
+          <p>{info.owner}{" "}{tr("shared this with a password.")}</p>
+          <label>{tr("Password")}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus /></label>
           {error && <p className="error" role="alert">{error}</p>}
-          <button className="primary">Open</button>
+          <button className="primary">{tr("Open")}</button>
         </form>
       </div>
     );
@@ -63,14 +64,14 @@ export default function PublicSharePage({ token }: { token: string }) {
   return (
     <div className="public">
       <header className="public-head">
-        <span className="brand-inline"><span lang="bn">ঘর</span> GharBox</span>
+        <span className="brand-inline"><span lang="bn">ঘর</span>{" "}{tr("GharBox")}</span>
         <div>
           <h1>{info.title}</h1>
-          <p className="muted">Shared by {info.owner}{info.expires_at ? `, until ${new Date(info.expires_at).toLocaleDateString()}` : ""}</p>
+          <p className="muted">{tr("Shared by")}{" "}{info.owner}{info.expires_at ? tr(", until {date}", { date: new Date(info.expires_at).toLocaleDateString(locale()) }) : ""}</p>
         </div>
       </header>
       {info.type === "folder" && crumbs.length > 0 && (
-        <nav className="crumbs small-crumbs" aria-label="Folder path">
+        <nav className="crumbs small-crumbs" aria-label={tr("Folder path")}>
           <button onClick={() => setPath("/")}>{info.title}</button>
           {crumbs.map((c, i) => (
             <span key={i} className="crumb"><span className="sep" aria-hidden>/</span>
@@ -91,7 +92,7 @@ export default function PublicSharePage({ token }: { token: string }) {
                   <td><a className="fname" href={url.publicFile(token, a, key)} target="_blank" rel="noreferrer"><Icon size={18} className="ico" /> {a.filename}</a></td>
                   <td className="row-actions">
                     <span className="muted small">{formatBytes(a.size)}</span>
-                    {info.allow_download && <a className="icon" href={url.publicFile(token, a, key, true)} aria-label={`Download ${a.filename}`}><Download size={16} /></a>}
+                    {info.allow_download && <a className="icon" href={url.publicFile(token, a, key, true)} aria-label={tr("Download {filename}", { filename: a.filename })}><Download size={16} /></a>}
                   </td>
                 </tr>
               );
@@ -105,7 +106,7 @@ export default function PublicSharePage({ token }: { token: string }) {
             const ratio = a.width && a.height ? a.width / a.height : 1;
             return (
               <button key={a.id} className="tile" style={{ flexGrow: ratio, aspectRatio: String(ratio), ["--r" as string]: ratio }}
-                onClick={() => setOpen(i)} aria-label={`Open ${a.filename}`}>
+                onClick={() => setOpen(i)} aria-label={tr("Open {filename}", { filename: a.filename })}>
                 {a.thumb_ready ? <img src={url.publicThumb(token, a, key)} alt="" loading="lazy" /> : <span className="tile-wait" />}
                 {a.kind === "video" && <span className="tile-badge"><Play size={12} fill="currentColor" /> {formatDuration(a.duration)}</span>}
               </button>
@@ -114,7 +115,7 @@ export default function PublicSharePage({ token }: { token: string }) {
           <span className="justified-filler" />
         </div>
       )}
-      {listing && listing.folders.length === 0 && listing.assets.length === 0 && <p className="muted">This is empty.</p>}
+      {listing && listing.folders.length === 0 && listing.assets.length === 0 && <p className="muted">{tr("This is empty.")}</p>}
       {open !== null && media[open] && (
         <PublicViewer items={media} index={open} token={token} shareKey={key} allowDownload={info.allow_download}
           onIndex={setOpen} onClose={() => setOpen(null)} />
@@ -140,16 +141,16 @@ function PublicViewer({ items, index, token, shareKey, allowDownload, onIndex, o
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={a.filename}>
       <div className="lightbox-bar">
         <span>{a.filename}</span>
-        {allowDownload && <a className="icon" href={url.publicFile(token, a, shareKey, true)} aria-label="Download"><Download size={18} /></a>}
-        <button className="icon" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        {allowDownload && <a className="icon" href={url.publicFile(token, a, shareKey, true)} aria-label={tr("Download")}><Download size={18} /></a>}
+        <button className="icon" onClick={onClose} aria-label={tr("Close")}><X size={20} /></button>
       </div>
-      {index > 0 && <button className="lb-nav prev" onClick={() => onIndex(index - 1)} aria-label="Previous"><ChevronLeft size={30} /></button>}
+      {index > 0 && <button className="lb-nav prev" onClick={() => onIndex(index - 1)} aria-label={tr("Previous")}><ChevronLeft size={30} /></button>}
       <div className="lightbox-stage">
         {a.kind === "video"
           ? <video key={a.id} src={url.publicFile(token, a, shareKey)} controls autoPlay playsInline />
           : <img key={a.id} src={url.publicPreview(token, a, shareKey)} alt={a.filename} />}
       </div>
-      {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label="Next"><ChevronRight size={30} /></button>}
+      {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label={tr("Next")}><ChevronRight size={30} /></button>}
     </div>
   );
 }

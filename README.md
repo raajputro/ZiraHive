@@ -31,14 +31,24 @@ your PC, phone and TV.
 - **Kids**: give a profile an age limit and it only sees titles rated for that age
 - **Family**: several accounts with their own private space, admin and member roles, and
   storage limits
+- **Vault**: a locked space for ID scans, bank papers and private photos, encrypted on your device
+  with your own passphrase before upload. The server only stores scrambled data: not even the
+  admin can open it. A recovery key gets you in if you forget the passphrase
+- **Offsite backup**: a daily encrypted copy of photos, files, the vault and the database on a USB
+  disk, another computer or a free cloud bucket (restic), with checks and a written restore guide
+  ([docs/BACKUP.md](docs/BACKUP.md))
+- **PC sync**: the GharBox Sync app keeps a folder on your Windows PC and a folder in GharBox the
+  same, both ways, like the Google Drive app ([sync-client/README.md](sync-client/README.md))
+- **বাংলা**: the whole interface in Bangla, with Bangla digits and dates. Each person picks their
+  language in Settings and it follows them to every device
 - **Security**: two-factor sign-in with recovery codes, "sign out everywhere", password changes
   end other sessions, slowed-down password guessing, and an activity log for the admin
 - **Notifications**: a bell in the app for backups, shared albums, new movies and a nearly full
   disk, and on your phone through the free ntfy app
 - **Admin dashboard**: who is watching what, background jobs, and free space on every disk
 
-> Status: milestone 1, batches 1 to 4 and remote access. Next up: an encrypted vault, encrypted
-> offsite backup, a Bangla interface and a PC sync client. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: milestone 1, batches 1 to 5 and remote access. Next up: document scanning and text search
+> (OCR) in the browser, and casting to a TV (Chromecast, DLNA). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it fits together
 

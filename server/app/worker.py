@@ -11,7 +11,7 @@ from . import db
 from .config import get_settings
 from .models import Library
 from .routers.files import purge_expired_trash
-from .services.jobs import make_offline_copy, process_asset, scan_library
+from .services.jobs import make_offline_copy, offsite_backup, offsite_check, process_asset, scan_library
 from .services.libraries import discover
 
 
@@ -32,6 +32,8 @@ async def nightly(ctx) -> None:
         await purge_expired_trash(session)
         await discover(session)
         await purge_old_offline_copies(session)
+        from .routers.vault import purge_unfinished
+        await purge_unfinished(session)
         from .services.audio_convert import purge_unused
         await asyncio.to_thread(purge_unused)
         ids = (await session.scalars(select(Library.id))).all()
@@ -85,10 +87,31 @@ async def party_reminders(ctx) -> None:
         await send_reminders(session)
 
 
+async def backup_if_due(ctx) -> None:
+    """Every hour: the daily offsite backup at its chosen hour (and retries after a failure)."""
+    from .services import offsite
+    async with db.sessionmaker()() as session:
+        if await offsite.due(session):
+            try:
+                await offsite.run_backup(session)
+            except offsite.BackupError:
+                pass
+
+
+async def weekly_check(ctx) -> None:
+    from .services import offsite
+    async with db.sessionmaker()() as session:
+        try:
+            await offsite.run_check(session)
+        except offsite.BackupError:
+            pass
+
+
 class WorkerSettings:
-    functions = [process_asset, scan_library, make_offline_copy]
+    functions = [process_asset, scan_library, make_offline_copy, offsite_backup, offsite_check]
     cron_jobs = [cron(nightly, hour={3}, minute={0}), cron(disk_check, minute={17}),
-                 cron(party_reminders, second={5})]
+                 cron(party_reminders, second={5}), cron(backup_if_due, minute={41}),
+                 cron(weekly_check, weekday={2}, hour={5}, minute={11})]
     on_startup = startup
     on_shutdown = shutdown
     redis_settings = RedisSettings.from_dsn(get_settings().redis_url or "redis://localhost:6379")

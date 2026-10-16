@@ -3,6 +3,7 @@ import ePub, { type Book as EBook, type NavItem, type Rendition } from "epubjs";
 import { url } from "../api";
 import type { TocEntry, ViewProps } from "../pages/Reader";
 
+import { num, t as tr } from "../i18n";
 const THEMES = {
   light: { body: { color: "#1a1d24 !important", background: "#ffffff !important" }, a: { color: "#2E4A8B !important" } },
   sepia: { body: { color: "#433422 !important", background: "#f4ecd8 !important" }, a: { color: "#8A6A33 !important" } },
@@ -41,10 +42,10 @@ export default function EpubView({ book, settings, onLocation, onToc, register, 
       const pct = eb.locations.length() ? eb.locations.percentageFromCfi(cfi) : where.start.percentage;
       const chap = where.start.displayed;
       cb.current.onLocation({ fraction: pct || 0, position: 0, locator: cfi, atEnd: !!where.atEnd,
-        label: `${Math.round((pct || 0) * 100)}%${chap?.total ? ` · page ${chap.page} of ${chap.total} in this chapter` : ""}` });
+        label: num(Math.round((pct || 0) * 100)) + "%" + (chap?.total ? tr(" · page {page} of {total} in this chapter", { page: chap.page, total: chap.total }) : "") });
     };
     r.on("relocated", (where: never) => { if (ready) located(where); });
-    r.on("displayError", () => setError("This book couldn't be shown."));
+    r.on("displayError", () => setError(tr("This book couldn't be shown.")));
     // swipe on phones, tap in the middle for the menu
     let sx = 0, sy = 0;
     r.on("touchstart", (e: TouchEvent) => { sx = e.changedTouches[0].screenX; sy = e.changedTouches[0].screenY; });
@@ -60,7 +61,7 @@ export default function EpubView({ book, settings, onLocation, onToc, register, 
 
     const start = book.progress?.locator && !book.progress.finished ? book.progress.locator : undefined;
     r.display(start).catch(() => r.display()).then(() => { ready = true; const l = r.currentLocation() as never; if (l) located(l); })
-      .catch(() => setError("This book couldn't be opened. It may be damaged or protected (DRM)."));
+      .catch(() => setError(tr("This book couldn't be opened. It may be damaged or protected (DRM).")));
     eb.loaded.navigation.then((nav) => onToc(flatten(nav.toc))).catch(() => undefined);
     // Locations give a real percentage. They take a moment to work out, so they're kept per book.
     eb.ready.then(async () => {

@@ -137,4 +137,25 @@ async def scan_library(_ctx: Any, library_id: str) -> dict:
     return await scan(library_id)
 
 
-JOBS = {"process_asset": process_asset, "scan_library": scan_library, "make_offline_copy": make_offline_copy}
+async def offsite_backup(_ctx: Any) -> str:
+    from . import offsite
+
+    async with sessionmaker()() as session:
+        try:
+            return (await offsite.run_backup(session)).status
+        except offsite.BackupError as exc:
+            return str(exc)
+
+
+async def offsite_check(_ctx: Any) -> str:
+    from . import offsite
+
+    async with sessionmaker()() as session:
+        try:
+            return (await offsite.run_check(session)).status
+        except offsite.BackupError as exc:
+            return str(exc)
+
+
+JOBS = {"process_asset": process_asset, "scan_library": scan_library, "make_offline_copy": make_offline_copy,
+        "offsite_backup": offsite_backup, "offsite_check": offsite_check}

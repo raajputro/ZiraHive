@@ -54,13 +54,26 @@
 - Age limits per category; continue reading; next in series
 - The end-to-end tests send the production Content-Security-Policy, so anything it would block fails the tests
 
+## Batch 5: private and safe (done)
+- Vault: end-to-end encrypted in the browser (Web Crypto: PBKDF2-SHA256 600k, AES-256-GCM, per-file
+  keys, authenticated chunks), encrypted names and thumbnails, recovery key, passphrase change,
+  auto-lock, resumable encrypted uploads; the server and admins only ever hold ciphertext
+- Offsite backup with restic: disk, S3-compatible, SFTP or rclone targets; database dump in every
+  snapshot; daily schedule, retries, weekly read-back check, retention, failure notifications,
+  security-check status, restore guide
+- Bangla interface: every screen, server messages and notifications, Bangla digits and dates,
+  per-account language; CI fails if a text has no Bangla
+- GharBox Sync for Windows: two-way folder sync with a three-way comparison, keep-both on conflicts,
+  Recycle Bin and GharBox trash for deletions, unplugged-drive and mass-delete guards, tray app,
+  device sign-in, single .exe built in CI
+- React Router 7 (security fix)
+
 ## Later for playback
 - Remux instead of re-encode when only the audio needs converting
 - Picture-based subtitles (PGS) burned in; automatic intro detection by audio fingerprint
 - Chromecast and DLNA
 
-## Batches 5 to 7
-- Batch 5: encrypted vault, encrypted offsite backup, Bangla interface, PC sync client
+## Batches 6 and 7
 - Batch 6: document scanner and OCR in the browser, Chromecast and DLNA
 - Batch 7: passkeys, plugins, linking two GharBox servers; voice chat in watch parties
 
@@ -79,5 +92,4 @@
 ## Platform
 - Alembic database migrations (needed before the first schema change after release)
 - Passkeys
-- Bangla interface
 - Admin dashboard: active streams and job queue

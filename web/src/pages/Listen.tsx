@@ -6,17 +6,18 @@ import { api, ApiError, url, type Artist, type ArtistDetail, type Book, type Boo
 import { clock, useAudio } from "../audio";
 import Dialog from "../components/Dialog";
 
+import { t as tr } from "../i18n";
 // ---------------------------------------------------------------- shared bits
 
 export function ListenTabs() {
   return (
-    <nav className="lib-tabs" aria-label="Listen">
-      <NavLink to="/listen" end>Home</NavLink>
-      <NavLink to="/listen/albums">Albums</NavLink>
-      <NavLink to="/listen/artists">Artists</NavLink>
-      <NavLink to="/listen/songs">Songs</NavLink>
-      <NavLink to="/listen/playlists">Playlists</NavLink>
-      <NavLink to="/listen/audiobooks">Audiobooks</NavLink>
+    <nav className="lib-tabs" aria-label={tr("Listen")}>
+      <NavLink to="/listen" end>{tr("Home")}</NavLink>
+      <NavLink to="/listen/albums">{tr("Albums")}</NavLink>
+      <NavLink to="/listen/artists">{tr("Artists")}</NavLink>
+      <NavLink to="/listen/songs">{tr("Songs")}</NavLink>
+      <NavLink to="/listen/playlists">{tr("Playlists")}</NavLink>
+      <NavLink to="/listen/audiobooks">{tr("Audiobooks")}</NavLink>
     </nav>
   );
 }
@@ -53,7 +54,7 @@ export function BookCard({ b, to }: { b: Book; to: string }) {
       <div className="cover tall">
         {b.cover_ready ? <img src={url.bookCover(b)} alt="" loading="lazy" /> : <span className="cover-blank">{b.title}</span>}
         {pct > 0 && !b.progress?.finished && <span className="poster-progress"><span style={{ width: `${pct}%` }} /></span>}
-        {b.progress?.finished && <span className="poster-flag">Finished</span>}
+        {b.progress?.finished && <span className="poster-flag">{tr("Finished")}</span>}
       </div>
       <span className="poster-title">{b.title}</span>
       <span className="poster-meta">{b.author ?? (b.series_name ? `${b.series_name}` : "")}</span>
@@ -66,8 +67,8 @@ function PlayButtons({ tracks }: { tracks: Track[] }) {
   if (!tracks.length) return null;
   return (
     <>
-      <button className="primary" onClick={() => a.playTracks(tracks)}><Play size={17} fill="currentColor" /> Play</button>
-      <button onClick={() => a.playTracks(tracks, 0, true)}><Shuffle size={17} /> Shuffle</button>
+      <button className="primary" onClick={() => a.playTracks(tracks)}><Play size={17} fill="currentColor" />{" "}{tr("Play")}</button>
+      <button onClick={() => a.playTracks(tracks, 0, true)}><Shuffle size={17} />{" "}{tr("Shuffle")}</button>
     </>
   );
 }
@@ -94,32 +95,32 @@ export function TrackList({ tracks, numbered = false, showAlbum = true, onRemove
           return (
             <li key={`${t.id}-${i}`} className={now ? "now" : ""}>
               <button className="track-main" onClick={() => (now ? a.toggle() : a.playTracks(tracks, i))}
-                aria-label={now && a.playing ? `Pause ${t.title}` : `Play ${t.title}`}>
+                aria-label={now && a.playing ? tr("Pause {title}", { title: t.title }) : tr("Play {title}", { title: t.title })}>
                 <span className="track-no">{now ? (a.playing ? <Pause size={14} /> : <Play size={14} />) : numbered ? (t.track_no ?? i + 1) : i + 1}</span>
                 <span className="track-text">
-                  <span className="track-title">{t.title}{!t.playable && <span className="tag" title="Converted for the browser the first time it plays">converts</span>}</span>
+                  <span className="track-title">{t.title}{!t.playable && <span className="tag" title={tr("Converted for the browser the first time it plays")}>{tr("converts")}</span>}</span>
                   <span className="muted small">{[t.artist, showAlbum ? t.album_title : null].filter(Boolean).join(" · ")}</span>
                 </span>
                 <span className="muted small track-dur">{clock(t.duration)}</span>
               </button>
               <button className={`icon ${fav(t) ? "fav" : ""}`} onClick={() => void toggleFav(t)} aria-pressed={fav(t)}
-                aria-label={fav(t) ? `Remove ${t.title} from favourites` : `Add ${t.title} to favourites`}>
+                aria-label={fav(t) ? tr("Remove {title} from favourites", { title: t.title }) : tr("Add {title} to favourites", { title: t.title })}>
                 <Heart size={16} fill={fav(t) ? "currentColor" : "none"} />
               </button>
               <div className="menu-wrap">
-                <button className="icon" onClick={() => setMenu(menu === i ? null : i)} aria-label={`More for ${t.title}`} aria-expanded={menu === i}>
+                <button className="icon" onClick={() => setMenu(menu === i ? null : i)} aria-label={tr("More for {title}", { title: t.title })} aria-expanded={menu === i}>
                   <MoreVertical size={16} />
                 </button>
                 {menu === i && (
                   <div className="menu" role="menu" onClick={() => setMenu(null)}>
-                    <button role="menuitem" onClick={() => a.playNext([t])}>Play next</button>
-                    <button role="menuitem" onClick={() => a.addToQueue([t])}>Add to queue</button>
-                    <button role="menuitem" onClick={() => setAdding([t])}>Add to playlist…</button>
-                    {t.album_id && <Link role="menuitem" to={`/listen/album/${t.album_id}`}>Go to album</Link>}
-                    {t.artist && <Link role="menuitem" to={`/listen/artist?name=${encodeURIComponent(t.artist)}`}>Go to artist</Link>}
-                    {onMove && i > 0 && <button role="menuitem" onClick={() => onMove(i, -1)}><ArrowUp size={14} /> Move up</button>}
-                    {onMove && i < tracks.length - 1 && <button role="menuitem" onClick={() => onMove(i, 1)}><ArrowDown size={14} /> Move down</button>}
-                    {onRemove && <button role="menuitem" className="danger-text" onClick={() => onRemove(i)}>Remove from playlist</button>}
+                    <button role="menuitem" onClick={() => a.playNext([t])}>{tr("Play next")}</button>
+                    <button role="menuitem" onClick={() => a.addToQueue([t])}>{tr("Add to queue")}</button>
+                    <button role="menuitem" onClick={() => setAdding([t])}>{tr("Add to playlist…")}</button>
+                    {t.album_id && <Link role="menuitem" to={`/listen/album/${t.album_id}`}>{tr("Go to album")}</Link>}
+                    {t.artist && <Link role="menuitem" to={`/listen/artist?name=${encodeURIComponent(t.artist)}`}>{tr("Go to artist")}</Link>}
+                    {onMove && i > 0 && <button role="menuitem" onClick={() => onMove(i, -1)}><ArrowUp size={14} />{" "}{tr("Move up")}</button>}
+                    {onMove && i < tracks.length - 1 && <button role="menuitem" onClick={() => onMove(i, 1)}><ArrowDown size={14} />{" "}{tr("Move down")}</button>}
+                    {onRemove && <button role="menuitem" className="danger-text" onClick={() => onRemove(i)}>{tr("Remove from playlist")}</button>}
                   </div>
                 )}
               </div>
@@ -139,25 +140,25 @@ function AddToPlaylist({ tracks, onClose }: { tracks: Track[]; onClose: () => vo
   useEffect(() => { api.playlists().then(setLists).catch(() => undefined); }, []);
   const ids = tracks.map((t) => t.id);
   const what = tracks.length === 1 ? tracks[0].title : `${tracks.length} songs`;
-  const add = async (p: Playlist) => { await api.addToPlaylist(p.id, ids); setDone(`Added ${what} to ${p.name}.`); };
+  const add = async (p: Playlist) => { await api.addToPlaylist(p.id, ids); setDone(tr("Added {what} to {name}.", { what: what, name: p.name })); };
   const create = async (e: FormEvent) => {
     e.preventDefault();
     if (!name.trim()) return;
     const p = await api.createPlaylist(name.trim(), ids);
-    setDone(`Made ${p.name} with ${what}.`);
+    setDone(tr("Made {name} with {what}.", { name: p.name, what: what }));
   };
   return (
-    <Dialog title="Add to playlist" onClose={onClose}>
-      {done ? <><p role="status">{done}</p><button className="primary" onClick={onClose}>Done</button></> : (
+    <Dialog title={tr("Add to playlist")} onClose={onClose}>
+      {done ? <><p role="status">{done}</p><button className="primary" onClick={onClose}>{tr("Done")}</button></> : (
         <div className="stack-form">
           {lists.length > 0 && (
             <ul className="pick-list">
-              {lists.map((p) => <li key={p.id}><button onClick={() => void add(p)}><ListPlus size={16} /> {p.name} <span className="muted small">{p.track_count} songs</span></button></li>)}
+              {lists.map((p) => <li key={p.id}><button onClick={() => void add(p)}><ListPlus size={16} /> {p.name} <span className="muted small">{p.track_count}{" "}{tr("songs")}</span></button></li>)}
             </ul>
           )}
           <form className="admin-row" onSubmit={create}>
-            <label>New playlist<input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} placeholder="Name" /></label>
-            <button className="primary" disabled={!name.trim()}><Plus size={16} /> Create</button>
+            <label>{tr("New playlist")}<input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} placeholder={tr("Name")} /></label>
+            <button className="primary" disabled={!name.trim()}><Plus size={16} />{" "}{tr("Create")}</button>
           </form>
         </div>
       )}
@@ -189,28 +190,28 @@ export function ListenHome() {
   }, []);
   const nothing = home && !home.recent_albums.length && !books.length;
   return (
-    <Page title="Listen">
+    <Page title={tr("Listen")}>
       {listening.length > 0 && (
         <section className="shelf-block">
-          <h2 className="shelf-title">Continue listening</h2>
+          <h2 className="shelf-title">{tr("Continue listening")}</h2>
           <div className="shelf">{listening.map((b) => <BookCard key={b.id} b={b} to={`/listen/book/${b.id}`} />)}</div>
         </section>
       )}
       {home && home.recently_played.length > 0 && (
         <section className="shelf-block">
-          <h2 className="shelf-title">Recently played</h2>
+          <h2 className="shelf-title">{tr("Recently played")}</h2>
           <TrackList tracks={home.recently_played.slice(0, 6)} />
         </section>
       )}
       {home && home.recent_albums.length > 0 && (
         <section className="shelf-block">
-          <Link to="/listen/albums" className="shelf-title link">Recently added</Link>
+          <Link to="/listen/albums" className="shelf-title link">{tr("Recently added")}</Link>
           <div className="shelf">{home.recent_albums.map((a) => <AlbumCard key={a.id} a={a} />)}</div>
         </section>
       )}
       {home && (home.playlists.length > 0 || home.favorite_count > 0) && (
         <section className="shelf-block">
-          <Link to="/listen/playlists" className="shelf-title link">Your playlists</Link>
+          <Link to="/listen/playlists" className="shelf-title link">{tr("Your playlists")}</Link>
           <div className="shelf">
             {home.favorite_count > 0 && <FavoritesTile count={home.favorite_count} />}
             {home.playlists.map((p) => <PlaylistTile key={p.id} p={p} />)}
@@ -219,21 +220,20 @@ export function ListenHome() {
       )}
       {home && home.most_played.length > 0 && (
         <section className="shelf-block">
-          <h2 className="shelf-title">Most played</h2>
+          <h2 className="shelf-title">{tr("Most played")}</h2>
           <TrackList tracks={home.most_played.slice(0, 6)} />
         </section>
       )}
       {books.length > 0 && (
         <section className="shelf-block">
-          <Link to="/listen/audiobooks" className="shelf-title link">Audiobooks</Link>
+          <Link to="/listen/audiobooks" className="shelf-title link">{tr("Audiobooks")}</Link>
           <div className="shelf">{books.map((b) => <BookCard key={b.id} b={b} to={`/listen/book/${b.id}`} />)}</div>
         </section>
       )}
       {nothing && (
         <div className="empty">
-          <h2>Nothing to listen to yet</h2>
-          <p>Put music in a folder called Music, and audiobooks in a folder called Audiobooks, inside your media folder.
-            Then open Settings and press Find new folders. Artist and album folders work, and so do the tags inside the files.</p>
+          <h2>{tr("Nothing to listen to yet")}</h2>
+          <p>{tr("Put music in a folder called Music, and audiobooks in a folder called Audiobooks, inside your media folder. Then open Settings and press Find new folders. Artist and album folders work, and so do the tags inside the files.")}</p>
         </div>
       )}
     </Page>
@@ -244,7 +244,7 @@ function FavoritesTile({ count }: { count: number }) {
   return (
     <Link to="/listen/songs?favorites=1" className="mtile">
       <div className="cover fav-cover"><Heart size={40} fill="currentColor" /></div>
-      <span className="poster-title">Favourites</span>
+      <span className="poster-title">{tr("Favourites")}</span>
       <span className="poster-meta">{count} {count === 1 ? "song" : "songs"}</span>
     </Link>
   );
@@ -272,18 +272,17 @@ export function AlbumsPage() {
   useEffect(() => { api.musicAlbums({ sort }).then(setAlbums).catch(() => setAlbums([])); }, [sort]);
   const shown = albums?.filter((a) => !filter || `${a.title} ${a.artist}`.toLowerCase().includes(filter.toLowerCase()));
   return (
-    <Page title="Albums">
+    <Page title={tr("Albums")}>
       <div className="lib-tools">
         <label className="search"><Search size={17} aria-hidden />
-          <input placeholder="Search albums" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Search albums" /></label>
-        <label className="sort">Sort by
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="added">Recently added</option><option value="title">Title</option>
-            <option value="artist">Artist</option><option value="year">Newest</option>
+          <input placeholder={tr("Search albums")} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={tr("Search albums")} /></label>
+        <label className="sort">{tr("Sort by")}<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <option value="added">{tr("Recently added")}</option><option value="title">{tr("Title")}</option>
+            <option value="artist">{tr("Artist")}</option><option value="year">{tr("Newest")}</option>
           </select>
         </label>
       </div>
-      {shown?.length === 0 && <p className="muted">{filter ? `Nothing matches "${filter}".` : "No albums yet."}</p>}
+      {shown?.length === 0 && <p className="muted">{filter ? tr("Nothing matches \"{filter}\".", { filter: filter }) : tr("No albums yet.")}</p>}
       <div className="mtile-grid">{shown?.map((a) => <AlbumCard key={a.id} a={a} />)}</div>
     </Page>
   );
@@ -294,16 +293,16 @@ export function AlbumDetailPage() {
   const [album, setAlbum] = useState<MusicAlbumDetail | null>(null);
   const [error, setError] = useState("");
   useEffect(() => { if (id) api.musicAlbum(id).then(setAlbum).catch((e) => setError(e.message)); }, [id]);
-  if (error) return <Page title="Album"><p className="error">{error}</p></Page>;
+  if (error) return <Page title={tr("Album")}><p className="error">{error}</p></Page>;
   if (!album) return <div className="page cinema-page" aria-busy="true" />;
   const discs = new Set(album.tracks.map((t) => t.disc_no ?? 1)).size > 1;
   return (
     <div className="page cinema-page listen-page">
-      <Link to="/listen/albums" className="back"><ArrowLeft size={18} /> Albums</Link>
+      <Link to="/listen/albums" className="back"><ArrowLeft size={18} />{" "}{tr("Albums")}</Link>
       <header className="detail-head">
         <Cover src={album.cover_ready ? url.albumCover(album) : null} label={album.title} />
         <div className="detail-text">
-          <span className="muted small">Album</span>
+          <span className="muted small">{tr("Album")}</span>
           <h1>{album.title}</h1>
           <p><Link to={`/listen/artist?name=${encodeURIComponent(album.artist)}`}>{album.artist}</Link>
             <span className="muted"> · {[album.year, album.genre, `${album.track_count} songs`, hours(album.duration)].filter(Boolean).join(" · ")}</span></p>
@@ -311,7 +310,7 @@ export function AlbumDetailPage() {
         </div>
       </header>
       <TrackList tracks={album.tracks} numbered showAlbum={false} />
-      {discs && <p className="muted small">Songs from every disc, in disc order.</p>}
+      {discs && <p className="muted small">{tr("Songs from every disc, in disc order.")}</p>}
     </div>
   );
 }
@@ -322,17 +321,17 @@ export function ArtistsPage() {
   useEffect(() => { api.artists().then(setArtists).catch(() => setArtists([])); }, []);
   const shown = artists?.filter((a) => !filter || a.name.toLowerCase().includes(filter.toLowerCase()));
   return (
-    <Page title="Artists">
+    <Page title={tr("Artists")}>
       <div className="lib-tools">
         <label className="search"><Search size={17} aria-hidden />
-          <input placeholder="Search artists" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Search artists" /></label>
+          <input placeholder={tr("Search artists")} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={tr("Search artists")} /></label>
       </div>
       <div className="mtile-grid">
         {shown?.map((a) => (
           <Link key={a.name} to={`/listen/artist?name=${encodeURIComponent(a.name)}`} className="mtile">
             <Cover src={a.cover_album_id ? url.albumCover({ id: a.cover_album_id }) : null} label={a.name} round />
             <span className="poster-title">{a.name}</span>
-            <span className="poster-meta">{a.album_count} {a.album_count === 1 ? "album" : "albums"}, {a.track_count} songs</span>
+            <span className="poster-meta">{a.album_count} {a.album_count === 1 ? "album" : "albums"}, {a.track_count}{" "}{tr("songs")}</span>
           </Link>
         ))}
       </div>
@@ -348,21 +347,21 @@ export function ArtistDetailPage() {
   useEffect(() => { api.artist(name).then(setArtist).catch((e) => setError(e.message)); }, [name]);
   return (
     <div className="page cinema-page listen-page">
-      <Link to="/listen/artists" className="back"><ArrowLeft size={18} /> Artists</Link>
+      <Link to="/listen/artists" className="back"><ArrowLeft size={18} />{" "}{tr("Artists")}</Link>
       {error && <p className="error">{error}</p>}
       {artist && <>
         <header className="detail-head">
           <Cover src={artist.albums.find((a) => a.cover_ready) ? url.albumCover(artist.albums.find((a) => a.cover_ready)!) : null} label={artist.name} round />
           <div className="detail-text">
-            <span className="muted small">Artist</span>
+            <span className="muted small">{tr("Artist")}</span>
             <h1>{artist.name}</h1>
-            <p className="muted">{artist.albums.length} {artist.albums.length === 1 ? "album" : "albums"}, {artist.tracks.length} songs</p>
+            <p className="muted">{artist.albums.length} {artist.albums.length === 1 ? "album" : "albums"}, {artist.tracks.length}{" "}{tr("songs")}</p>
             <div className="admin-row"><PlayButtons tracks={artist.tracks} /></div>
           </div>
         </header>
-        <h2 className="shelf-title">Songs</h2>
+        <h2 className="shelf-title">{tr("Songs")}</h2>
         <TrackList tracks={artist.tracks.slice(0, 10)} />
-        <h2 className="shelf-title">Albums</h2>
+        <h2 className="shelf-title">{tr("Albums")}</h2>
         <div className="mtile-grid">{artist.albums.map((a) => <AlbumCard key={a.id} a={a} />)}</div>
       </>}
     </div>
@@ -384,20 +383,19 @@ export function SongsPage() {
     return () => clearTimeout(t);
   }, [query, favorites, sort]);
   return (
-    <Page title={favorites ? "Favourites" : "Songs"}>
+    <Page title={favorites ? tr("Favourites") : tr("Songs")}>
       <div className="lib-tools">
         <label className="search"><Search size={17} aria-hidden />
-          <input placeholder="Search songs, artists, albums" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search songs" /></label>
+          <input placeholder={tr("Search songs, artists, albums")} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={tr("Search songs")} /></label>
         <label className="check"><input type="checkbox" checked={favorites}
-          onChange={(e) => setParams(e.target.checked ? { favorites: "1" } : {})} /> Favourites only</label>
-        <label className="sort">Sort by
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="title">Title</option><option value="artist">Artist</option><option value="added">Recently added</option>
+          onChange={(e) => setParams(e.target.checked ? { favorites: "1" } : {})} />{" "}{tr("Favourites only")}</label>
+        <label className="sort">{tr("Sort by")}<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <option value="title">{tr("Title")}</option><option value="artist">{tr("Artist")}</option><option value="added">{tr("Recently added")}</option>
           </select>
         </label>
         {tracks && tracks.length > 0 && <div className="admin-row"><PlayButtons tracks={tracks} /></div>}
       </div>
-      {tracks?.length === 0 && <p className="muted">{favorites ? "Press the heart next to a song to add it here." : query ? `Nothing matches "${query}".` : "No songs yet."}</p>}
+      {tracks?.length === 0 && <p className="muted">{favorites ? tr("Press the heart next to a song to add it here.") : query ? tr("Nothing matches \"{query}\".", { query: query }) : tr("No songs yet.")}</p>}
       {tracks && <TrackList tracks={tracks} />}
     </Page>
   );
@@ -421,16 +419,16 @@ export function PlaylistsPage() {
     navigate(`/listen/playlist/${p.id}`);
   };
   return (
-    <Page title="Playlists">
+    <Page title={tr("Playlists")}>
       <form className="admin-row" onSubmit={create} style={{ marginBottom: 20 }}>
-        <label>New playlist<input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} placeholder="Name" /></label>
-        <button className="primary" disabled={!name.trim()}><Plus size={16} /> Create</button>
+        <label>{tr("New playlist")}<input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} placeholder={tr("Name")} /></label>
+        <button className="primary" disabled={!name.trim()}><Plus size={16} />{" "}{tr("Create")}</button>
       </form>
       <div className="mtile-grid">
         <FavoritesTile count={favCount} />
         {lists?.map((p) => <PlaylistTile key={p.id} p={p} />)}
       </div>
-      {lists?.length === 0 && <p className="muted">Make a playlist here, or use "Add to playlist" in the menu next to any song.</p>}
+      {lists?.length === 0 && <p className="muted">{tr("Make a playlist here, or use \"Add to playlist\" in the menu next to any song.")}</p>}
     </Page>
   );
 }
@@ -443,36 +441,36 @@ export function PlaylistDetailPage() {
   const [renaming, setRenaming] = useState(false);
   const [name, setName] = useState("");
   useEffect(() => { if (id) api.playlist(id).then(setP).catch((e) => setError(e.message)); }, [id]);
-  if (error) return <Page title="Playlist"><p className="error">{error}</p></Page>;
+  if (error) return <Page title={tr("Playlist")}><p className="error">{error}</p></Page>;
   if (!p) return <div className="page cinema-page" aria-busy="true" />;
   const save = async (ids: string[]) => setP(await api.updatePlaylist(p.id, { track_ids: ids }));
   const ids = p.tracks.map((t) => t.id);
   const move = (i: number, d: -1 | 1) => { const n = [...ids]; [n[i], n[i + d]] = [n[i + d], n[i]]; void save(n); };
   const removeAt = (i: number) => void save(ids.filter((_, j) => j !== i));
   const rename = async (e: FormEvent) => { e.preventDefault(); setP(await api.updatePlaylist(p.id, { name })); setRenaming(false); };
-  const del = async () => { if (confirm(`Delete the playlist "${p.name}"? The songs stay in your library.`)) { await api.deletePlaylist(p.id); navigate("/listen/playlists"); } };
+  const del = async () => { if (confirm(tr("Delete the playlist \"{name}\"? The songs stay in your library.", { name: p.name }))) { await api.deletePlaylist(p.id); navigate("/listen/playlists"); } };
   return (
     <div className="page cinema-page listen-page">
-      <Link to="/listen/playlists" className="back"><ArrowLeft size={18} /> Playlists</Link>
+      <Link to="/listen/playlists" className="back"><ArrowLeft size={18} />{" "}{tr("Playlists")}</Link>
       <header className="detail-head">
         <PlaylistTileArt p={p} />
         <div className="detail-text">
-          <span className="muted small">Playlist</span>
+          <span className="muted small">{tr("Playlist")}</span>
           {renaming ? (
             <form className="admin-row" onSubmit={rename}>
-              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} aria-label="Playlist name" autoFocus />
-              <button className="primary">Save</button><button type="button" onClick={() => setRenaming(false)}>Cancel</button>
+              <input value={name} onChange={(e) => setName(e.target.value)} maxLength={128} aria-label={tr("Playlist name")} autoFocus />
+              <button className="primary">{tr("Save")}</button><button type="button" onClick={() => setRenaming(false)}>{tr("Cancel")}</button>
             </form>
           ) : <h1>{p.name}</h1>}
-          <p className="muted">{p.track_count} songs · {hours(p.duration)}</p>
+          <p className="muted">{p.track_count}{" "}{tr("songs ·")}{" "}{hours(p.duration)}</p>
           <div className="admin-row">
             <PlayButtons tracks={p.tracks} />
-            <button onClick={() => { setName(p.name); setRenaming(true); }}>Rename</button>
-            <button className="icon" onClick={() => void del()} aria-label="Delete playlist"><Trash2 size={17} /></button>
+            <button onClick={() => { setName(p.name); setRenaming(true); }}>{tr("Rename")}</button>
+            <button className="icon" onClick={() => void del()} aria-label={tr("Delete playlist")}><Trash2 size={17} /></button>
           </div>
         </div>
       </header>
-      {p.tracks.length === 0 && <p className="muted">Empty for now. Use "Add to playlist" in the menu next to any song.</p>}
+      {p.tracks.length === 0 && <p className="muted">{tr("Empty for now. Use \"Add to playlist\" in the menu next to any song.")}</p>}
       <TrackList tracks={p.tracks} onRemove={removeAt} onMove={move} />
     </div>
   );
@@ -496,17 +494,16 @@ export function AudiobooksPage() {
   useEffect(() => { api.books({ kind: "audiobook", sort }).then(setBooks).catch(() => setBooks([])); }, [sort]);
   const shown = books?.filter((b) => !filter || `${b.title} ${b.author ?? ""} ${b.narrator ?? ""}`.toLowerCase().includes(filter.toLowerCase()));
   return (
-    <Page title="Audiobooks">
+    <Page title={tr("Audiobooks")}>
       <div className="lib-tools">
         <label className="search"><Search size={17} aria-hidden />
-          <input placeholder="Search audiobooks" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Search audiobooks" /></label>
-        <label className="sort">Sort by
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="added">Recently added</option><option value="title">Title</option><option value="author">Author</option>
+          <input placeholder={tr("Search audiobooks")} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={tr("Search audiobooks")} /></label>
+        <label className="sort">{tr("Sort by")}<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <option value="added">{tr("Recently added")}</option><option value="title">{tr("Title")}</option><option value="author">{tr("Author")}</option>
           </select>
         </label>
       </div>
-      {shown?.length === 0 && <p className="muted">{filter ? `Nothing matches "${filter}".` : "No audiobooks yet. Put them in a folder called Audiobooks: one file per book, or one folder per book."}</p>}
+      {shown?.length === 0 && <p className="muted">{filter ? tr("Nothing matches \"{filter}\".", { filter: filter }) : tr("No audiobooks yet. Put them in a folder called Audiobooks: one file per book, or one folder per book.")}</p>}
       <div className="mtile-grid books">{shown?.map((b) => <BookCard key={b.id} b={b} to={`/listen/book/${b.id}`} />)}</div>
     </Page>
   );
@@ -517,7 +514,7 @@ export function AudiobookPage() {
   const a = useAudio();
   const [b, setB] = useState<BookDetail | null>(null);
   const [error, setError] = useState("");
-  const load = () => { if (id) api.book(id).then(setB).catch((e) => setError(e instanceof ApiError ? e.message : "Couldn't load this book")); };
+  const load = () => { if (id) api.book(id).then(setB).catch((e) => setError(e instanceof ApiError ? e.message : tr("Couldn't load this book"))); };
   useEffect(load, [id]);
   const here = a.book?.id === b?.id && a.current?.kind === "book";
   const pos = here ? a.bookTime : (b?.progress && !b.progress.finished ? b.progress.position : 0);
@@ -527,36 +524,36 @@ export function AudiobookPage() {
     b.chapters.forEach((c, j) => { if (c.start <= pos + 0.25) i = j; });
     return i;
   }, [b, pos]);
-  if (error) return <Page title="Audiobook"><p className="error">{error}</p></Page>;
+  if (error) return <Page title={tr("Audiobook")}><p className="error">{error}</p></Page>;
   if (!b) return <div className="page cinema-page" aria-busy="true" />;
   const startOver = async () => { await api.resetBookProgress(b.id); a.playBook({ ...b, progress: null }, 0); };
   return (
     <div className="page cinema-page listen-page">
-      <Link to="/listen/audiobooks" className="back"><ArrowLeft size={18} /> Audiobooks</Link>
+      <Link to="/listen/audiobooks" className="back"><ArrowLeft size={18} />{" "}{tr("Audiobooks")}</Link>
       <header className="detail-head">
         <div className="cover tall">{b.cover_ready ? <img src={url.bookCover(b)} alt="" /> : <span className="cover-blank"><Headphones size={44} /></span>}</div>
         <div className="detail-text">
-          <span className="muted small">Audiobook</span>
+          <span className="muted small">{tr("Audiobook")}</span>
           <h1>{b.title}</h1>
-          <p>{b.author && <>by {b.author}</>}{b.narrator && <span className="muted"> · read by {b.narrator}</span>}</p>
+          <p>{b.author && <>{tr("by")}{" "}{b.author}</>}{b.narrator && <span className="muted">{" "}{tr("· read by")}{" "}{b.narrator}</span>}</p>
           <p className="muted small">{[hours(b.duration ?? 0), b.year, b.chapters.length ? `${b.chapters.length} chapters` : null].filter(Boolean).join(" · ")}</p>
           {pos > 0 && b.duration && <div className="book-progress"><span style={{ width: `${Math.min(100, (pos / b.duration) * 100)}%` }} /></div>}
           <div className="admin-row">
             {here ? (
               <button className="primary" onClick={a.toggle}>{a.playing ? <Pause size={17} /> : <Play size={17} fill="currentColor" />}
-                {a.playing ? "Pause" : "Play"}</button>
+                {a.playing ? tr("Pause") : tr("Play")}</button>
             ) : (
               <button className="primary" onClick={() => a.playBook(b)}><Play size={17} fill="currentColor" />
-                {pos > 0 ? `Resume from ${clock(pos)}` : "Play"}</button>
+                {pos > 0 ? tr("Resume from {clock}", { clock: clock(pos) }) : tr("Play")}</button>
             )}
-            {pos > 0 && <button onClick={() => void startOver()}><RotateCcw size={16} /> Start over</button>}
-            {b.downloadable && <a className="button" href={url.bookFile(b, true)}>Download</a>}
+            {pos > 0 && <button onClick={() => void startOver()}><RotateCcw size={16} />{" "}{tr("Start over")}</button>}
+            {b.downloadable && <a className="button" href={url.bookFile(b, true)}>{tr("Download")}</a>}
           </div>
           {b.description && <p className="overview">{b.description}</p>}
         </div>
       </header>
       {b.chapters.length > 0 && <>
-        <h2 className="shelf-title">Chapters</h2>
+        <h2 className="shelf-title">{tr("Chapters")}</h2>
         <ol className="tracks chapters">
           {b.chapters.map((c, i) => (
             <li key={i} className={i === chapterAt && pos > 0 ? "now" : ""}>

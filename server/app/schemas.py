@@ -42,6 +42,7 @@ class UserOut(ORM):
 
 class MeOut(UserOut):
     ntfy_url: str | None = None
+    language: str | None = None
     used_bytes: int = 0
 
 
@@ -59,7 +60,9 @@ class UserUpdateIn(BaseModel):
 
 
 class MySettingsIn(BaseModel):
+    """Only the fields sent are changed."""
     ntfy_url: str | None = Field(default=None, max_length=512, pattern=r"^(https?://.+)?$")
+    language: str | None = Field(default=None, pattern=r"^(en|bn)?$")
 
 
 class TwoFactorSetupOut(BaseModel):
@@ -137,6 +140,9 @@ class UploadCreateIn(BaseModel):
     # True for camera-roll backup (skip what's already saved anywhere); False when you put a
     # file into a specific folder in Files and expect to see it there.
     dedupe: bool = True
+    # The PC sync client: replace the file with this name in this folder (any kind of file),
+    # keeping the old one as a version, instead of adding "name (1).jpg".
+    replace: bool = False
 
 
 class UploadOut(BaseModel):
@@ -713,3 +719,106 @@ class BookProgressIn(BaseModel):
     locator: str | None = Field(default=None, max_length=2000)
     fraction: float = Field(ge=0, le=1)
     finished: bool | None = None
+
+
+# ------------------------------------------------------------------ vault
+
+_B64 = r"^[A-Za-z0-9+/=_-]+$"
+
+
+class VaultSetupIn(BaseModel):
+    salt: str = Field(min_length=16, max_length=64, pattern=_B64)
+    iterations: int = Field(ge=100_000, le=10_000_000)
+    wrapped_key: str = Field(min_length=40, max_length=512, pattern=_B64)
+    recovery_wrapped_key: str = Field(min_length=40, max_length=512, pattern=_B64)
+
+
+class VaultKeysIn(BaseModel):
+    """New passphrase (and optionally a new recovery key). Needs the account password."""
+    password: str
+    salt: str = Field(min_length=16, max_length=64, pattern=_B64)
+    iterations: int = Field(ge=100_000, le=10_000_000)
+    wrapped_key: str = Field(min_length=40, max_length=512, pattern=_B64)
+    recovery_wrapped_key: str | None = Field(default=None, min_length=40, max_length=512, pattern=_B64)
+
+
+class VaultResetIn(BaseModel):
+    password: str
+
+
+class VaultOut(BaseModel):
+    set_up: bool
+    kdf: str | None = None
+    salt: str | None = None
+    iterations: int | None = None
+    wrapped_key: str | None = None
+    recovery_wrapped_key: str | None = None
+    item_count: int = 0
+    bytes: int = 0
+
+
+class VaultItemIn(BaseModel):
+    size: int = Field(ge=16)
+    chunk_size: int = Field(ge=64 * 1024, le=16 * 1024 * 1024)
+    wrapped_key: str = Field(min_length=40, max_length=512, pattern=_B64)
+    meta: str = Field(min_length=16, max_length=16384, pattern=_B64)
+
+
+class VaultItemUpdateIn(BaseModel):
+    meta: str = Field(min_length=16, max_length=16384, pattern=_B64)
+
+
+class VaultItemOut(ORM):
+    id: str
+    size: int
+    received: int
+    chunk_size: int
+    wrapped_key: str
+    meta: str
+    has_thumb: bool
+    complete: bool
+    created_at: datetime
+
+
+# ------------------------------------------------------------------ offsite backup
+
+class BackupConfigIn(BaseModel):
+    repository: str = Field(min_length=2, max_length=1024)
+    password: str | None = Field(default=None, min_length=12, max_length=256)  # None -> keep, or make one
+    env: dict[str, str] | None = None  # None -> keep
+    hour: int = Field(default=2, ge=0, le=23)  # UTC
+    include_media: bool = False
+    enabled: bool = True
+
+
+class BackupRunOut(ORM):
+    id: str
+    kind: str
+    status: str
+    started_at: datetime
+    finished_at: datetime | None
+    snapshot_id: str | None
+    files_new: int | None
+    files_changed: int | None
+    bytes_added: int | None
+    total_bytes: int | None
+    message: str | None
+
+
+class BackupOut(BaseModel):
+    configured: bool
+    enabled: bool = False
+    repository: str | None = None
+    env_keys: list[str] = []
+    hour: int = 2
+    include_media: bool = False
+    restic: str | None = None
+    runs: list[BackupRunOut] = []
+    password: str | None = None  # only right after it was made, to write down
+    created: bool = False        # the repository was just created
+
+
+class SnapshotOut(BaseModel):
+    id: str
+    time: str
+    paths: list[str]

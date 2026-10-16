@@ -1,6 +1,7 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { X } from "lucide-react";
 
+import { t as tr } from "../i18n";
 /** A modal built on the native <dialog>: focus trapping, Esc to close and backdrop for free. */
 export default function Dialog({ title, onClose, children, wide = false }:
   { title: string; onClose: () => void; children: ReactNode; wide?: boolean }) {
@@ -16,7 +17,7 @@ export default function Dialog({ title, onClose, children, wide = false }:
       <div className="dialog-body">
         <header className="dialog-head">
           <h2>{title}</h2>
-          <button className="icon" onClick={onClose} aria-label="Close"><X size={18} /></button>
+          <button className="icon" onClick={onClose} aria-label={tr("Close")}><X size={18} /></button>
         </header>
         {children}
       </div>

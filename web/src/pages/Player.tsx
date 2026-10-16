@@ -8,6 +8,7 @@ import { useAuth } from "../App";
 import { usePrefs } from "../prefs";
 import { defaultAudio, defaultQuality, SubtitleTracks, TrackMenus, useSubtitle, useVideoSource } from "../video";
 
+import { t as tr } from "../i18n";
 // Remount for every title so progress is always saved against the right one.
 export default function PlayerRoute() {
   const { id } = useParams();
@@ -98,7 +99,7 @@ function Player({ id }: { id: string }) {
     <div className="player-page">
       {isEpisode
         ? <Link to={`/watch/series/${m.series_id}`} className="back"><ArrowLeft size={18} /> {m.series_title}</Link>
-        : <Link to={`/watch/c/${m.library_id}`} className="back"><ArrowLeft size={18} /> Back</Link>}
+        : <Link to={`/watch/c/${m.library_id}`} className="back"><ArrowLeft size={18} />{" "}{tr("Back")}</Link>}
       <div className="player-frame">
         <video ref={video} controls playsInline poster={m.poster_ready ? url.poster(m) : undefined}
           preload={lowData ? "none" : "metadata"}
@@ -113,14 +114,13 @@ function Player({ id }: { id: string }) {
         </video>
         {inIntro && (
           <button className="overlay-btn skip" onClick={() => { if (video.current) video.current.currentTime = m.intro_end!; }}>
-            <FastForward size={17} /> Skip intro
-          </button>
+            <FastForward size={17} />{" "}{tr("Skip intro")}</button>
         )}
         {countdown !== null && (
           <div className="overlay-next" role="status">
-            <span>Next episode in {countdown}</span>
-            <button className="primary" onClick={() => void playNext()}><SkipForward size={16} /> Play now</button>
-            <button onClick={() => { dismissedNext.current = true; setCountdown(null); }}>Keep watching</button>
+            <span>{tr("Next episode in")}{" "}{countdown}</span>
+            <button className="primary" onClick={() => void playNext()}><SkipForward size={16} />{" "}{tr("Play now")}</button>
+            <button onClick={() => { dismissedNext.current = true; setCountdown(null); }}>{tr("Keep watching")}</button>
           </div>
         )}
       </div>
@@ -128,8 +128,8 @@ function Player({ id }: { id: string }) {
       <div className="player-controls">
         <TrackMenus tracks={tracks} quality={quality} setQuality={setQuality} audio={audio} setAudio={setAudio}
           subtitle={subtitle} setSubtitle={setSubtitle} />
-        {m.next_id && <button onClick={() => void playNext()}><SkipForward size={16} /> Next episode</button>}
-        <button onClick={() => { video.current?.pause(); setTogether(true); }}><PartyPopper size={16} /> Watch together</button>
+        {m.next_id && <button onClick={() => void playNext()}><SkipForward size={16} />{" "}{tr("Next episode")}</button>}
+        <button onClick={() => { video.current?.pause(); setTogether(true); }}><PartyPopper size={16} />{" "}{tr("Watch together")}</button>
       </div>
       {error && <p className="error" role="alert">{error}</p>}
 
@@ -144,12 +144,12 @@ function Player({ id }: { id: string }) {
         {m.overview && <p className="overview">{m.overview}</p>}
         {together && <PartyDialog mediaId={m.id} title={isEpisode ? `${m.series_title} ${episodeCode(m)}` : m.title} onClose={() => setTogether(false)} />}
         <OfflinePanel media={m} qualities={tracks.qualities} />
-        {user.is_admin && !isEpisode && <RatingControl value={m.age} onChange={(v) => api.setMediaRating(m.id, v)} label="Suitable for" />}
+        {user.is_admin && !isEpisode && <RatingControl value={m.age} onChange={(v) => api.setMediaRating(m.id, v)} label={tr("Suitable for")} />}
         <details className="more">
-          <summary><ExternalLink size={15} /> Open in another player</summary>
-          <p className="muted small">For VLC on a TV or phone: Media, Open Network Stream, then paste this address. It works for 24 hours.</p>
+          <summary><ExternalLink size={15} />{" "}{tr("Open in another player")}</summary>
+          <p className="muted small">{tr("For VLC on a TV or phone: Media, Open Network Stream, then paste this address. It works for 24 hours.")}</p>
           <code>{link || "loading…"}</code>
-          <button onClick={() => void navigator.clipboard?.writeText(link)} disabled={!link}>Copy address</button>
+          <button onClick={() => void navigator.clipboard?.writeText(link)} disabled={!link}>{tr("Copy address")}</button>
         </details>
       </div>
     </div>
@@ -172,32 +172,31 @@ function OfflinePanel({ media, qualities }: { media: Media; qualities: string[] 
   const make = async () => {
     setMsg("");
     try { await api.requestOffline(media.id, quality); await load(); }
-    catch (e) { setMsg(e instanceof Error ? e.message : "Couldn't start"); }
+    catch (e) { setMsg(e instanceof Error ? e.message : tr("Couldn't start")); }
   };
   return (
     <section className="offline">
-      <h2><Download size={17} aria-hidden /> Watch without internet</h2>
-      <p className="muted small">GharBox makes a smaller copy you can save on your phone or laptop. You'll get a notification when it's ready.</p>
+      <h2><Download size={17} aria-hidden />{" "}{tr("Watch without internet")}</h2>
+      <p className="muted small">{tr("GharBox makes a smaller copy you can save on your phone or laptop. You'll get a notification when it's ready.")}</p>
       {copies.map((c) => (
         <div key={c.id} className="offline-row">
           <strong>{c.quality}</strong>
           {c.status === "ready" && <><span className="muted small">{formatBytes(c.size ?? 0)}</span>
-            <a className="button primary" href={url.offlineFile(c)}><Download size={15} /> Save file</a></>}
+            <a className="button primary" href={url.offlineFile(c)}><Download size={15} />{" "}{tr("Save file")}</a></>}
           {(c.status === "queued" || c.status === "working") && (
             <><div className="disk" role="progressbar" aria-valuenow={Math.round(c.progress * 100)} aria-valuemin={0} aria-valuemax={100}>
               <span style={{ width: `${c.progress * 100}%` }} /></div>
               <span className="muted small">{c.status === "queued" ? "waiting" : `${Math.round(c.progress * 100)}%`}</span></>
           )}
-          {c.status === "failed" && <span className="error small">Failed: {c.error}</span>}
+          {c.status === "failed" && <span className="error small">{tr("Failed:")}{" "}{c.error}</span>}
         </div>
       ))}
       <div className="inline-form">
-        <label>Quality
-          <select value={quality} onChange={(e) => setQuality(e.target.value)}>
+        <label>{tr("Quality")}<select value={quality} onChange={(e) => setQuality(e.target.value)}>
             {qualities.map((q) => <option key={q} value={q}>{q}</option>)}
           </select>
         </label>
-        <button onClick={() => void make()}>Make a copy</button>
+        <button onClick={() => void make()}>{tr("Make a copy")}</button>
       </div>
       {msg && <p className="error">{msg}</p>}
     </section>
@@ -213,10 +212,10 @@ export function RatingControl({ value, onChange, label }: { value: number | null
         const next = e.target.value === "" ? null : Number(e.target.value);
         setV(next); await onChange(next); setSaved(true); setTimeout(() => setSaved(false), 1500);
       }}>
-        <option value="">Not rated</option>
+        <option value="">{tr("Not rated")}</option>
         {AGE_OPTIONS.map((a) => <option key={a} value={a}>{AGE_LABEL[a]}</option>)}
       </select>
-      {saved && <span className="muted small"> Saved</span>}
+      {saved && <span className="muted small">{" "}{tr("Saved")}</span>}
     </label>
   );
 }

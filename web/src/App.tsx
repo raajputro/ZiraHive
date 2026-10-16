@@ -21,8 +21,10 @@ import { AlbumDetailPage, AlbumsPage as MusicAlbumsPage, ArtistDetailPage, Artis
   PlaylistDetailPage, PlaylistsPage, SongsPage } from "./pages/Listen";
 import { ReadHome, ReadLibraryPage, ReadSeriesPage } from "./pages/Read";
 import ReaderRoute from "./pages/Reader";
+import VaultPage from "./pages/Vault";
 import AdminPage from "./pages/Admin";
 
+import { t as tr, adoptAccountLanguage, lang, setLang } from "./i18n";
 interface AuthCtx { user: User; signOut: () => void; refreshUser: () => void }
 const AuthContext = createContext<AuthCtx | null>(null);
 export const useAuth = () => useContext(AuthContext)!;
@@ -39,7 +41,7 @@ function SignedInApp() {
   const [needsSetup, setNeedsSetup] = useState(false);
 
   useEffect(() => {
-    api.me().then(setUser).catch(async () => {
+    api.me().then((u) => { adoptAccountLanguage(u.language); setUser(u); }).catch(async () => {
       setNeedsSetup((await api.setupStatus().catch(() => ({ needs_setup: false }))).needs_setup);
       setUser(null);
     });
@@ -49,7 +51,7 @@ function SignedInApp() {
   }, []);
 
   if (user === undefined) return <div className="boot" aria-busy="true" />;
-  if (user === null) return <SignIn firstRun={needsSetup} onSignedIn={(u) => { setNeedsSetup(false); setUser(u); }} />;
+  if (user === null) return <SignIn firstRun={needsSetup} onSignedIn={(u) => { adoptAccountLanguage(u.language); setNeedsSetup(false); setUser(u); }} />;
 
   const signOut = () => { void api.logout().finally(() => setUser(null)); };
   const refreshUser = () => { void api.me().then(setUser).catch(() => undefined); };
@@ -87,6 +89,7 @@ function SignedInApp() {
               <Route path="/read/series" element={<ReadSeriesPage />} />
               <Route path="/read/book/:id" element={<ReaderRoute />} />
               <Route path="/trash" element={<TrashPage />} />
+              <Route path="/vault" element={<VaultPage />} />
               <Route path="/settings" element={<AdminPage />} />
               <Route path="*" element={<Navigate to="/photos" replace />} />
             </Routes>
@@ -104,31 +107,31 @@ function Shell({ children }: { children: ReactNode }) {
   const cinema = ["/watch", "/play", "/party", "/listen"].some((p) => pathname.startsWith(p));
   useEffect(() => { document.documentElement.dataset.room = cinema ? "cinema" : "home"; }, [cinema]);
   const links = [
-    { to: "/photos", label: "Photos", icon: Images },
-    { to: "/files", label: "Files", icon: Folder },
-    { to: "/watch", label: "Watch", icon: Clapperboard },
-    { to: "/listen", label: "Listen", icon: Headphones },
-    { to: "/read", label: "Read", icon: BookOpen },
-    { to: "/trash", label: "Trash", icon: Trash2, desktop: true },
-    { to: "/settings", label: "Settings", icon: Settings, desktop: true },
+    { to: "/photos", label: tr("Photos"), icon: Images },
+    { to: "/files", label: tr("Files"), icon: Folder },
+    { to: "/watch", label: tr("Watch"), icon: Clapperboard },
+    { to: "/listen", label: tr("Listen"), icon: Headphones },
+    { to: "/read", label: tr("Read"), icon: BookOpen },
+    { to: "/trash", label: tr("Trash"), icon: Trash2, desktop: true },
+    { to: "/settings", label: tr("Settings"), icon: Settings, desktop: true },
   ];
   return (
     <div className="shell">
-      <nav className="rail" aria-label="Main">
-        <div className="brand"><span lang="bn">ঘর</span> GharBox</div>
+      <nav className="rail" aria-label={tr("Main")}>
+        <div className="brand"><span lang="bn">ঘর</span>{" "}{tr("GharBox")}</div>
         {links.map(({ to, label, icon: Icon, desktop }) => (
           <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}><Icon size={19} aria-hidden /> <span>{label}</span></NavLink>
         ))}
         <div className="rail-foot">
           <span className="who">{user.username}</span>
           <NotificationBell />
-          <button className="icon" onClick={signOut} aria-label="Sign out" title="Sign out"><LogOut size={17} /></button>
+          <button className="icon" onClick={signOut} aria-label={tr("Sign out")} title={tr("Sign out")}><LogOut size={17} /></button>
         </div>
       </nav>
       <div className="mobile-top">
-        <span className="brand-inline"><span lang="bn">ঘর</span> GharBox</span>
-        <NavLink to="/trash" className="icon" aria-label="Trash"><Trash2 size={19} /></NavLink>
-        <NavLink to="/settings" className="icon" aria-label="Settings"><Settings size={19} /></NavLink>
+        <span className="brand-inline"><span lang="bn">ঘর</span>{" "}{tr("GharBox")}</span>
+        <NavLink to="/trash" className="icon" aria-label={tr("Trash")}><Trash2 size={19} /></NavLink>
+        <NavLink to="/settings" className="icon" aria-label={tr("Settings")}><Settings size={19} /></NavLink>
         <NotificationBell />
       </div>
       <main>{children}</main>
@@ -148,14 +151,14 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
   const submit = async (e: FormEvent) => {
     e.preventDefault();
     setError("");
-    if (firstRun && password.length < 8) { setError("Use at least 8 characters for the password."); return; }
+    if (firstRun && password.length < 8) { setError(tr("Use at least 8 characters for the password.")); return; }
     setBusy(true);
     try {
       const res = firstRun ? await api.setup(username, password) : await api.login(username, password, needCode ? code : undefined);
       onSignedIn(res.user);
     } catch (err) {
       if (err instanceof ApiError && err.code === "2fa_required") { setNeedCode(true); return; }
-      setError(err instanceof ApiError ? err.message : "Can't reach the server. Check that GharBox is running.");
+      setError(err instanceof ApiError ? err.message : tr("Can't reach the server. Check that GharBox is running."));
     } finally { setBusy(false); }
   };
 
@@ -163,19 +166,20 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
     <div className="signin">
       <form onSubmit={submit}>
         <div className="signin-mark" lang="bn" aria-hidden>ঘর</div>
-        <h1>{firstRun ? "Set up your GharBox" : "Welcome home"}</h1>
-        <p>{firstRun ? "Create the admin account. You can add family members afterwards." : "Sign in to your photos, files and movies."}</p>
-        <label>Username<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus /></label>
-        <label>Password<input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+        <h1>{firstRun ? tr("Set up your GharBox") : tr("Welcome home")}</h1>
+        <p>{firstRun ? tr("Create the admin account. You can add family members afterwards.") : tr("Sign in to your photos, files and movies.")}</p>
+        <label>{tr("Username")}<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus /></label>
+        <label>{tr("Password")}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
           autoComplete={firstRun ? "new-password" : "current-password"} required /></label>
         {needCode && (
-          <label>Code from your authenticator app
-            <input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code"
-              placeholder="123456, or a recovery code" required autoFocus />
+          <label>{tr("Code from your authenticator app")}<input value={code} onChange={(e) => setCode(e.target.value)} inputMode="numeric" autoComplete="one-time-code"
+              placeholder={tr("123456, or a recovery code")} required autoFocus />
           </label>
         )}
         {error && <p className="error" role="alert">{error}</p>}
-        <button className="primary" disabled={busy}>{firstRun ? "Create admin account" : needCode ? "Verify and sign in" : "Sign in"}</button>
+        <button className="primary" disabled={busy}>{firstRun ? tr("Create admin account") : needCode ? tr("Verify and sign in") : tr("Sign in")}</button>
+        <button type="button" className="lang-switch" onClick={() => setLang(lang() === "bn" ? "en" : "bn")}
+          lang={lang() === "bn" ? "en" : "bn"}>{lang() === "bn" ? "English" : "বাংলা"}</button>
       </form>
     </div>
   );

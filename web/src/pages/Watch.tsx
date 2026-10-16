@@ -4,14 +4,15 @@ import { Search, ChevronRight } from "lucide-react";
 import { api, url, episodeCode, formatDuration, VIDEO_KINDS, type Library, type Media, type Title } from "../api";
 import { useAuth } from "../App";
 
+import { t as tr } from "../i18n";
 /** Category tabs shared by every Watch page: Home, English Movies, Web Series, ... */
 export function WatchTabs({ libraries, query, onQuery }:
   { libraries: Library[]; query?: string; onQuery?: (q: string) => void }) {
   return (
     <div className="watch-bar">
-      <nav className="lib-tabs" aria-label="Categories">
-        <NavLink to="/watch" end>Home</NavLink>
-        <NavLink to="/watch/parties">Watch parties</NavLink>
+      <nav className="lib-tabs" aria-label={tr("Categories")}>
+        <NavLink to="/watch" end>{tr("Home")}</NavLink>
+        <NavLink to="/watch/parties">{tr("Watch parties")}</NavLink>
         {libraries.filter((l) => l.available && l.item_count > 0 && VIDEO_KINDS.includes(l.kind)).map((l) => (
           <NavLink key={l.id} to={`/watch/c/${l.id}`}>{l.name}</NavLink>
         ))}
@@ -19,7 +20,7 @@ export function WatchTabs({ libraries, query, onQuery }:
       {onQuery && (
         <label className="search">
           <Search size={17} aria-hidden />
-          <input placeholder="Search everything" value={query} onChange={(e) => onQuery(e.target.value)} aria-label="Search movies and series" />
+          <input placeholder={tr("Search everything")} value={query} onChange={(e) => onQuery(e.target.value)} aria-label={tr("Search movies and series")} />
         </label>
       )}
     </div>
@@ -38,7 +39,7 @@ export function TitleCard({ t }: { t: Title }) {
     <Link to={to} className="poster">
       <div className="poster-art">
         {t.poster_ready ? <img src={url.titlePoster(t)} alt="" loading="lazy" /> : <span className="poster-blank">{t.title}</span>}
-        {t.type === "series" && <span className="poster-flag">Series</span>}
+        {t.type === "series" && <span className="poster-flag">{tr("Series")}</span>}
         {pct > 0 && <span className="poster-progress"><span style={{ width: `${pct}%` }} /></span>}
       </div>
       <span className="poster-title">{t.title}</span>
@@ -58,7 +59,7 @@ function ContinueCard({ m }: { m: Media }) {
       </div>
       <span className="poster-title">{isEpisode ? m.series_title : m.title}</span>
       <span className="poster-meta">
-        {isEpisode ? `${episodeCode(m)}${m.position < 5 ? ", up next" : ""}` : `${formatDuration((m.duration ?? 0) - m.position)} left`}
+        {isEpisode ? `${episodeCode(m)}${m.position < 5 ? tr(", up next") : ""}` : tr("{formatDuration} left", { formatDuration: formatDuration((m.duration ?? 0) - m.position) })}
       </span>
     </Link>
   );
@@ -95,13 +96,13 @@ export default function WatchHome() {
 
   return (
     <div className="page cinema-page">
-      <header className="page-head"><h1>Watch</h1></header>
+      <header className="page-head"><h1>{tr("Watch")}</h1></header>
       {libs && <WatchTabs libraries={libs} query={query} onQuery={setQuery} />}
 
       {results && (
         <section>
           {results.length === 0
-            ? <p className="muted">Nothing matches "{query}".</p>
+            ? <p className="muted">{tr("Nothing matches \"")}{query}".</p>
             : <div className="poster-grid">{results.map((t) => <TitleCard key={t.id} t={t} />)}</div>}
         </section>
       )}
@@ -109,7 +110,7 @@ export default function WatchHome() {
       {!results && <>
         {resume.length > 0 && (
           <section className="shelf-block">
-            <h2 className="shelf-title">Continue watching</h2>
+            <h2 className="shelf-title">{tr("Continue watching")}</h2>
             <div className="shelf stills">{resume.map((m) => <ContinueCard key={m.id} m={m} />)}</div>
           </section>
         )}
@@ -123,12 +124,10 @@ export default function WatchHome() {
         ))}
         {libs && visible.length === 0 && (
           <div className="empty">
-            <h2>Nothing to watch yet</h2>
+            <h2>{tr("Nothing to watch yet")}</h2>
             {user.is_admin ? (
-              <p>Make one folder per category inside your media folder, such as English Movies, Hindi Movies,
-                Bangla Movies, Web Series and Animation. Then open <Link to="/settings">Settings</Link> and press
-                Find new folders.</p>
-            ) : <p>Ask the admin to add movie and series folders.</p>}
+              <p>{tr("Make one folder per category inside your media folder, such as English Movies, Hindi Movies, Bangla Movies, Web Series and Animation. Then open")}{" "}<Link to="/settings">{tr("Settings")}</Link>{" "}{tr("and press Find new folders.")}</p>
+            ) : <p>{tr("Ask the admin to add movie and series folders.")}</p>}
           </div>
         )}
       </>}
@@ -154,22 +153,21 @@ export function LibraryPage() {
 
   return (
     <div className="page cinema-page">
-      <header className="page-head"><h1>{lib?.name ?? "Watch"}</h1></header>
+      <header className="page-head"><h1>{lib?.name ?? tr("Watch")}</h1></header>
       {libs && <WatchTabs libraries={libs} />}
       <div className="lib-tools">
         <label className="search">
           <Search size={17} aria-hidden />
-          <input placeholder={`Search ${lib?.name ?? ""}`} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Search this category" />
+          <input placeholder={tr("Search {name}", { name: lib?.name ?? "" })} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={tr("Search this category")} />
         </label>
-        <label className="sort">Sort by
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="added">Recently added</option>
-            <option value="title">Title</option>
-            <option value="year">Newest release</option>
+        <label className="sort">{tr("Sort by")}<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <option value="added">{tr("Recently added")}</option>
+            <option value="title">{tr("Title")}</option>
+            <option value="year">{tr("Newest release")}</option>
           </select>
         </label>
       </div>
-      {shown && shown.length === 0 && <p className="muted">{filter ? `Nothing matches "${filter}".` : "This category is empty."}</p>}
+      {shown && shown.length === 0 && <p className="muted">{filter ? tr("Nothing matches \"{filter}\".", { filter: filter }) : tr("This category is empty.")}</p>}
       {shown && shown.length > 0 && <div className="poster-grid">{shown.map((t) => <TitleCard key={t.id} t={t} />)}</div>}
     </div>
   );

@@ -35,7 +35,9 @@ async def used_bytes(session: AsyncSession, user_id: str) -> int:
     versions = await session.scalar(select(func.coalesce(func.sum(AssetVersion.size), 0))
                                     .join(Asset, Asset.id == AssetVersion.asset_id)
                                     .where(Asset.owner_id == user_id)) or 0
-    return int(files) + int(versions)
+    from .vault import vault_bytes
+
+    return int(files) + int(versions) + await vault_bytes(session, user_id)
 
 
 @router.get("/setup/status")
@@ -133,9 +135,22 @@ async def me(user: User = Depends(current_user), session: AsyncSession = Depends
 @router.put("/auth/me/settings", response_model=MeOut)
 async def update_my_settings(body: MySettingsIn, user: User = Depends(current_user),
                              session: AsyncSession = Depends(get_session)):
-    user.ntfy_url = body.ntfy_url or None
+    if "ntfy_url" in body.model_fields_set:
+        user.ntfy_url = body.ntfy_url or None
+    if "language" in body.model_fields_set:
+        user.language = body.language or None
     await session.commit()
     return await me(user, session)
+
+
+@router.post("/auth/device-token")
+async def device_token(request: Request, user: User = Depends(current_user),
+                       session: AsyncSession = Depends(get_session)) -> dict:
+    """A sign-in for an app on a computer (the PC sync client) that lasts a year.
+    "Sign out everywhere" and changing the password still end it."""
+    await audit(session, "device_linked", user, detail=request.headers.get("user-agent", "")[:120], request=request)
+    await session.commit()
+    return {"token": create_token(user, days=365)}
 
 
 @router.post("/auth/me/test-notification", status_code=204)

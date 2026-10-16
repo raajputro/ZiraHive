@@ -5,6 +5,7 @@ import { api, url, type Book, type Library } from "../api";
 import { useAuth } from "../App";
 import { BookCard } from "./Listen";
 
+import { t as tr } from "../i18n";
 const READ_KINDS = ["books", "comics"];
 
 function useReadLibraries() {
@@ -15,8 +16,8 @@ function useReadLibraries() {
 
 function ReadTabs({ libs }: { libs: Library[] }) {
   return (
-    <nav className="lib-tabs" aria-label="Reading categories">
-      <NavLink to="/read" end>Home</NavLink>
+    <nav className="lib-tabs" aria-label={tr("Reading categories")}>
+      <NavLink to="/read" end>{tr("Home")}</NavLink>
       {libs.filter((l) => l.available && l.item_count > 0).map((l) => <NavLink key={l.id} to={`/read/c/${l.id}`}>{l.name}</NavLink>)}
     </nav>
   );
@@ -51,7 +52,7 @@ function SeriesCard({ series, books, libraryId }: { series: string; books: Book[
         <span className="poster-flag">{books.length}</span>
       </div>
       <span className="poster-title">{series}</span>
-      <span className="poster-meta">{books.length} books{read ? `, ${read} read` : ""}</span>
+      <span className="poster-meta">{books.length}{" "}{tr("books")}{read ? tr(", {read} read", { read: read }) : ""}</span>
     </Link>
   );
 }
@@ -77,18 +78,18 @@ export function ReadHome() {
   const visible = libs?.filter((l) => l.available && l.item_count > 0) ?? [];
   return (
     <div className="page read-page">
-      <header className="page-head"><h1>Read</h1></header>
+      <header className="page-head"><h1>{tr("Read")}</h1></header>
       <div className="watch-bar">
         {libs && <ReadTabs libs={libs} />}
         <label className="search"><Search size={17} aria-hidden />
-          <input placeholder="Search books and comics" value={query} onChange={(e) => setQuery(e.target.value)} aria-label="Search books and comics" /></label>
+          <input placeholder={tr("Search books and comics")} value={query} onChange={(e) => setQuery(e.target.value)} aria-label={tr("Search books and comics")} /></label>
       </div>
-      {results && (results.length === 0 ? <p className="muted">Nothing matches "{query}".</p>
+      {results && (results.length === 0 ? <p className="muted">{tr("Nothing matches \"")}{query}".</p>
         : <div className="mtile-grid books">{results.map((b) => <BookCard key={b.id} b={b} to={readerLink(b)} />)}</div>)}
       {!results && <>
         {cont.length > 0 && (
           <section className="shelf-block">
-            <h2 className="shelf-title">Continue reading</h2>
+            <h2 className="shelf-title">{tr("Continue reading")}</h2>
             <div className="shelf">{cont.map((b) => <BookCard key={b.id} b={b} to={readerLink(b)} />)}</div>
           </section>
         )}
@@ -100,11 +101,10 @@ export function ReadHome() {
         ))}
         {libs && visible.length === 0 && (
           <div className="empty">
-            <h2>Nothing to read yet</h2>
+            <h2>{tr("Nothing to read yet")}</h2>
             {user.is_admin
-              ? <p>Put EPUB and PDF books in a folder called Ebooks, and comics (CBZ, CBR, or folders of pages) in a folder called Comics,
-                  inside your media folder. Then open <Link to="/settings">Settings</Link> and press Find new folders.</p>
-              : <p>Ask the admin to add book and comic folders.</p>}
+              ? <p>{tr("Put EPUB and PDF books in a folder called Ebooks, and comics (CBZ, CBR, or folders of pages) in a folder called Comics, inside your media folder. Then open")}{" "}<Link to="/settings">{tr("Settings")}</Link>{" "}{tr("and press Find new folders.")}</p>
+              : <p>{tr("Ask the admin to add book and comic folders.")}</p>}
           </div>
         )}
       </>}
@@ -125,20 +125,19 @@ export function ReadLibraryPage() {
   const items = shown ? (grouped && !filter ? group(shown) : shown) : null;
   return (
     <div className="page read-page">
-      <header className="page-head"><h1>{lib?.name ?? "Read"}</h1></header>
+      <header className="page-head"><h1>{lib?.name ?? tr("Read")}</h1></header>
       {libs && <ReadTabs libs={libs} />}
       <div className="lib-tools">
         <label className="search"><Search size={17} aria-hidden />
-          <input placeholder={`Search ${lib?.name ?? ""}`} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Search this category" /></label>
-        <label className="sort">Sort by
-          <select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
-            <option value="added">Recently added</option><option value="title">Title</option>
-            <option value="author">Author</option><option value="series">Series</option>
+          <input placeholder={tr("Search {name}", { name: lib?.name ?? "" })} value={filter} onChange={(e) => setFilter(e.target.value)} aria-label={tr("Search this category")} /></label>
+        <label className="sort">{tr("Sort by")}<select value={sort} onChange={(e) => setSort(e.target.value as typeof sort)}>
+            <option value="added">{tr("Recently added")}</option><option value="title">{tr("Title")}</option>
+            <option value="author">{tr("Author")}</option><option value="series">{tr("Series")}</option>
           </select>
         </label>
-        <label className="check"><input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.target.checked)} /> Group series</label>
+        <label className="check"><input type="checkbox" checked={grouped} onChange={(e) => setGrouped(e.target.checked)} />{" "}{tr("Group series")}</label>
       </div>
-      {shown?.length === 0 && <p className="muted">{filter ? `Nothing matches "${filter}".` : "This category is empty."}</p>}
+      {shown?.length === 0 && <p className="muted">{filter ? tr("Nothing matches \"{filter}\".", { filter: filter }) : tr("This category is empty.")}</p>}
       <div className="mtile-grid books">
         {items?.map((x) => ("series" in x
           ? <SeriesCard key={`s-${x.series}`} series={x.series} books={x.books} libraryId={id!} />
@@ -157,9 +156,9 @@ export function ReadSeriesPage() {
   const next = books?.find((b) => !b.progress?.finished);
   return (
     <div className="page read-page">
-      <Link to={library ? `/read/c/${library}` : "/read"} className="back"><ArrowLeft size={18} /> Back</Link>
+      <Link to={library ? `/read/c/${library}` : "/read"} className="back"><ArrowLeft size={18} />{" "}{tr("Back")}</Link>
       <header className="page-head"><h1>{name}</h1>
-        {next && <Link className="button primary" to={readerLink(next)}>{next.progress?.fraction ? "Continue" : "Start"} with {next.title}</Link>}
+        {next && <Link className="button primary" to={readerLink(next)}>{next.progress?.fraction ? tr("Continue") : tr("Start")}{" "}{tr("with")}{" "}{next.title}</Link>}
       </header>
       <div className="mtile-grid books">{books?.map((b) => <BookCard key={b.id} b={b} to={readerLink(b)} />)}</div>
     </div>

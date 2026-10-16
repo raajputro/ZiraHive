@@ -3,6 +3,7 @@ import { Link } from "react-router-dom";
 import { ChevronDown, ListMusic, Loader2, Moon, Pause, Play, Repeat, Repeat1, Rewind, FastForward, Shuffle, SkipBack, SkipForward, X } from "lucide-react";
 import { clock, useAudio, type Sleep } from "../audio";
 
+import { t as tr } from "../i18n";
 const RATES = [0.75, 1, 1.1, 1.25, 1.5, 1.75, 2];
 
 /** The bar along the bottom while something plays, and the full "Now playing" panel. */
@@ -24,34 +25,34 @@ export default function NowPlaying() {
 
   return (
     <>
-      <div className="np-bar" role="region" aria-label="Now playing">
+      <div className="np-bar" role="region" aria-label={tr("Now playing")}>
         <div className="np-progress" aria-hidden><span style={{ width: `${total ? Math.min(100, (pos / total) * 100) : 0}%` }} /></div>
-        <button className="np-who" onClick={() => setOpen(true)} aria-label="Open now playing">
+        <button className="np-who" onClick={() => setOpen(true)} aria-label={tr("Open now playing")}>
           {a.current.cover ? <img src={a.current.cover} alt="" /> : <span className="np-blank"><ListMusic size={20} /></span>}
-          <span className="np-text"><strong>{title}</strong><span>{a.preparing ? "Preparing audio…" : a.error || subtitle}</span></span>
+          <span className="np-text"><strong>{title}</strong><span>{a.preparing ? tr("Preparing audio…") : a.error || subtitle}</span></span>
         </button>
         <div className="np-buttons">
           {isBook
-            ? <button className="icon np-wide" onClick={() => a.skip(-15)} aria-label="Back 15 seconds"><Rewind size={18} /></button>
-            : <button className="icon np-wide" onClick={a.prev} aria-label="Previous"><SkipBack size={18} /></button>}
-          <button className="icon np-play" onClick={a.toggle} aria-label={a.playing ? "Pause" : "Play"} disabled={a.preparing}>
+            ? <button className="icon np-wide" onClick={() => a.skip(-15)} aria-label={tr("Back 15 seconds")}><Rewind size={18} /></button>
+            : <button className="icon np-wide" onClick={a.prev} aria-label={tr("Previous")}><SkipBack size={18} /></button>}
+          <button className="icon np-play" onClick={a.toggle} aria-label={a.playing ? tr("Pause") : tr("Play")} disabled={a.preparing}>
             <PlayIcon size={20} className={a.preparing ? "spin" : ""} fill={a.preparing ? "none" : "currentColor"} />
           </button>
           {isBook
-            ? <button className="icon" onClick={() => a.skip(30)} aria-label="Forward 30 seconds"><FastForward size={18} /></button>
-            : <button className="icon" onClick={a.next} aria-label="Next" disabled={a.index + 1 >= a.queue.length && a.repeat !== "all"}><SkipForward size={18} /></button>}
+            ? <button className="icon" onClick={() => a.skip(30)} aria-label={tr("Forward 30 seconds")}><FastForward size={18} /></button>
+            : <button className="icon" onClick={a.next} aria-label={tr("Next")} disabled={a.index + 1 >= a.queue.length && a.repeat !== "all"}><SkipForward size={18} /></button>}
         </div>
         <span className="np-time np-wide">{clock(pos)} / {clock(total)}</span>
-        <button className="icon np-wide" onClick={a.close} aria-label="Stop and close"><X size={18} /></button>
+        <button className="icon np-wide" onClick={a.close} aria-label={tr("Stop and close")}><X size={18} /></button>
       </div>
 
       {open && (
-        <div className="np-panel" role="dialog" aria-label="Now playing" aria-modal="true">
+        <div className="np-panel" role="dialog" aria-label={tr("Now playing")} aria-modal="true">
           <header>
-            <button className="icon" onClick={() => setOpen(false)} aria-label="Close"><ChevronDown size={22} /></button>
-            <span className="muted small">{isBook ? "Audiobook" : `${a.index + 1} of ${a.queue.length}`}</span>
+            <button className="icon" onClick={() => setOpen(false)} aria-label={tr("Close")}><ChevronDown size={22} /></button>
+            <span className="muted small">{isBook ? tr("Audiobook") : tr("{n} of {total}", { n: a.index + 1, total: a.queue.length })}</span>
             <button className="icon" onClick={() => setList((x) => !x)} aria-pressed={list}
-              aria-label={isBook ? "Chapters" : "Queue"}><ListMusic size={20} /></button>
+              aria-label={isBook ? tr("Chapters") : tr("Queue")}><ListMusic size={20} /></button>
           </header>
           {!list ? (
             <div className="np-main">
@@ -61,27 +62,26 @@ export default function NowPlaying() {
                 <Link to={a.current.link} onClick={() => setOpen(false)} className="muted">{subtitle}</Link>
               </div>
               <input type="range" className="np-seek" min={0} max={Math.max(1, total)} step={1} value={Math.min(pos, total)}
-                onChange={(e) => seekTo(Number(e.target.value))} aria-label="Position" />
+                onChange={(e) => seekTo(Number(e.target.value))} aria-label={tr("Position")} />
               <div className="np-times"><span>{clock(pos)}</span><span>-{clock(Math.max(0, total - pos))}</span></div>
               {a.error && <p className="error" role="alert">{a.error}</p>}
               <div className="np-controls">
                 {isBook
-                  ? <button className="icon" onClick={() => a.skip(-15)} aria-label="Back 15 seconds"><Rewind size={22} /><small>15</small></button>
-                  : <button className={`icon ${a.shuffle ? "on" : ""}`} onClick={a.toggleShuffle} aria-pressed={a.shuffle} aria-label="Shuffle"><Shuffle size={20} /></button>}
-                <button className="icon" onClick={isBook ? () => a.seekBook(prevChapterStart(a)) : a.prev} aria-label={isBook ? "Previous chapter" : "Previous"}><SkipBack size={24} /></button>
-                <button className="icon np-big" onClick={a.toggle} aria-label={a.playing ? "Pause" : "Play"} disabled={a.preparing}>
+                  ? <button className="icon" onClick={() => a.skip(-15)} aria-label={tr("Back 15 seconds")}><Rewind size={22} /><small>15</small></button>
+                  : <button className={`icon ${a.shuffle ? "on" : ""}`} onClick={a.toggleShuffle} aria-pressed={a.shuffle} aria-label={tr("Shuffle")}><Shuffle size={20} /></button>}
+                <button className="icon" onClick={isBook ? () => a.seekBook(prevChapterStart(a)) : a.prev} aria-label={isBook ? tr("Previous chapter") : tr("Previous")}><SkipBack size={24} /></button>
+                <button className="icon np-big" onClick={a.toggle} aria-label={a.playing ? tr("Pause") : tr("Play")} disabled={a.preparing}>
                   <PlayIcon size={30} className={a.preparing ? "spin" : ""} fill={a.preparing ? "none" : "currentColor"} />
                 </button>
-                <button className="icon" onClick={isBook ? () => nextChapter(a) : a.next} aria-label={isBook ? "Next chapter" : "Next"}><SkipForward size={24} /></button>
+                <button className="icon" onClick={isBook ? () => nextChapter(a) : a.next} aria-label={isBook ? tr("Next chapter") : tr("Next")}><SkipForward size={24} /></button>
                 {isBook
-                  ? <button className="icon" onClick={() => a.skip(30)} aria-label="Forward 30 seconds"><FastForward size={22} /><small>30</small></button>
-                  : <button className={`icon ${a.repeat !== "off" ? "on" : ""}`} onClick={a.cycleRepeat} aria-label={`Repeat: ${a.repeat}`}>
+                  ? <button className="icon" onClick={() => a.skip(30)} aria-label={tr("Forward 30 seconds")}><FastForward size={22} /><small>30</small></button>
+                  : <button className={`icon ${a.repeat !== "off" ? "on" : ""}`} onClick={a.cycleRepeat} aria-label={tr("Repeat: {repeat}", { repeat: a.repeat })}>
                       {a.repeat === "one" ? <Repeat1 size={20} /> : <Repeat size={20} />}</button>}
               </div>
               <div className="np-extra">
                 {isBook && (
-                  <label>Speed
-                    <select value={a.rate} onChange={(e) => a.setRate(Number(e.target.value))}>
+                  <label>{tr("Speed")}<select value={a.rate} onChange={(e) => a.setRate(Number(e.target.value))}>
                       {RATES.map((r) => <option key={r} value={r}>{r}×</option>)}
                     </select>
                   </label>
@@ -103,7 +103,7 @@ export default function NowPlaying() {
                 <li key={q.key} className={i === a.index ? "now" : ""}>
                   <button onClick={() => a.jump(i)}><span>{q.title}<span className="muted small"> {q.subtitle}</span></span>
                     <span className="muted small">{clock(q.duration)}</span></button>
-                  {i !== a.index && <button className="icon" onClick={() => a.remove(i)} aria-label={`Remove ${q.title} from the queue`}><X size={15} /></button>}
+                  {i !== a.index && <button className="icon" onClick={() => a.remove(i)} aria-label={tr("Remove {title} from the queue", { title: q.title })}><X size={15} /></button>}
                 </li>
               ))}
             </ol>
@@ -139,12 +139,12 @@ function SleepMenu({ isBook }: { isBook: boolean }) {
     a.setSleep(s);
   };
   return (
-    <label><span><Moon size={14} aria-hidden /> Sleep</span>
+    <label><span><Moon size={14} aria-hidden />{" "}{tr("Sleep")}</span>
       <select value={value} onChange={(e) => choose(e.target.value)}>
-        <option value="off">Off</option>
-        {value === "timer" && <option value="timer">{left} min left</option>}
-        {[10, 15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m} minutes</option>)}
-        <option value={isBook ? "chapter" : "track"}>{isBook ? "End of chapter" : "End of this song"}</option>
+        <option value="off">{tr("Off")}</option>
+        {value === "timer" && <option value="timer">{left}{" "}{tr("min left")}</option>}
+        {[10, 15, 30, 45, 60, 90].map((m) => <option key={m} value={m}>{m}{" "}{tr("minutes")}</option>)}
+        <option value={isBook ? "chapter" : "track"}>{isBook ? tr("End of chapter") : tr("End of this song")}</option>
       </select>
     </label>
   );

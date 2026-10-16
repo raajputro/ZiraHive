@@ -31,6 +31,9 @@ x-server-volumes: &server-volumes
   # A category on another drive: mount it outside /media, then add it in
   # Settings > Watch categories > Add a folder from another drive.
   # - E:/Korean Dramas:/media-e/korean-dramas:ro
+  # Offsite backup to a USB or second disk: mount a folder on it here, then choose
+  # /backup-disk/gharbox in Settings > Server > Offsite backup. See docs/BACKUP.md.
+  # - F:/GharBox Backup:/backup-disk
 
 services:
   web:

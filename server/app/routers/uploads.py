@@ -86,7 +86,7 @@ async def create_upload(body: UploadCreateIn, user: User = Depends(current_user)
     up = UploadSession(owner_id=user.id, filename=storage.safe_name(body.filename), folder=folder,
                        size=body.size, sha256=body.sha256.lower() if body.sha256 else None,
                        taken_at=as_utc(body.taken_at), device_asset_id=body.device_asset_id,
-                       dedupe=body.dedupe)
+                       dedupe=body.dedupe and not body.replace, replace=body.replace)
     session.add(up)
     await session.commit()
     _part_path(up.id).touch()
@@ -198,14 +198,22 @@ async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> Upl
         await session.commit()
         return UploadOut(status="exists", size=existing.size, offset=existing.size,
                          asset=AssetOut.model_validate(existing))
-    if storage.kind_for(up.filename) in VERSIONED_KINDS:
+    if storage.kind_for(up.filename) in VERSIONED_KINDS or up.replace:
         current = await session.scalar(select(Asset).where(
             Asset.owner_id == user.id, Asset.folder == up.folder, Asset.filename == up.filename,
             Asset.deleted_at.is_(None)))
+        if current and current.sha256 == digest:  # same contents: nothing to keep
+            part.unlink(missing_ok=True)
+            await session.delete(up)
+            await session.commit()
+            return UploadOut(status="complete", size=current.size, offset=current.size,
+                             asset=AssetOut.model_validate(current))
         if current:
             await add_version(session, user, current, part, digest, up.size)
             await session.delete(up)
             await session.commit()
+            if current.kind in ("photo", "video"):
+                await jobs.enqueue("process_asset", current.id)  # new picture, new thumbnail
             return UploadOut(status="complete", size=current.size, offset=current.size,
                              asset=AssetOut.model_validate(current))
     target, rel = storage.unique_target(user.username, up.folder, up.filename)

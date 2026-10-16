@@ -5,6 +5,7 @@ import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import { url } from "../api";
 import type { TocEntry, ViewProps } from "../pages/Reader";
 
+import { t as tr } from "../i18n";
 pdfjs.GlobalWorkerOptions.workerSrc = workerUrl;
 
 /** PDF one page at a time with pdf.js, sharp on high-density screens. */
@@ -39,7 +40,7 @@ export default function PdfView({ book, settings, onLocation, onToc, register, o
         await walk(outline, 0);
         onToc(out);
       }
-    }).catch((e) => setError(e?.name === "PasswordException" ? "This PDF is protected with a password." : "This PDF couldn't be opened."));
+    }).catch((e) => setError(e?.name === "PasswordException" ? tr("This PDF is protected with a password.") : tr("This PDF couldn't be opened.")));
     return () => { void loading.destroy(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [book.id]);
@@ -93,7 +94,7 @@ export default function PdfView({ book, settings, onLocation, onToc, register, o
   if (error) return <div className="reader-msg"><p className="error">{error}</p></div>;
   return (
     <div className={`pdf-stage theme-${settings.theme}`} ref={stage} onClick={onTapMiddle}>
-      <canvas ref={canvas} aria-label={`Page ${page} of ${pages}`} role="img" />
+      <canvas ref={canvas} aria-label={tr("Page {page} of {pages}", { page: page, pages: pages })} role="img" />
     </div>
   );
 }

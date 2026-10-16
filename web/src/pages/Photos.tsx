@@ -7,14 +7,15 @@ import { usePrefs } from "../prefs";
 import { DropZone } from "./Files";
 import { AddToAlbumDialog } from "./Albums";
 
-const monthFmt = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric" });
-const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric", month: "short" });
+import { locale, t as tr } from "../i18n";
+const monthFmt = new Intl.DateTimeFormat(locale(), { month: "long", year: "numeric" });
+const dayFmt = new Intl.DateTimeFormat(locale(), { weekday: "short", day: "numeric", month: "short" });
 
 export function PhotoTabs() {
   return (
-    <nav className="lib-tabs photo-tabs" aria-label="Photos">
-      <NavLink to="/photos" end>Timeline</NavLink>
-      <NavLink to="/photos/albums">Albums</NavLink>
+    <nav className="lib-tabs photo-tabs" aria-label={tr("Photos")}>
+      <NavLink to="/photos" end>{tr("Timeline")}</NavLink>
+      <NavLink to="/photos/albums">{tr("Albums")}</NavLink>
     </nav>
   );
 }
@@ -27,7 +28,7 @@ export function Tile({ a, selected, selecting, onOpen, onToggle, thumbUrl }:
   return (
     <button className={`tile ${selected ? "selected" : ""}`} style={{ flexGrow: ratio, aspectRatio: String(ratio), ["--r" as string]: ratio }}
       onClick={selecting ? onToggle : onOpen} aria-pressed={selecting ? !!selected : undefined}
-      aria-label={`${selecting ? "Select" : "Open"} ${a.filename}`}>
+      aria-label={`${selecting ? tr("Select") : tr("Open")} ${a.filename}`}>
       {a.thumb_ready ? <img src={thumbUrl} alt="" loading="lazy" /> : <span className="tile-wait" />}
       {a.kind === "video" && <span className="tile-badge"><Play size={12} fill="currentColor" /> {formatDuration(a.duration)}</span>}
       {selecting && <span className="tile-check" aria-hidden>{selected && <Check size={14} />}</span>}
@@ -38,13 +39,13 @@ export function Tile({ a, selected, selecting, onOpen, onToggle, thumbUrl }:
 function OnThisDay({ memories, onOpen }: { memories: Memory[]; onOpen: (m: Memory, i: number) => void }) {
   if (!memories.length) return null;
   return (
-    <section className="memories" aria-label="On this day">
-      <h2 className="shelf-title">On this day</h2>
+    <section className="memories" aria-label={tr("On this day")}>
+      <h2 className="shelf-title">{tr("On this day")}</h2>
       <div className="memory-row">
         {memories.map((m) => (
           <button key={m.year} className="memory" onClick={() => onOpen(m, 0)}>
             <img src={url.thumb(m.items[0])} alt="" />
-            <span>{m.years_ago === 1 ? "1 year ago" : `${m.years_ago} years ago`}</span>
+            <span>{m.years_ago === 1 ? tr("1 year ago") : tr("{years_ago} years ago", { years_ago: m.years_ago })}</span>
             <small>{m.items.length} {m.items.length === 1 ? "photo" : "photos"}</small>
           </button>
         ))}
@@ -77,7 +78,7 @@ export default function PhotosPage() {
       setCursor(page.next_cursor);
       setDone(!page.next_cursor);
       setError("");
-    } catch (e) { setError(e instanceof Error ? e.message : "Couldn't load photos"); }
+    } catch (e) { setError(e instanceof Error ? e.message : tr("Couldn't load photos")); }
     finally { setLoading(false); }
   }, [cursor, loading]);
 
@@ -119,17 +120,17 @@ export default function PhotosPage() {
     <DropZone onFiles={addFiles}>
       <div className="page">
         <header className="page-head">
-          <h1>Photos</h1>
+          <h1>{tr("Photos")}</h1>
           {selecting ? (
             <>
-              <span className="muted">{selected.size} selected</span>
-              <button className="primary" disabled={!selected.size} onClick={() => setAlbumPicker(true)}><FolderPlus size={17} /> Add to album</button>
-              <button onClick={stopSelecting}>Done</button>
+              <span className="muted">{selected.size}{" "}{tr("selected")}</span>
+              <button className="primary" disabled={!selected.size} onClick={() => setAlbumPicker(true)}><FolderPlus size={17} />{" "}{tr("Add to album")}</button>
+              <button onClick={stopSelecting}>{tr("Done")}</button>
             </>
           ) : (
             <>
-              {items.length > 0 && <button onClick={() => setSelecting(true)}><CheckSquare size={17} /> Select</button>}
-              <button className="primary" onClick={() => input.current?.click()}><Upload size={17} /> Upload photos</button>
+              {items.length > 0 && <button onClick={() => setSelecting(true)}><CheckSquare size={17} />{" "}{tr("Select")}</button>}
+              <button className="primary" onClick={() => input.current?.click()}><Upload size={17} />{" "}{tr("Upload photos")}</button>
             </>
           )}
           <input ref={input} type="file" multiple accept="image/*,video/*,.heic,.heif" hidden
@@ -140,8 +141,8 @@ export default function PhotosPage() {
         {!selecting && <OnThisDay memories={memories} onOpen={(m, i) => setViewer({ items: m.items, index: i })} />}
         {!loading && !error && items.length === 0 && (
           <div className="empty">
-            <h2>No photos yet</h2>
-            <p>Drop photos and videos here, or install the phone app to back up your camera roll automatically.</p>
+            <h2>{tr("No photos yet")}</h2>
+            <p>{tr("Drop photos and videos here, or install the phone app to back up your camera roll automatically.")}</p>
           </div>
         )}
         {groups.map((m) => (
@@ -161,7 +162,7 @@ export default function PhotosPage() {
             ))}
           </section>
         ))}
-        <div ref={sentinel} className="sentinel">{loading && "Loading…"}</div>
+        <div ref={sentinel} className="sentinel">{loading && tr("Loading…")}</div>
       </div>
       {viewer && viewer.items[viewer.index] && (
         <Lightbox items={viewer.items} index={viewer.index} onIndex={(i) => setViewer({ ...viewer, index: i })} onClose={() => setViewer(null)} />
@@ -197,19 +198,19 @@ export function Lightbox({ items, index, onIndex, onClose }:
       <div className="lightbox-bar">
         <span>{a.filename}</span>
         {a.kind === "photo" && !original && (
-          <button className="icon" onClick={() => setOriginal(true)} aria-label="Show full size" title="Show full size"><Maximize size={18} /></button>
+          <button className="icon" onClick={() => setOriginal(true)} aria-label={tr("Show full size")} title={tr("Show full size")}><Maximize size={18} /></button>
         )}
-        <a className="icon" href={url.file(a, true)} aria-label="Download"><Download size={18} /></a>
-        <button className="icon" onClick={onClose} aria-label="Close"><X size={20} /></button>
+        <a className="icon" href={url.file(a, true)} aria-label={tr("Download")}><Download size={18} /></a>
+        <button className="icon" onClick={onClose} aria-label={tr("Close")}><X size={20} /></button>
       </div>
-      {index > 0 && <button className="lb-nav prev" onClick={() => onIndex(index - 1)} aria-label="Previous"><ChevronLeft size={30} /></button>}
+      {index > 0 && <button className="lb-nav prev" onClick={() => onIndex(index - 1)} aria-label={tr("Previous")}><ChevronLeft size={30} /></button>}
       <div className="lightbox-stage">
         {a.kind === "video"
           ? <video key={a.id} src={url.file(a)} controls autoPlay={!lowData} preload={lowData ? "none" : "metadata"}
               poster={a.thumb_ready ? url.thumb(a) : undefined} playsInline />
           : <img key={a.id + src} src={src} alt={a.filename} onError={() => original && setOriginal(false)} />}
       </div>
-      {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label="Next"><ChevronRight size={30} /></button>}
+      {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label={tr("Next")}><ChevronRight size={30} /></button>}
     </div>
   );
 }

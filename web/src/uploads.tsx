@@ -2,6 +2,7 @@ import { createContext, useCallback, useContext, useRef, useState, type ReactNod
 import { X, Check, AlertCircle, Copy } from "lucide-react";
 import { api, ApiError, formatBytes } from "./api";
 
+import { t as tr } from "./i18n";
 const CHUNK = 8 * 1024 * 1024;
 const HASH_LIMIT = 512 * 1024 * 1024; // hash in the browser below this size; the server always verifies
 
@@ -63,7 +64,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       const item = queue.current.shift()!;
       run.backup ||= item.dedupe;
       try { if ((await uploadOne(item)) === "exists") run.skipped++; else run.uploaded++; }
-      catch (e) { run.failed++; patch(item.key, { state: "error", error: e instanceof Error ? e.message : "Upload failed" }); }
+      catch (e) { run.failed++; patch(item.key, { state: "error", error: e instanceof Error ? e.message : tr("Upload failed") }); }
       listeners.current.forEach((fn) => fn());
     }
     // Report bigger backups, and any failure, so a push notification reaches the phone
@@ -98,20 +99,20 @@ export function UploadProvider({ children }: { children: ReactNode }) {
       {items.length > 0 && (
         <aside className="tray" aria-live="polite">
           <header>
-            <strong>{active ? `Uploading ${active} of ${items.length}` : `${items.length} uploaded`}</strong>
-            <span>{formatBytes(sent)} of {formatBytes(total)}</span>
-            {!active && <button className="icon" aria-label="Close" onClick={() => setItems([])}><X size={16} /></button>}
+            <strong>{active ? tr("Uploading {active} of {length}", { active: active, length: items.length }) : tr("{length} uploaded", { length: items.length })}</strong>
+            <span>{formatBytes(sent)}{" "}{tr("of")}{" "}{formatBytes(total)}</span>
+            {!active && <button className="icon" aria-label={tr("Close")} onClick={() => setItems([])}><X size={16} /></button>}
           </header>
           <div className="tray-bar"><span style={{ width: `${total ? (sent / total) * 100 : 0}%` }} /></div>
-          {active > 0 && <p className="tray-hint">You can lock your phone: uploading pauses and carries on when you open GharBox again. You'll get a notification when it's done.</p>}
+          {active > 0 && <p className="tray-hint">{tr("You can lock your phone: uploading pauses and carries on when you open GharBox again. You'll get a notification when it's done.")}</p>}
           <ul>
             {items.slice(-50).reverse().map((i) => (
               <li key={i.key} className={i.state}>
                 <span className="name" title={i.file.name}>{i.file.name}</span>
-                {i.state === "done" && <Check size={15} aria-label="Uploaded" />}
-                {i.state === "exists" && <span className="note"><Copy size={13} /> already backed up</span>}
+                {i.state === "done" && <Check size={15} aria-label={tr("Uploaded")} />}
+                {i.state === "exists" && <span className="note"><Copy size={13} />{" "}{tr("already backed up")}</span>}
                 {i.state === "error" && <span className="note" title={i.error}><AlertCircle size={14} /> {i.error}</span>}
-                {i.state === "hashing" && <span className="note">checking</span>}
+                {i.state === "hashing" && <span className="note">{tr("checking")}</span>}
                 {i.state === "uploading" && <span className="note">{Math.round((i.sent / Math.max(i.file.size, 1)) * 100)}%</span>}
               </li>
             ))}

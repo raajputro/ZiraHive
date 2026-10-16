@@ -3,7 +3,8 @@ import { Link } from "react-router-dom";
 import { Bell } from "lucide-react";
 import { api, type Notice } from "../api";
 
-const when = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" });
+import { locale, t as tr, tx } from "../i18n";
+const when = new Intl.RelativeTimeFormat(locale(), { numeric: "auto" });
 function ago(iso: string) {
   const mins = Math.round((Date.now() - new Date(iso).getTime()) / 60000);
   if (mins < 60) return when.format(-mins, "minute");
@@ -33,16 +34,16 @@ export default function NotificationBell() {
 
   return (
     <div className="bell" ref={box}>
-      <button className="icon" onClick={toggle} aria-label={`Notifications${unread ? `, ${unread} new` : ""}`} aria-expanded={open}>
+      <button className="icon" onClick={toggle} aria-label={unread ? tr("Notifications, {n} new", { n: unread }) : tr("Notifications")} aria-expanded={open}>
         <Bell size={18} />
         {unread > 0 && <span className="badge">{unread > 9 ? "9+" : unread}</span>}
       </button>
       {open && (
-        <div className="bell-panel" role="region" aria-label="Notifications">
-          {items.length === 0 && <p className="muted small">Nothing yet. Backups, shared albums and new movies show up here.</p>}
+        <div className="bell-panel" role="region" aria-label={tr("Notifications")}>
+          {items.length === 0 && <p className="muted small">{tr("Nothing yet. Backups, shared albums and new movies show up here.")}</p>}
           <ul>
             {items.map((n) => {
-              const inner = (<><strong>{n.title}</strong>{n.body && <span>{n.body}</span>}<time>{ago(n.created_at)}</time></>);
+              const inner = (<><strong>{tx(n.title)}</strong>{n.body && <span>{tx(n.body)}</span>}<time>{ago(n.created_at)}</time></>);
               return (
                 <li key={n.id} className={n.read_at ? "" : "new"}>
                   {n.link ? <Link to={n.link} onClick={() => setOpen(false)}>{inner}</Link> : <div>{inner}</div>}
