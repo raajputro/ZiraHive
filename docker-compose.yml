@@ -1,0 +1,108 @@
+# GharBox: self-hosted backup + media server
+#
+#   docker compose up -d --build              core stack
+#   docker compose --profile ai up -d         core + local AI (Ollama)
+#
+# Settings live in .env (copy .env.example to .env first).
+
+name: gharbox
+
+x-server-env: &server-env
+  GHARBOX_DATA_DIR: /data
+  GHARBOX_DATABASE_URL: postgresql+asyncpg://gharbox:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/gharbox
+  GHARBOX_REDIS_URL: redis://redis:6379
+  GHARBOX_SECRET_KEY: ${GHARBOX_SECRET_KEY:-}
+  GHARBOX_MEDIA_LIBRARIES: ${GHARBOX_MEDIA_LIBRARIES:-Movies:/media/movies}
+  GHARBOX_TMDB_API_KEY: ${GHARBOX_TMDB_API_KEY:-}
+  GHARBOX_CORS_ORIGINS: ""
+
+x-server-volumes: &server-volumes
+  - ${GHARBOX_DATA_PATH:-./gharbox-data}:/data
+  # Read-only, so GharBox can never modify or delete your movies.
+  - ${MOVIES_PATH:-./movies}:/media/movies:ro
+
+services:
+  web:
+    build: ./web
+    restart: unless-stopped
+    ports:
+      - "${GHARBOX_HTTP_PORT:-8080}:80"
+      - "${GHARBOX_HTTPS_PORT:-8443}:443"
+    environment:
+      GHARBOX_SITE_ADDRESS: ${GHARBOX_SITE_ADDRESS:-:80}
+    volumes:
+      - caddy-data:/data
+    depends_on:
+      api:
+        condition: service_healthy
+
+  api:
+    build: ./server
+    restart: unless-stopped
+    environment: *server-env
+    volumes: *server-volumes
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+
+  worker:
+    build: ./server
+    restart: unless-stopped
+    command: ["arq", "app.worker.WorkerSettings"]
+    healthcheck:
+      disable: true
+    environment: *server-env
+    volumes: *server-volumes
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_started
+    # NVIDIA GPU for faster thumbnails now and hardware transcoding later.
+    # Uncomment if you have an NVIDIA card and the NVIDIA driver for WSL2.
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu, video] }]
+
+  postgres:
+    # pgvector is included now so AI search can be added later without a migration of images.
+    image: pgvector/pgvector:pg16
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: gharbox
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: gharbox
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U gharbox"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  redis:
+    image: redis:7-alpine
+    restart: unless-stopped
+    volumes:
+      - redis-data:/data
+
+  # ---- optional: local AI (docker compose --profile ai up -d) -------------
+  ollama:
+    image: ollama/ollama:latest
+    profiles: ["ai"]
+    restart: unless-stopped
+    volumes:
+      - ollama-models:/root/.ollama
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+volumes:
+  postgres-data:
+  redis-data:
+  caddy-data:
+  ollama-models:

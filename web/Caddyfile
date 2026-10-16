@@ -1,0 +1,22 @@
+{$GHARBOX_SITE_ADDRESS::80} {
+	encode zstd gzip
+
+	handle /api/* {
+		reverse_proxy api:8000 {
+			# stream video and large downloads without buffering
+			flush_interval -1
+			transport http {
+				read_timeout 0
+				write_timeout 0
+			}
+		}
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+}
