@@ -277,7 +277,8 @@ async def test_notifications(client, admin, tmp_path):
     await jobs.drain_local()
     n = (await client.get("/api/notifications")).json()
     titles = [i["title"] for i in n["items"]]
-    assert "1 new video in Movies" in titles and "Backed up 12 photos and videos from iPhone" in titles
+    assert "1 new video in Movies" in titles
+    assert "Upload needs attention: 1 file failed from iPhone" in titles
     assert n["unread"] == 2
     await client.post("/api/notifications/read")
     assert (await client.get("/api/notifications")).json()["unread"] == 0
@@ -353,3 +354,10 @@ async def test_unique_hash_rule_is_migrated_away(tmp_path, monkeypatch):
     db.execute("INSERT INTO assets (id, owner_id, folder, filename, size, mime, kind, sha256, storage_path, "
                "thumb_ready, created_at) VALUES ('a2','u1','/b','x.txt',1,'t','document','abc','p',0,'2026-10-16')")
     get_settings.cache_clear()
+
+
+async def test_backup_report_success_and_quiet_runs(client, admin):
+    await client.post("/api/events/backup", json={"uploaded": 0, "skipped": 50, "failed": 0})  # nothing new: silent
+    await client.post("/api/events/backup", json={"uploaded": 8, "skipped": 2, "failed": 0, "device": "Android phone"})
+    titles = [i["title"] for i in (await client.get("/api/notifications")).json()["items"]]
+    assert titles == ["Backed up 8 photos and videos from Android phone"]
