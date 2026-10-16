@@ -11,6 +11,8 @@ from fastapi.responses import StreamingResponse
 
 CHUNK = 1024 * 1024
 _RANGE = re.compile(r"bytes=(\d*)-(\d*)")
+# DLNA: may seek by bytes (OP=01), not converted (CI=0), streaming + background transfer flags
+DLNA_FEATURES = "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"
 
 
 def _content_disposition(filename: str, inline: bool) -> str:
@@ -44,6 +46,8 @@ def ranged_file_response(request: Request, path: Path, media_type: str,
         status = 206
 
     async def body():
+        if request.method == "HEAD":
+            return
         async with aiofiles.open(path, "rb") as f:
             await f.seek(start)
             remaining = end - start + 1
@@ -59,4 +63,7 @@ def ranged_file_response(request: Request, path: Path, media_type: str,
         headers["Content-Range"] = f"bytes {start}-{end}/{size}"
     if filename:
         headers["Content-Disposition"] = _content_disposition(filename, inline)
+    if request.headers.get("getcontentfeatures.dlna.org"):  # smart TVs (DLNA) ask what they may do
+        headers["contentFeatures.dlna.org"] = DLNA_FEATURES
+        headers["transferMode.dlna.org"] = "Streaming"
     return StreamingResponse(body(), status_code=status, media_type=media_type, headers=headers)

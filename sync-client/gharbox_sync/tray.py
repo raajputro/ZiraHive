@@ -12,7 +12,7 @@ from datetime import datetime
 from pathlib import Path
 
 from .api import ApiError, SignedOut
-from .cli import login, startup, sync_all
+from .cli import login, startup, sync_all, tv_server
 from .config import Config, Pair, load_token
 from .i18n import set_language, t
 
@@ -103,12 +103,14 @@ class TrayApp:
         self.wake = threading.Event()
         self.allow_deletions = False
         self.stop = False
+        self.tv = None
         menu = pystray.Menu(
             pystray.MenuItem(lambda _: self.status, None, enabled=False),
             pystray.MenuItem(t("Sync now"), lambda: self.kick(), default=True),
             pystray.MenuItem(t("Sync now, deletions included"), lambda: self.kick(True)),
             pystray.MenuItem(lambda _: t("Resume") if cfg.paused else t("Pause"), lambda: self.toggle()),
             pystray.MenuItem(t("Open the folder"), lambda: self.open_folder()),
+            pystray.MenuItem(t("Show on TVs at home"), lambda: self.toggle_tv(), checked=lambda _: cfg.tv_sharing),
             pystray.MenuItem(t("Open GharBox"), lambda: webbrowser.open(cfg.server + "/files")),
             pystray.MenuItem(t("Quit"), lambda: self.quit()),
         )
@@ -139,6 +141,27 @@ class TrayApp:
         self.set("paused" if self.cfg.paused else "ok", t("Paused") if self.cfg.paused else t("Up to date"))
         self.wake.set()
 
+    def start_tv(self) -> None:
+        try:
+            self.tv = tv_server(self.cfg)
+            self.tv.start()
+        except OSError as exc:  # e.g. another DLNA server holds the port
+            log.warning("TV sharing failed: %s", exc)
+            self.tv = None
+            self.notify(t("Couldn't show GharBox on TVs: {error}", error=exc))
+
+    def toggle_tv(self) -> None:
+        self.cfg.tv_sharing = not self.cfg.tv_sharing
+        self.cfg.save()
+        if self.cfg.tv_sharing:
+            self.start_tv()
+            if self.tv:
+                self.notify(t("TVs at home can now find \"{name}\". Allow it if Windows asks about the firewall.",
+                              name=self.tv.name))
+        elif self.tv:
+            self.tv.stop()
+            self.tv = None
+
     def open_folder(self) -> None:
         if self.cfg.pairs:
             path = self.cfg.pairs[0].local
@@ -148,6 +171,8 @@ class TrayApp:
                 subprocess.Popen(["xdg-open", path])
 
     def quit(self) -> None:
+        if self.tv:
+            self.tv.stop()
         self.stop = True
         self.wake.set()
         self.icon.stop()
@@ -190,4 +215,6 @@ def run_tray() -> None:
         set_language(cfg.language)
     app = TrayApp(cfg)
     threading.Thread(target=app.loop, daemon=True).start()
+    if cfg.tv_sharing:
+        app.start_tv()
     app.icon.run()

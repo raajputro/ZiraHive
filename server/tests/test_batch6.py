@@ -202,3 +202,67 @@ async def test_pick_category_folders_from_drives(client, admin, tmp_path):
     token = (await client.post("/api/auth/login", json={"username": "rina", "password": "rinapassword"})).json()["token"]
     assert (await client.get("/api/admin/folders", headers={"Authorization": f"Bearer {token}"})).status_code == 403
 
+
+
+# ------------------------------------------------------------ Chromecast
+
+async def _movies(client, tmp_path):
+    from conftest import make_rich_video, make_video
+
+    make_video(tmp_path / "movies" / "Plain (2020)" / "Plain (2020).mp4", seconds=3)
+    make_rich_video(tmp_path / "movies" / "Dhaka Nights (2024)")
+    r = await client.post("/api/libraries", json={"name": "Movies", "path": str(tmp_path / "movies"), "kind": "movies"})
+    assert r.status_code == 201, r.text
+    await jobs.drain_local()
+    return {m["title"]: m for m in (await client.get("/api/media")).json()}
+
+
+async def test_cast_links_work_only_for_that_title(client, admin, tmp_path, monkeypatch):
+    movies = await _movies(client, tmp_path)
+    plain, rich = movies["Plain"], movies["Dhaka Nights"]
+    lan = "http://192.168.1.20:8080"
+
+    # opened over the internet (e.g. Tailscale): the TV can't use that address
+    r = await client.get(f"/api/media/{plain['id']}/cast")
+    assert r.status_code == 409 and r.json()["detail"]["code"] == "lan_url_needed"
+
+    # opened on the home network: that address is used
+    direct = (await client.get(f"{lan}/api/media/{plain['id']}/cast")).json()
+    assert direct["url"].startswith(f"{lan}/api/media/{plain['id']}/stream?token=")
+    assert direct["content_type"] == "video/mp4" and not direct["converted"]
+
+    # a file the Chromecast can't play: the converted stream, with subtitles
+    conv = (await client.get(f"{lan}/api/media/{rich['id']}/cast")).json()
+    assert conv["converted"] and "/hls/360p/0/index.m3u8?token=" in conv["url"]
+    assert conv["content_type"] == "application/x-mpegURL" and conv["title"] == "Dhaka Nights"
+    assert {s["label"] for s in conv["subtitles"]} == {"Bangla", "English"}
+
+    # the device has no sign-in: only the link's token
+    client.headers.pop("Authorization")
+    client.cookies.clear()
+    path = conv["url"].removeprefix(lan)
+    token = path.split("token=")[1]
+    pl = await client.get(path)
+    assert pl.status_code == 200 and pl.headers["access-control-allow-origin"] == "*"
+    seg = next(ln for ln in pl.text.splitlines() if ln.startswith("seg/"))
+    assert seg.endswith(f"?token={token}")  # segments carry it too
+    base = path.split("index.m3u8")[0]
+    s0 = await client.get(base + seg)
+    assert s0.status_code == 200 and s0.headers["access-control-allow-origin"] == "*"
+    vtt = await client.get(conv["subtitles"][0]["url"].removeprefix(lan))
+    assert vtt.status_code == 200 and vtt.text.startswith("WEBVTT")
+    st = await client.get(direct["url"].removeprefix(lan), headers={"Range": "bytes=0-99"})
+    assert st.status_code == 206 and st.headers["access-control-allow-origin"] == "*"
+
+    # ... and nothing else: not the account, not another title
+    assert (await client.get(f"/api/auth/me?token={token}")).status_code == 401
+    assert (await client.get(f"/api/media/{plain['id']}/stream?token={token}")).status_code == 401
+    assert (await client.get(f"/api/media/{rich['id']}/stream", headers={"Authorization": f"Bearer {token}"})).status_code == 401
+
+    # a fixed address from settings wins
+    client.headers["Authorization"] = f"Bearer {admin}"
+    monkeypatch.setenv("GHARBOX_LAN_URL", "http://gharbox.lan:8080/")
+    from app.config import get_settings
+    get_settings.cache_clear()
+    r = (await client.get(f"/api/media/{plain['id']}/cast")).json()
+    assert r["url"].startswith("http://gharbox.lan:8080/api/media/")

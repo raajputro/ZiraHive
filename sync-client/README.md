@@ -40,6 +40,19 @@ certificate. Choose **More info > Run anyway**, or build it yourself from this s
 - The sign-in is kept in Windows Credential Manager and lasts a year. **Settings > Sign out
   everywhere** in GharBox, or changing your password, signs this PC out too.
 
+## Show GharBox on the TV
+
+Tick **Show on TVs at home** in the tray menu. Smart TVs on the same Wi-Fi (Samsung, LG, Sony,
+Android TV, Xbox, VLC on a phone: anything that speaks DLNA) then list **GharBox (your PC's name)**
+among their media sources, with your video categories, series by season, Continue watching and
+music albums. The first time, Windows asks whether to allow the app on private networks: allow it.
+
+- The TV sees what the signed-in account can see, and anyone on your Wi-Fi can browse it, so sign
+  in with the family's account rather than the admin. Its age limits apply.
+- The TV plays the files from GharBox directly, with links that each play one title for 12 hours.
+  When this app runs on another PC than GharBox, set `GHARBOX_LAN_URL` in GharBox's `.env`.
+- Not on Windows? `gharbox-sync tv` runs the same on any computer at home (Linux, Mac).
+
 ## Command line
 
 ```
@@ -47,6 +60,7 @@ GharBoxSync.exe once                 sync once and print what happened
 GharBoxSync.exe add D:\Work /Work    sync another folder pair
 GharBoxSync.exe status
 GharBoxSync.exe startup on|off       start with Windows (the set-up window does this)
+GharBoxSync.exe tv                   show GharBox on TVs at home until stopped
 ```
 
 Settings and a log are in `%APPDATA%\GharBox Sync`.

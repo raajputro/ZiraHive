@@ -226,7 +226,7 @@ async def prepare_track(track_id: str, force: bool = False, user: User = Depends
     return AudioReadyOut(ready=ready, failed=failed)
 
 
-@router.get("/tracks/{track_id}/stream")
+@router.api_route("/tracks/{track_id}/stream", methods=["GET", "HEAD"])
 async def stream_track(track_id: str, request: Request, converted: bool = False, user: User = Depends(current_user),
                        session: AsyncSession = Depends(get_session)):
     t, lib = await _track(session, user, track_id)

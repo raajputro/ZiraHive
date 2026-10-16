@@ -48,6 +48,18 @@ foreach ($d in Get-PSDrive -PSProvider FileSystem) {
         $found += "${letter}:"
     }
 }
+$port = if ($envText -match "(?m)^GHARBOX_HTTP_PORT=(\d+)") { $Matches[1] } else { "8080" }
+
+# This PC's address on the home network, for Chromecasts and smart TVs.
+$lan = $null
+try {
+    $lan = (Get-NetIPConfiguration | Where-Object { $_.IPv4DefaultGateway -and $_.NetAdapter.Status -eq "Up" } |
+        Select-Object -First 1).IPv4Address.IPAddress
+} catch { }
+if ($lan -and $envText -notmatch "(?m)^GHARBOX_LAN_URL=\S") {
+    $envText = Set-EnvLine $envText "GHARBOX_LAN_URL" "http://${lan}:$port"
+}
+
 Set-Content -Path .env -Value $envText -Encoding UTF8 -NoNewline
 Write-Host ("Drives GharBox can read (read-only): " + ($found -join ", "))
 
@@ -55,9 +67,9 @@ Write-Host "Starting GharBox. The first time takes 10-20 minutes while Docker bu
 docker compose up -d --build
 if ($LASTEXITCODE -ne 0) { Write-Host "Docker couldn't start GharBox. Is Docker Desktop running?" -ForegroundColor Yellow; exit 1 }
 
-$port = if ($envText -match "(?m)^GHARBOX_HTTP_PORT=(\d+)") { $Matches[1] } else { "8080" }
 Write-Host ""
 Write-Host "GharBox is running: http://localhost:$port" -ForegroundColor Green
+if ($lan) { Write-Host "On phones and TVs at home: http://${lan}:$port" }
 Write-Host "Create your admin account there, then Settings > Server > Categories > Choose folder"
 Write-Host "to add your movie, music and book folders where they already are."
 Start-Process "http://localhost:$port"

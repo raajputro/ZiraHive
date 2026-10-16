@@ -851,3 +851,22 @@ class FolderBrowseOut(BaseModel):
     parent: str | None
     guess: str | None = None  # category type this folder's own name suggests
     folders: list[FolderPick]
+
+
+class CastSubtitle(BaseModel):
+    url: str
+    label: str
+    language: str | None = None
+
+
+class CastOut(BaseModel):
+    """Everything a Chromecast (or a TV) needs to play one title by itself."""
+    url: str
+    content_type: str
+    title: str
+    subtitle: str | None = None
+    poster: str | None = None
+    duration: float | None = None
+    start: float = 0
+    subtitles: list[CastSubtitle] = []
+    converted: bool = False  # True: an HLS stream converted on the fly

@@ -47,8 +47,8 @@ your PC, phone and TV.
   disk, and on your phone through the free ntfy app
 - **Admin dashboard**: who is watching what, background jobs, and free space on every disk
 
-> Status: milestone 1, batches 1 to 5 and remote access. Next up: document scanning and text search
-> (OCR) in the browser, and casting to a TV (Chromecast, DLNA). See [docs/ROADMAP.md](docs/ROADMAP.md).
+> Status: milestone 1, batches 1 to 6 and remote access. Next up: passkeys, plugins, linking two
+> GharBox servers and voice chat in watch parties. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## How it fits together
 
@@ -221,6 +221,38 @@ GharBox's own data folder never shows up as media, even when its drive is shared
 - Browsers play MP4/WebM with H.264, VP9 or AV1. Other files (for example HEVC in MKV)
   show a copyable link you can open in VLC on your PC, phone or TV until transcoding lands.
 - Categories rescan every night at 03:00, or press the scan button in Settings.
+
+### On the TV
+
+- **Chromecast** (and TVs with Chromecast built in, like most Android and Google TVs): press
+  **Cast to TV** under the player in Chrome or Edge and pick the TV. The TV fetches the film from
+  GharBox by itself; the page becomes the remote (pause, seek, stop), and where you stopped is saved.
+  Files a Chromecast can't play are converted on the fly, with subtitles. Two things are needed:
+  - GharBox's home-network address in `.env` as `GHARBOX_LAN_URL` (`setup.ps1` fills it in, e.g.
+    `http://192.168.0.10:8080`). Give the PC a fixed address in your router so it doesn't change.
+  - A secure page, as Google requires: open GharBox at `http://localhost:8080` on the PC itself, or
+    at your Tailscale `https://` address on a phone or laptop.
+
+  The links the TV gets play only that one title, for 12 hours; they can't open anything else.
+- **Smart TVs without Chromecast** (Samsung, LG, Sony, most others) use **DLNA**. In the GharBox
+  Sync app on the PC, tick **Show on TVs at home** in the tray menu (allow it if Windows asks about the
+  firewall). The TV's media or source menu then lists *GharBox (your PC)* with your categories,
+  series by season, Continue watching and your music albums. TVs play the original files, so
+  MKV with AC-3 sound usually works without conversion. Anyone on your Wi-Fi can browse what the
+  signed-in account can see, so sign the app in with the family's account rather than the admin,
+  and age limits then apply. No Windows PC? `gharbox-sync tv` does the same on any computer at home.
+- **iPhone, iPad, Mac**: AirPlay from the video's own controls.
+
+## Search and scanning
+
+- **Search** in Files finds documents by the words inside them, not just their names: PDFs,
+  Word, PowerPoint and OpenDocument files, text files, and the text in scanned PDFs and photos of
+  pages, in Bangla and English (Tesseract). New uploads are read in the background; older files are
+  read overnight. `GHARBOX_OCR=all` in `.env` also reads every photo (slower), `off` turns it off.
+- **Scan** in Files turns paper into a searchable PDF using the phone's camera: GharBox finds the
+  page, straightens it (drag the corners if it guessed wrong), and cleans it up (Enhanced, Colour,
+  Grey or Black and white). Add as many pages as you like, reorder them, then **Save as PDF**.
+  Everything until saving happens on the phone.
 
 ## Sharing and family
 

@@ -119,3 +119,16 @@ class Api:
         r = await self.http.delete(f"/api/assets/{asset_id}")
         if r.status_code != 404:  # already gone is fine
             _raise(r)
+
+
+def dlna_fetcher(server: str, token: str, transport: httpx.BaseTransport | None = None):
+    """A plain (not async) folder fetcher for the TV server, which answers TVs from threads."""
+    http = httpx.Client(base_url=server.rstrip("/"), transport=transport, timeout=30, follow_redirects=True,
+                        headers={"User-Agent": USER_AGENT, "Authorization": f"Bearer {token}"})
+
+    def fetch(folder_id: str) -> dict:
+        r = http.get("/api/dlna/browse", params={"id": folder_id})
+        _raise(r)
+        return r.json()
+
+    return fetch

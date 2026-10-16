@@ -192,6 +192,12 @@ export interface FolderBrowse {
 }
 export interface SearchHit { asset: Asset; snippet: string | null; in_text: boolean }
 
+export interface CastInfo {
+  url: string; content_type: string; title: string; subtitle: string | null; poster: string | null;
+  duration: number | null; start: number; converted: boolean;
+  subtitles: { url: string; label: string; language: string | null }[];
+}
+
 export const api = {
   browseFolders: (path?: string) => request<FolderBrowse>("GET", `/api/admin/folders${q({ path })}`),
   search: (text: string) => request<SearchHit[]>("GET", `/api/search${q({ q: text })}`),
@@ -338,6 +344,8 @@ export const api = {
   rsvp: (id: string, rsvp: "going" | "declined") => request<Party>("PUT", `/api/parties/${id}/rsvp`, { rsvp }),
   inviteToParty: (id: string, user_ids: string[]) => request<Party>("POST", `/api/parties/${id}/invite`, { user_ids }),
   endParty: (id: string) => request<Party>("POST", `/api/parties/${id}/end`),
+  castInfo: (id: string, quality: string, audio: number) =>
+    request<CastInfo>("GET", `/api/media/${id}/cast?quality=${encodeURIComponent(quality)}&audio=${audio}`),
   streamLink: (id: string) => request<{ path: string }>("GET", `/api/media/${id}/link`),
   saveProgress: (id: string, position: number, duration?: number) =>
     request<void>("PUT", `/api/media/${id}/progress`, { position, duration }),

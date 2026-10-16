@@ -1,14 +1,20 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, SkipForward, Download, ExternalLink, FastForward, PartyPopper } from "lucide-react";
+import { ArrowLeft, Cast, Pause, Play, Square, SkipForward, Download, ExternalLink, FastForward, PartyPopper } from "lucide-react";
+import { castProblem, castTo, loadCast, type CastControl, type CastState } from "../cast";
 import PartyDialog from "../components/PartyDialog";
-import { api, url, episodeCode, formatBytes, formatDuration, AGE_LABEL, AGE_OPTIONS,
+import { api, ApiError, url, episodeCode, formatBytes, formatDuration, AGE_LABEL, AGE_OPTIONS,
   type Media, type OfflineCopy, type Quality, type Tracks } from "../api";
 import { useAuth } from "../App";
 import { usePrefs } from "../prefs";
 import { defaultAudio, defaultQuality, SubtitleTracks, TrackMenus, useSubtitle, useVideoSource } from "../video";
 
-import { t as tr } from "../i18n";
+import { digits, t as tr } from "../i18n";
+
+const clock = (sec: number) => {
+  const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
+  return digits(`${h ? `${h}:${String(m).padStart(2, "0")}` : m}:${String(s).padStart(2, "0")}`);
+};
 // Remount for every title so progress is always saved against the right one.
 export default function PlayerRoute() {
   const { id } = useParams();
@@ -32,6 +38,11 @@ function Player({ id }: { id: string }) {
   const [link, setLink] = useState("");
   const [together, setTogether] = useState(false);
   const video = useRef<HTMLVideoElement>(null);
+  const [cast, setCast] = useState<CastControl | null>(null);
+  const [castState, setCastState] = useState<CastState | null>(null);
+  const [castHelp, setCastHelp] = useState("");
+  const [castBusy, setCastBusy] = useState(false);
+  const castTime = useRef(0);
   const lastSaved = useRef(0);
   const resumeAt = useRef<number | null>(null);
   const dismissedNext = useRef(false);
@@ -65,6 +76,60 @@ function Player({ id }: { id: string }) {
     return () => { window.removeEventListener("pagehide", onHide); void save(); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [m]);
+
+  // Chromecast: the TV plays it by itself; this page becomes the remote
+  const startCast = async () => {
+    if (!m || !quality) return;
+    setCastHelp("");
+    const problem = castProblem();
+    if (problem === "insecure") {
+      setCastHelp(tr("Casting needs a secure page. Open GharBox with https (your online address), or as http://localhost:8080 on the server PC, then try again. On an iPhone or Mac, use AirPlay in the video's own controls."));
+      return;
+    }
+    if (problem === "browser") {
+      setCastHelp(tr("Casting works in Chrome and Edge. In this browser, use \"Open in another player\" below, or AirPlay on an iPhone or Mac."));
+      return;
+    }
+    setCastBusy(true);
+    try {
+      if (!(await loadCast())) {
+        setCastHelp(tr("Google's Cast library couldn't be loaded. Check the internet connection and try again."));
+        return;
+      }
+      const info = await api.castInfo(m.id, quality, audio);
+      const v = video.current;
+      if (v && v.currentTime > 5) info.start = v.currentTime;
+      v?.pause();
+      const ctl = await castTo(info, subtitle);
+      setCast(ctl);
+    } catch (e) {
+      if (e instanceof Error && e.message !== "cancelled" && !/cancel/i.test(e.message)) {
+        setCastHelp(e instanceof ApiError ? e.message : tr("Couldn't start playing on the TV. Check that it's on the same Wi-Fi as GharBox."));
+      }
+    } finally { setCastBusy(false); }
+  };
+  useEffect(() => {
+    if (!cast || !m) return;
+    let saved = 0;
+    const stop = cast.watch((st) => {
+      setCastState(st);
+      if (!st) {  // stopped from here, the TV or the phone's notification
+        setCast(null);
+        const v = video.current;
+        if (v && castTime.current > 0) v.currentTime = castTime.current;
+        return;
+      }
+      castTime.current = st.time;
+      if (st.time > 0 && Date.now() - saved > 10_000) {
+        saved = Date.now();
+        void api.saveProgress(m.id, st.time, st.duration || m.duration || undefined).catch(() => undefined);
+      }
+    });
+    return () => {
+      stop();
+      if (castTime.current > 0) void api.saveProgress(m.id, castTime.current, m.duration || undefined).catch(() => undefined);
+    };
+  }, [cast, m]);
 
   const playNext = async () => {
     if (!m?.next_id) return;
@@ -112,7 +177,21 @@ function Player({ id }: { id: string }) {
           onEnded={() => { if (m.next_id) void playNext(); else void save(); }}>
           <SubtitleTracks media={m} tracks={tracks} />
         </video>
-        {inIntro && (
+        {cast && (
+          <div className="cast-panel" role="group" aria-label={tr("Playing on the TV")}>
+            <p><Cast size={20} aria-hidden />{" "}{tr("Playing on {device}", { device: castState?.device ?? "Chromecast" })}</p>
+            <input type="range" min={0} max={Math.max(1, Math.round(castState?.duration ?? m.duration ?? 0))}
+              value={Math.round(castState?.time ?? 0)} aria-label={tr("Position")}
+              onChange={(e) => cast.seek(Number(e.target.value))} />
+            <p className="muted small">{clock(castState?.time ?? 0)} / {clock(castState?.duration ?? m.duration ?? 0)}</p>
+            <div className="admin-row">
+              <button className="primary" onClick={() => cast.playPause()}>
+                {castState?.playing ? <><Pause size={16} />{" "}{tr("Pause")}</> : <><Play size={16} />{" "}{tr("Play")}</>}</button>
+              <button onClick={() => cast.stop()}><Square size={16} />{" "}{tr("Stop casting")}</button>
+            </div>
+          </div>
+        )}
+        {inIntro && !cast && (
           <button className="overlay-btn skip" onClick={() => { if (video.current) video.current.currentTime = m.intro_end!; }}>
             <FastForward size={17} />{" "}{tr("Skip intro")}</button>
         )}
@@ -130,7 +209,9 @@ function Player({ id }: { id: string }) {
           subtitle={subtitle} setSubtitle={setSubtitle} />
         {m.next_id && <button onClick={() => void playNext()}><SkipForward size={16} />{" "}{tr("Next episode")}</button>}
         <button onClick={() => { video.current?.pause(); setTogether(true); }}><PartyPopper size={16} />{" "}{tr("Watch together")}</button>
+        {!cast && <button onClick={() => void startCast()} disabled={castBusy}><Cast size={16} />{" "}{castBusy ? tr("Connecting…") : tr("Cast to TV")}</button>}
       </div>
+      {castHelp && <p className="notice" role="status">{castHelp}</p>}
       {error && <p className="error" role="alert">{error}</p>}
 
       <div className="player-info">

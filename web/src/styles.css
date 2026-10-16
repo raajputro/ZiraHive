@@ -858,3 +858,10 @@ body.has-player .tray { bottom: 88px; }
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { transition: none !important; animation: none !important; }
 }
+
+/* Chromecast remote */
+.cast-panel { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center;
+  gap: 10px; padding: 20px; background: color-mix(in srgb, #000 90%, transparent); color: #fff; text-align: center; }
+.cast-panel p { margin: 0; display: flex; align-items: center; gap: 8px; }
+.cast-panel input[type=range] { width: min(520px, 90%); }
+.cast-panel .muted { color: #ddd; }

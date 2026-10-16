@@ -12,9 +12,9 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session
-from ..models import Library, MediaItem, OfflineCopy, Series, User, utcnow
-from ..schemas import MarkersIn, OfflineIn, OfflineOut, RatingIn, SeriesOut, TracksOut
-from ..security import admin_user, current_user
+from ..models import Library, MediaItem, OfflineCopy, Series, User, WatchProgress, utcnow
+from ..schemas import CastOut, CastSubtitle, MarkersIn, OfflineIn, OfflineOut, RatingIn, SeriesOut, TracksOut
+from ..security import admin_user, create_media_token, current_user
 from ..services import activity, jobs, transcode
 from ..services.events import audit
 from ..services.ranged import ranged_file_response
@@ -68,17 +68,27 @@ async def _session_for(session: AsyncSession, user: User, media_id: str, quality
                                  "or pick Original quality.", headers={"Retry-After": "30"})
 
 
+def _device_headers(request: Request, headers: dict) -> dict:
+    """A Chromecast fetches with its own player page, from another origin: allow that for the
+    one-title links (?token=), which only work for this title anyway."""
+    if request.query_params.get("token"):
+        headers["Access-Control-Allow-Origin"] = "*"
+    return headers
+
+
 @router.get("/media/{media_id}/hls/{quality}/{audio}/index.m3u8")
-async def hls_playlist(media_id: str, quality: str, audio: int, user: User = Depends(current_user),
+async def hls_playlist(media_id: str, quality: str, audio: int, request: Request, user: User = Depends(current_user),
                        session: AsyncSession = Depends(get_session)):
     item, _ = await _session_for(session, user, media_id, quality, audio)
-    return PlainTextResponse(transcode.playlist(item.duration), media_type="application/vnd.apple.mpegurl",
-                             headers={"Cache-Control": "no-cache"})
+    token = request.query_params.get("token")
+    query = f"?token={token}" if token else ""  # devices without cookies need it on every segment
+    return PlainTextResponse(transcode.playlist(item.duration, query), media_type="application/vnd.apple.mpegurl",
+                             headers=_device_headers(request, {"Cache-Control": "no-cache"}))
 
 
 @router.get("/media/{media_id}/hls/{quality}/{audio}/seg/{n}.ts")
-async def hls_segment(media_id: str, quality: str, audio: int, n: int, user: User = Depends(current_user),
-                      session: AsyncSession = Depends(get_session)):
+async def hls_segment(media_id: str, quality: str, audio: int, n: int, request: Request,
+                      user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
     item, s = await _session_for(session, user, media_id, quality, audio)
     if n < 0 or n >= transcode.segment_count(item.duration):
         raise HTTPException(404, "No such segment")
@@ -88,13 +98,14 @@ async def hls_segment(media_id: str, quality: str, audio: int, n: int, user: Use
         path = await transcode.manager.segment(s, n)
     except (RuntimeError, TimeoutError) as exc:
         raise HTTPException(500, f"Couldn't convert this part of the video: {exc}")
-    return FileResponse(path, media_type="video/mp2t", headers={"Cache-Control": "private, max-age=3600"})
+    return FileResponse(path, media_type="video/mp2t",
+                        headers=_device_headers(request, {"Cache-Control": "private, max-age=3600"}))
 
 
 # ------------------------------------------------------------- subtitles
 
 @router.get("/media/{media_id}/subtitles/{sub_id}.vtt")
-async def subtitle(media_id: str, sub_id: str, user: User = Depends(current_user),
+async def subtitle(media_id: str, sub_id: str, request: Request, user: User = Depends(current_user),
                    session: AsyncSession = Depends(get_session)):
     item = await _get_media(media_id, session, user)
     src = await _source(session, item)
@@ -109,7 +120,65 @@ async def subtitle(media_id: str, sub_id: str, user: User = Depends(current_user
             await asyncio.to_thread(to_vtt, src, sub, dest)
         except Exception as exc:
             raise HTTPException(500, f"Couldn't read these subtitles: {exc}")
-    return FileResponse(dest, media_type="text/vtt", headers={"Cache-Control": "private, max-age=86400"})
+    return FileResponse(dest, media_type="text/vtt",
+                        headers=_device_headers(request, {"Cache-Control": "private, max-age=86400"}))
+
+
+# ------------------------------------------------------------ Chromecast
+
+_PRIVATE = re.compile(r"^(10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.)")
+_CASTABLE = {".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/mp4", ".webm": "video/webm"}
+
+
+def device_base_url(request: Request) -> str:
+    """The address TVs and Chromecasts on the home network can reach GharBox at."""
+    from ..config import get_settings
+
+    configured = get_settings().lan_url.strip().rstrip("/")
+    if configured:
+        return configured
+    host = request.url.hostname or ""
+    if _PRIVATE.match(host):
+        return str(request.base_url).rstrip("/")
+    raise HTTPException(409, {"code": "lan_url_needed", "message":
+                              "To cast, GharBox needs this PC's home-network address. Set GHARBOX_LAN_URL "
+                              "in .env (setup.ps1 fills it in) and restart GharBox."})
+
+
+@router.get("/media/{media_id}/cast", response_model=CastOut)
+async def cast_info(media_id: str, request: Request, quality: str | None = None, audio: int | None = None,
+                    user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    """Links for a Chromecast: the file itself when it can play it, otherwise the converted
+    stream, plus poster and subtitles. They work only for this title, for 12 hours."""
+    item = await _get_media(media_id, session, user)
+    base = device_base_url(request)
+    src = await _source(session, item)
+    tracks = await _tracks(session, item, src)
+    default_audio = next((a["index"] for a in tracks["audio"] if a.get("default")), 0)
+    audio = default_audio if audio is None else audio
+    token = create_media_token(user, item.id)
+    t = f"token={token}"
+    ext = Path(item.rel_path).suffix.lower()
+    direct = (browser_playable(item) and ext in _CASTABLE and audio == default_audio
+              and quality in (None, "original"))
+    if direct:
+        url, content_type = f"{base}/api/media/{item.id}/stream?{t}", _CASTABLE[ext]
+    else:
+        options = transcode.qualities_for(item.height)
+        q = quality if quality in options else next((o for o in options if o in ("1080p", "720p")), options[0])
+        url, content_type = f"{base}/api/media/{item.id}/hls/{q}/{audio}/index.m3u8?{t}", "application/x-mpegURL"
+    progress = await session.scalar(select(WatchProgress).where(WatchProgress.user_id == user.id,
+                                                                WatchProgress.media_id == item.id))
+    series = await session.get(Series, item.series_id) if item.series_id else None
+    return CastOut(
+        url=url, content_type=content_type, converted=not direct,
+        title=series.title if series else item.title,
+        subtitle=(f"S{item.season or 1} E{item.episode}" + (f" · {item.episode_title}" if item.episode_title else "")
+                  if series and item.episode is not None else (str(item.year) if item.year else None)),
+        poster=f"{base}/api/media/{item.id}/poster?{t}" if item.poster_ready else None,
+        duration=item.duration, start=progress.position if progress and not progress.finished else 0,
+        subtitles=[CastSubtitle(url=f"{base}/api/media/{item.id}/subtitles/{s['id']}.vtt?{t}", label=s["label"],
+                                language=s.get("language")) for s in tracks["subtitles"] if s["usable"]])
 
 
 # --------------------------------------------------------- offline copies

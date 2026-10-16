@@ -462,7 +462,7 @@ async def media_poster(media_id: str, user: User = Depends(current_user),
                         headers={"Cache-Control": "private, max-age=86400"})
 
 
-@router.get("/media/{media_id}/stream")
+@router.api_route("/media/{media_id}/stream", methods=["GET", "HEAD"])
 async def stream_media(media_id: str, request: Request, user: User = Depends(current_user),
                        session: AsyncSession = Depends(get_session)):
     """Direct play: the original file, with Range support so players can seek."""
@@ -474,7 +474,11 @@ async def stream_media(media_id: str, request: Request, user: User = Depends(cur
     if root not in path.parents:
         raise HTTPException(400, "Invalid path")
     mime = _MIME.get(path.suffix.lower(), "application/octet-stream")
-    return ranged_file_response(request, path, mime, path.name, inline=True)
+    resp = ranged_file_response(request, path, mime, path.name, inline=True)
+    if request.query_params.get("token"):  # a Chromecast or TV playing it by itself
+        resp.headers["Access-Control-Allow-Origin"] = "*"
+        resp.headers["Access-Control-Expose-Headers"] = "Content-Length, Content-Range, Accept-Ranges"
+    return resp
 
 
 @router.get("/media/{media_id}/link")

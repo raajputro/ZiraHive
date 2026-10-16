@@ -34,6 +34,8 @@ class Config:
     language: str = "en"
     interval: int = 60          # seconds between checks
     paused: bool = False
+    tv_sharing: bool = False    # show GharBox on smart TVs at home (DLNA)
+    device_id: str = ""         # this PC's DLNA identity, made once
     pairs: list[Pair] = field(default_factory=list)
 
     @classmethod

@@ -54,6 +54,7 @@ jobs:
       GHARBOX_DATABASE_URL: postgresql+asyncpg://gharbox:gharbox@localhost:5432/gharbox
       GHARBOX_REDIS_URL: redis://localhost:6379
       GHARBOX_MEDIA_ROOT: ${{ github.workspace }}/ci-media
+      GHARBOX_LAN_URL: http://192.168.1.50:4173
       E2E_BASE_URL: http://localhost:4173
     steps:
       - uses: actions/checkout@v4

@@ -68,19 +68,32 @@
   device sign-in, single .exe built in CI
 - React Router 7 (security fix)
 
+## Batch 6: paper and TVs (done)
+- Categories use folders where they already are: drives mounted read-only, a folder browser in
+  Settings, the data folder protected from being added or walked
+- Words inside files: PDF text layers, Word/PowerPoint/OpenDocument, text files; Tesseract OCR
+  (Bangla + English) for scanned PDFs and photos of pages; nightly catch-up; search with highlighted snippets
+- Document scanner in the browser: page detection, perspective correction, filters (adaptive
+  black and white), multi-page with reordering; saved as a searchable PDF made by Tesseract
+- Chromecast: Cast to TV from the player with the Cast SDK loaded only on demand, direct play or
+  converted HLS, subtitles, remote controls, progress saved; one-title links (12 h) accepted only on
+  that title's media URLs; CORS only for those
+- DLNA/UPnP media server in GharBox Sync (SSDP discovery, ContentDirectory, ConnectionManager):
+  categories, series by season, Continue watching, music albums; TVs stream the original files
+  with byte-range seeking; `gharbox-sync tv` for other computers
+- setup.ps1 for first-time Windows setup (drives, data folder, home-network address)
+
 ## Later for playback
 - Remux instead of re-encode when only the audio needs converting
 - Picture-based subtitles (PGS) burned in; automatic intro detection by audio fingerprint
-- Chromecast and DLNA
+- Converted streams for DLNA TVs that can't play a file
 
-## Batches 6 and 7
-- Batch 6: document scanner and OCR in the browser, Chromecast and DLNA
-- Batch 7: passkeys, plugins, linking two GharBox servers; voice chat in watch parties
+## Batch 7
+- Passkeys, plugins, linking two GharBox servers; voice chat in watch parties
 
 ## Milestone 4: local AI (docker compose --profile ai)
 - Search photos by description (CLIP embeddings in pgvector)
 - Face grouping, duplicate and blurry photo cleanup
-- OCR for documents and screenshots
 - Whisper subtitles for movies without them
 - Ask in plain language through a local LLM in Ollama
 

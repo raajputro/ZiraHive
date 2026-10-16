@@ -919,6 +919,17 @@ const bn: Record<string, string> = {
   "For example E:\\Movies\\English": "যেমন E:\\Movies\\English",
   "Pick a folder on one of your drives. With Docker, list the drive in .env first (for example DRIVE_E=E:/) and restart.": "আপনার কোনো ড্রাইভের একটি ফোল্ডার বাছুন। ডকারে আগে .env-এ ড্রাইভটি লিখুন (যেমন DRIVE_E=E:/) আর আবার চালু করুন।",
   "Media folder": "মিডিয়া ফোল্ডার",
+
+  // ------------------------------------------------------------ Chromecast
+  "Casting needs a secure page. Open GharBox with https (your online address), or as http://localhost:8080 on the server PC, then try again. On an iPhone or Mac, use AirPlay in the video's own controls.": "কাস্ট করতে নিরাপদ পেজ লাগে। GharBox https দিয়ে (আপনার অনলাইন ঠিকানা) বা সার্ভার পিসিতে http://localhost:8080 হিসেবে খুলে আবার চেষ্টা করুন। আইফোন বা ম্যাকে ভিডিওর নিজের কন্ট্রোলে AirPlay ব্যবহার করুন।",
+  "Casting works in Chrome and Edge. In this browser, use \"Open in another player\" below, or AirPlay on an iPhone or Mac.": "কাস্ট Chrome ও Edge-এ চলে। এই ব্রাউজারে নিচের \"অন্য প্লেয়ারে খুলুন\" ব্যবহার করুন, অথবা আইফোন বা ম্যাকে AirPlay।",
+  "Google's Cast library couldn't be loaded. Check the internet connection and try again.": "গুগলের কাস্ট লাইব্রেরি লোড হয়নি। ইন্টারনেট সংযোগ দেখে আবার চেষ্টা করুন।",
+  "Couldn't start playing on the TV. Check that it's on the same Wi-Fi as GharBox.": "টিভিতে চালানো শুরু করা যায়নি। টিভি GharBox-এর একই ওয়াই-ফাইতে আছে কি না দেখুন।",
+  "Playing on the TV": "টিভিতে চলছে",
+  "Playing on {device}": "{device}-এ চলছে",
+  "Stop casting": "কাস্ট বন্ধ করুন",
+  "Cast to TV": "টিভিতে কাস্ট",
+  "To cast, GharBox needs this PC's home-network address. Set GHARBOX_LAN_URL in .env (setup.ps1 fills it in) and restart GharBox.": "কাস্ট করতে GharBox-এর এই পিসির বাসার নেটওয়ার্কের ঠিকানা লাগে। .env-এ GHARBOX_LAN_URL দিন (setup.ps1 নিজেই দেয়) এবং GharBox আবার চালু করুন।",
 };
 
 export default bn;

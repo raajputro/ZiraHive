@@ -20,7 +20,7 @@ import time
 from pathlib import Path
 
 from . import __version__
-from .api import Api, ApiError, SignedOut
+from .api import Api, ApiError, SignedOut, dlna_fetcher
 from .config import Config, Pair, app_dir, load_token, save_token
 from .engine import Report, sync_pair
 
@@ -78,6 +78,20 @@ def startup(on: bool) -> Path:
     return launcher
 
 
+def tv_server(cfg: Config):
+    """The DLNA server that shows GharBox on TVs, as the signed-in account (not started)."""
+    import socket
+    import uuid
+
+    from .dlna import DlnaServer
+
+    if not cfg.device_id:
+        cfg.device_id = str(uuid.uuid4())
+        cfg.save()
+    name = f"GharBox ({socket.gethostname()})"
+    return DlnaServer(name, cfg.device_id, cfg.server, dlna_fetcher(cfg.server, load_token(cfg) or ""))
+
+
 def main(argv: list[str] | None = None) -> None:
     if sys.stdout is None or sys.stderr is None:  # the windowed .exe has no console window
         out = open(app_dir() / "output.log", "a", encoding="utf-8")  # noqa: SIM115
@@ -100,6 +114,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("run")
     sub.add_parser("status")
     sub.add_parser("tray")
+    sub.add_parser("tv", help="show GharBox on smart TVs at home (DLNA) until stopped")
     p = sub.add_parser("startup")
     p.add_argument("state", choices=["on", "off"])
     args = ap.parse_args(argv)
@@ -148,6 +163,17 @@ def main(argv: list[str] | None = None) -> None:
             if args.cmd == "once":
                 break
             time.sleep(cfg.interval)
+    elif args.cmd == "tv":
+        if not cfg.server or not load_token(cfg):
+            sys.exit("Sign in first: gharbox-sync login --server https://... --user NAME")
+        server = tv_server(cfg)
+        server.start()
+        print(f"TVs at home can now find \"{server.name}\" (as {cfg.username}). Ctrl+C stops it.")
+        try:
+            while True:
+                time.sleep(3600)
+        except KeyboardInterrupt:
+            server.stop()
     elif args.cmd == "startup":
         print(startup(args.state == "on"))
 

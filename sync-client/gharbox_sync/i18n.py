@@ -27,6 +27,10 @@ BN = {
     "Start with Windows": "উইন্ডোজের সাথে চালু হোক",
     "Start syncing": "সিঙ্ক শুরু করুন",
     "Signing in…": "সাইন ইন হচ্ছে…",
+    "Show on TVs at home": "বাসার টিভিতে দেখান",
+    "TVs at home can now find \"{name}\". Allow it if Windows asks about the firewall.":
+        "বাসার টিভি এখন \"{name}\" খুঁজে পাবে। উইন্ডোজ ফায়ারওয়াল নিয়ে জিজ্ঞেস করলে অনুমতি দিন।",
+    "Couldn't show GharBox on TVs: {error}": "টিভিতে ঘরবক্স দেখানো যায়নি: {error}",
 }
 
 _lang = "en"
