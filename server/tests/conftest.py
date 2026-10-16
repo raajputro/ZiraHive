@@ -19,7 +19,8 @@ async def app(tmp_path, monkeypatch):
     from app.config import get_settings
     get_settings.cache_clear()
     from app.main import create_app
-    from app.security import login_throttle, share_throttle
+    from app.security import login_ip_throttle, login_throttle, share_throttle
+    login_ip_throttle._fails.clear()
     login_throttle._fails.clear()
     share_throttle._fails.clear()
     from app.services import activity

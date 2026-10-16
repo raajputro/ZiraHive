@@ -1,22 +1,79 @@
-{$GHARBOX_SITE_ADDRESS::80} {
-	encode zstd gzip
+{
+	admin off
+	servers {
+		# Trust X-Forwarded-* only from the Docker network and Tailscale, so client IPs
+		# in the activity log and password-guessing limits can't be faked.
+		trusted_proxies static private_ranges 100.64.0.0/10
+	}
+}
 
-	handle /api/* {
-		reverse_proxy api:8000 {
-			# stream video and large downloads without buffering
-			flush_interval -1
-			transport http {
-				read_timeout 0
-				write_timeout 0
-			}
+(security_headers) {
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy no-referrer
+		Cross-Origin-Opener-Policy same-origin
+		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Content-Security-Policy "default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; media-src 'self' blob:; font-src 'self' data:; connect-src 'self'; object-src 'none'; base-uri 'none'; frame-ancestors 'none'; form-action 'self'"
+		# Only takes effect over HTTPS (browsers ignore it on plain http)
+		Strict-Transport-Security "max-age=31536000"
+	}
+}
+
+(api_proxy) {
+	reverse_proxy {$GHARBOX_API_UPSTREAM:api:8000} {
+		# stream video and large downloads without buffering
+		flush_interval -1
+		transport http {
+			read_timeout 0
+			write_timeout 0
 		}
 	}
+}
 
+# ---------------------------------------------------------------------------
+# Private site: the whole app. Reach it on your home network, or from anywhere
+# through Tailscale. Never expose this one to the open internet.
+# ---------------------------------------------------------------------------
+{$GHARBOX_SITE_ADDRESS::80} {
+	import security_headers
+	encode zstd gzip
+	# nobody gets to pretend they came through the public gateway
+	request_header -X-GharBox-Gateway
+
+	handle /api/* {
+		import api_proxy
+	}
 	handle {
-		root * /srv
+		root * {$GHARBOX_WEB_ROOT:/srv}
 		try_files {path} /index.html
 		file_server
 	}
-
 	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+}
+
+# ---------------------------------------------------------------------------
+# Public site: share links ONLY (/s/<token>). Tailscale Funnel publishes this one.
+# Sign-in, files, photos and movies are not reachable here at all; the server
+# double-checks this using the X-GharBox-Gateway header set below.
+# ---------------------------------------------------------------------------
+:{$GHARBOX_PUBLIC_PORT:8081} {
+	import security_headers
+	encode zstd gzip
+
+	handle /api/s/* {
+		request_header X-GharBox-Gateway public
+		import api_proxy
+	}
+	@app path /s/* /assets/* /favicon.svg /manifest.webmanifest /*.png
+	handle @app {
+		root * {$GHARBOX_WEB_ROOT:/srv}
+		try_files {path} /index.html
+		file_server
+	}
+	header /assets/* Cache-Control "public, max-age=31536000, immutable"
+	handle {
+		respond "Not found" 404
+	}
 }

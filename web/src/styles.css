@@ -220,6 +220,7 @@ main { min-width: 0; }
 .tray header span { color: var(--muted); font-variant-numeric: tabular-nums; }
 .tray-bar { height: 3px; background: var(--line); margin: 0 14px 6px; border-radius: 2px; overflow: hidden; }
 .tray-bar span { display: block; height: 100%; background: var(--jute); transition: width .3s; }
+.tray-hint { margin: 0 14px 6px; font-size: .8rem; color: var(--muted); }
 .tray ul { list-style: none; margin: 0; padding: 0 14px 10px; max-height: 210px; overflow: auto; font-size: .85rem; }
 .tray li { display: flex; align-items: center; gap: 8px; padding: 4px 0; }
 .tray .name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -441,6 +442,15 @@ label.check.grow { flex: 1; }
 .audit tr.warn td:nth-child(3) { color: var(--danger); }
 .nowrap { white-space: nowrap; }
 
+.checks { list-style: none; padding: 0; margin: 10px 0 0; display: grid; gap: 10px; }
+.checks li { display: grid; grid-template-columns: 22px 1fr; gap: 8px; align-items: start; }
+.checks .mark { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; }
+.checks li.ok .mark { background: color-mix(in srgb, #3B8A57 18%, transparent); color: #3B8A57; }
+.checks li.high .mark { background: color-mix(in srgb, var(--danger) 18%, transparent); color: var(--danger); }
+.checks li.medium .mark, .checks li.info .mark { background: color-mix(in srgb, var(--jute) 25%, transparent); color: var(--jute-deep); }
+.checks p { margin: 2px 0 0; color: var(--muted); font-size: .9rem; }
+.notice.small { font-size: .85rem; }
+
 /* ---------------------------------------------------------------- phone */
 @media (max-width: 760px) {
   .shell { grid-template-columns: 1fr; }
@@ -450,7 +460,8 @@ label.check.grow { flex: 1; }
   }
   .brand, .rail-foot { display: none; }
   .mobile-top {
-    display: flex; align-items: center; justify-content: space-between; padding: 10px 12px 0 16px;
+    display: flex; align-items: center; justify-content: space-between;
+    padding: calc(10px + env(safe-area-inset-top)) 12px 0 16px;
   }
   .mobile-top .bell-panel { left: auto; right: 0; bottom: auto; top: calc(100% + 6px); width: min(330px, calc(100vw - 24px)); }
   .page { padding-top: 12px; }

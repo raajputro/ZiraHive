@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Copy, Trash2, Check } from "lucide-react";
-import { api, ApiError, url, type Share, type ShareTarget } from "../api";
+import { api, ApiError, hasPublicBase, url, type Share, type ShareTarget } from "../api";
 import Dialog from "./Dialog";
 
 const dateFmt = new Intl.DateTimeFormat(undefined, { day: "numeric", month: "short", year: "numeric" });
@@ -38,6 +38,10 @@ export default function ShareDialog({ type, id, label, onClose }:
   return (
     <Dialog title={`Share ${label}`} onClose={onClose}>
       <p className="muted small">Anyone with the link can open it, even without a GharBox account.</p>
+      {!hasPublicBase() && (
+        <p className="notice small">These links only open on your home network and on Tailscale, because no public share
+          address is set up yet. See docs/REMOTE_ACCESS.md.</p>
+      )}
       {links.length > 0 && (
         <ul className="share-list">
           {links.map((s) => (

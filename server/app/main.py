@@ -3,7 +3,8 @@ from __future__ import annotations
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import select
 
@@ -51,8 +52,18 @@ async def lifespan(_: FastAPI):
 
 
 def create_app() -> FastAPI:
+    settings = get_settings()
+    docs = {} if settings.api_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
     app = FastAPI(title="GharBox", version=VERSION, lifespan=lifespan,
-                  description="Self-hosted backup and media server")
+                  description="Self-hosted backup and media server", **docs)
+
+    @app.middleware("http")
+    async def public_gateway_guard(request: Request, call_next):
+        """Requests from the public share-link site may only reach share endpoints.
+        Caddy already limits that site to /api/s/*; this is the second lock."""
+        if request.headers.get("x-gharbox-gateway") == "public" and not request.url.path.startswith("/api/s/"):
+            return JSONResponse({"detail": "Not found"}, status_code=404)
+        return await call_next(request)
     origins = [o.strip() for o in get_settings().cors_origins.split(",") if o.strip()]
     if origins:
         app.add_middleware(CORSMiddleware, allow_origins=origins, allow_credentials=True,
@@ -65,6 +76,11 @@ def create_app() -> FastAPI:
     @app.get("/api/health", tags=["system"])
     async def health() -> dict:
         return {"status": "ok", "version": VERSION}
+
+    @app.get("/api/config", tags=["system"])
+    async def public_config() -> dict:
+        """What the web app needs before signing in. Nothing secret."""
+        return {"version": VERSION, "public_url": get_settings().public_url.rstrip("/")}
 
     return app
 

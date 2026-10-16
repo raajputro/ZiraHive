@@ -1,7 +1,8 @@
 # GharBox: self-hosted backup + media server
 #
-#   docker compose up -d --build              core stack
-#   docker compose --profile ai up -d         core + local AI (Ollama)
+#   docker compose up -d --build                   core stack (home network)
+#   docker compose --profile remote up -d --build  + secure access from anywhere (Tailscale)
+#   docker compose --profile ai up -d              + local AI (Ollama)
 #
 # Settings live in .env (copy .env.example to .env first).
 
@@ -16,6 +17,8 @@ x-server-env: &server-env
   GHARBOX_MEDIA_ROOT: /media
   GHARBOX_MEDIA_LIBRARIES: ${GHARBOX_MEDIA_LIBRARIES:-}
   GHARBOX_TMDB_API_KEY: ${GHARBOX_TMDB_API_KEY:-}
+  GHARBOX_PUBLIC_URL: ${GHARBOX_PUBLIC_URL:-}
+  GHARBOX_API_DOCS: "false"
   GHARBOX_CORS_ORIGINS: ""
 
 x-server-volumes: &server-volumes
@@ -31,8 +34,11 @@ services:
     build: ./web
     restart: unless-stopped
     ports:
-      - "${GHARBOX_HTTP_PORT:-8080}:80"
-      - "${GHARBOX_HTTPS_PORT:-8443}:443"
+      # Home network access. Set GHARBOX_BIND=127.0.0.1 to allow only this PC
+      # (then use Tailscale from every other device).
+      - "${GHARBOX_BIND:-0.0.0.0}:${GHARBOX_HTTP_PORT:-8080}:80"
+      # The share-links-only site (8081) is NOT published here on purpose:
+      # only the tailscale container reaches it, through the Docker network.
     environment:
       GHARBOX_SITE_ADDRESS: ${GHARBOX_SITE_ADDRESS:-:80}
     volumes:
@@ -94,6 +100,27 @@ services:
     volumes:
       - redis-data:/data
 
+  # ---- optional: access from anywhere (docker compose --profile remote up -d) ----
+  # Private: https://gharbox.<your-tailnet>.ts.net  -> whole app, your devices only
+  # Public:  https://gharbox.<your-tailnet>.ts.net:8443 -> share links only (Tailscale Funnel)
+  # Setup steps: docs/REMOTE_ACCESS.md
+  tailscale:
+    image: tailscale/tailscale:stable
+    profiles: ["remote"]
+    hostname: ${TS_HOSTNAME:-gharbox}
+    restart: unless-stopped
+    environment:
+      TS_AUTHKEY: ${TS_AUTHKEY:-}
+      TS_HOSTNAME: ${TS_HOSTNAME:-gharbox}
+      TS_STATE_DIR: /var/lib/tailscale
+      TS_SERVE_CONFIG: /config/${TS_SERVE_FILE:-serve.json}
+      TS_USERSPACE: "true"  # no special network driver needed; works with Docker Desktop
+    volumes:
+      - tailscale-state:/var/lib/tailscale
+      - ./tailscale:/config:ro
+    depends_on:
+      - web
+
   # ---- optional: local AI (docker compose --profile ai up -d) -------------
   ollama:
     image: ollama/ollama:latest
@@ -107,6 +134,7 @@ services:
     #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
 
 volumes:
+  tailscale-state:
   postgres-data:
   redis-data:
   caddy-data:

@@ -68,6 +68,18 @@ export interface Stats {
 }
 export interface UploadResult { id: string | null; offset: number; size: number; status: "uploading" | "complete" | "exists"; asset: Asset | null }
 
+export interface SecurityItem { ok: boolean; title: string; fix: string | null; level: "high" | "medium" | "info" }
+
+let publicBase = "";
+/** Loads the public share-link address once (GHARBOX_PUBLIC_URL on the server). */
+export async function loadConfig() {
+  try {
+    const r = await fetch("/api/config");
+    if (r.ok) publicBase = (await r.json()).public_url || "";
+  } catch { /* offline: fall back to this address */ }
+}
+export const hasPublicBase = () => !!publicBase;
+
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) { super(message); }
 }
@@ -146,6 +158,7 @@ export const api = {
   markNotificationsRead: () => request<void>("POST", "/api/notifications/read"),
   audit: (before?: string) => request<AuditEvent[]>("GET", `/api/admin/audit${q({ before, limit: 100 })}`),
   activity: () => request<Activity>("GET", "/api/admin/activity"),
+  security: () => request<SecurityItem[]>("GET", "/api/admin/security"),
   updateUser: (id: string, change: { is_admin?: boolean; quota_gb?: number; clear_quota?: boolean; new_password?: string; reset_2fa?: boolean }) =>
     request<AdminUser>("PATCH", `/api/users/${id}`, change),
 
@@ -187,6 +200,8 @@ export const api = {
     request<UploadResult>("POST", "/api/uploads", body),
   uploadChunk: (id: string, offset: number, chunk: Blob, signal?: AbortSignal) =>
     request<UploadResult>("PATCH", `/api/uploads/${id}`, chunk, { headers: { "Upload-Offset": String(offset) }, signal }),
+  reportBackup: (r: { uploaded: number; skipped: number; failed: number; device: string }) =>
+    request<void>("POST", "/api/events/backup", { uploaded: r.uploaded, skipped: r.skipped, failed: r.failed, device: r.device }),
   uploadStatus: (id: string) => request<UploadResult>("GET", `/api/uploads/${id}`),
 };
 
@@ -194,7 +209,7 @@ export const url = {
   thumb: (a: { id: string }) => `/api/assets/${a.id}/thumb`,
   preview: (a: { id: string }) => `/api/assets/${a.id}/preview`,
   version: (a: { id: string }, v: { id: string }) => `/api/assets/${a.id}/versions/${v.id}/file`,
-  shareLink: (s: { token: string }) => `${location.origin}/s/${s.token}`,
+  shareLink: (s: { token: string }) => `${publicBase || location.origin}/s/${s.token}`,
   publicFile: (token: string, a: { id: string }, key?: string, download = false) =>
     `/api/s/${token}/assets/${a.id}/file${q({ key, download: download ? "true" : undefined })}`,
   publicThumb: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/thumb${q({ key })}`,

@@ -5,7 +5,7 @@ import shutil
 from datetime import datetime
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, Request
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -13,8 +13,8 @@ from ..config import get_settings
 from ..db import get_session
 from ..models import Asset, AuditEvent, Library, MediaItem, Notification, User, utcnow
 from ..schemas import (ActivityOut, AuditOut, BackupReportIn, DiskOut, NotificationList,
-                       NotificationOut, StatsOut, StreamOut)
-from ..security import admin_user, current_user
+                       NotificationOut, SecurityCheck, StatsOut, StreamOut)
+from ..security import admin_user, current_user, is_https
 from ..services import activity, jobs
 from ..services.events import notify
 
@@ -75,6 +75,47 @@ async def activity_now(_: User = Depends(admin_user), session: AsyncSession = De
         streams=[StreamOut(**s) for s in activity.active_streams()],
         jobs_queued=await jobs.queued_count(), jobs_mode="redis worker" if settings.redis_url else "in-process",
         disks=disks, cache_bytes=_dir_size(settings.cache_dir), started_at=activity.STARTED_AT)
+
+
+@router.get("/admin/security", response_model=list[SecurityCheck])
+async def security_check(request: Request, _: User = Depends(admin_user),
+                         session: AsyncSession = Depends(get_session)):
+    """A plain-language checklist for the admin. Each item says what to do if it fails."""
+    settings = get_settings()
+    checks: list[SecurityCheck] = []
+
+    def add(ok: bool, title: str, fix: str, level: str = "high") -> None:
+        checks.append(SecurityCheck(ok=ok, title=title, fix=None if ok else fix, level=level))
+
+    host = request.url.hostname or ""
+    # home network and Tailscale addresses are already private/encrypted
+    local = host in ("localhost", "127.0.0.1") or host.startswith(("192.168.", "10.", "172.", "100."))
+    add(is_https(request) or local, "You're connected over HTTPS",
+        "Open GharBox through its Tailscale address (https://gharbox.<your-tailnet>.ts.net) "
+        "instead of plain http when you're away from home.")
+    admins = (await session.scalars(select(User).where(User.is_admin.is_(True)))).all()
+    weak = [a.username for a in admins if not a.totp_enabled]
+    add(not weak, "Every admin uses two-factor sign-in",
+        f"Turn on two-factor for: {', '.join(weak)} (Settings > Your account).")
+    add(len(settings.resolved_secret()) >= 32, "Sign-in tokens use a strong secret key",
+        "Set GHARBOX_SECRET_KEY in .env to a long random value (or leave it empty to auto-generate).")
+    add(not settings.api_docs, "The developer API page is off",
+        "Set GHARBOX_API_DOCS=false in .env unless you are developing.", "medium")
+    if settings.public_url:
+        add(settings.public_url.startswith("https://"), "Share links use HTTPS",
+            "GHARBOX_PUBLIC_URL should start with https://")
+    else:
+        add(False, "Share links can be opened outside your home",
+            "Set up the public share address (docs/REMOTE_ACCESS.md) and put it in GHARBOX_PUBLIC_URL. "
+            "Until then, links only work on your home network and Tailscale.", "info")
+    others = await session.scalar(select(func.count()).select_from(User).where(
+        User.is_admin.is_(False), User.totp_enabled.is_(False))) or 0
+    add(others == 0, "Family members use two-factor sign-in",
+        f"{others} member account(s) sign in with a password only. Recommended, not required.", "info")
+    usage = shutil.disk_usage(settings.data_dir)
+    add(usage.free / usage.total > 0.1, "There's room for new backups",
+        "The backup disk is over 90% full. Empty the trash or add a bigger disk.", "medium")
+    return checks
 
 
 @router.get("/admin/audit", response_model=list[AuditOut])

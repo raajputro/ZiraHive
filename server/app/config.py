@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     media_libraries: str = ""
     tmdb_api_key: str = ""
 
+    # The public address of the share-link gateway, used when making share links, e.g.
+    # https://gharbox.tail1234.ts.net:8443  (empty: links use whatever address you're on)
+    public_url: str = ""
+    # Secure cookies: "auto" = when the request came over HTTPS; "true" / "false" to force
+    secure_cookies: str = "auto"
+    api_docs: bool = False  # the interactive /docs page; leave off on anything reachable remotely
+
     max_chunk_mb: int = 64
     cors_origins: str = "http://localhost:5173"
 

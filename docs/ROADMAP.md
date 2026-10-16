@@ -10,7 +10,7 @@
   direct play with seeking, resume position, continue watching
 - Watch categories: one per folder (auto-discovered), movies / series / mixed types, ordering
 - Web series: seasons and episodes, series pages, next episode autoplay, up next
-- Phone app: camera roll backup with dedup, Live Photos, resume
+- Browser upload from phones with dedup and resume; installable to the home screen
 
 ## Batch 1: accounts and sharing (done)
 - Share links for files, folders and albums: password, expiry, view-only, visit count
@@ -26,12 +26,11 @@
 ## Milestone 2: play anything
 - FFmpeg transcoding to HLS, with NVIDIA NVENC when available
 - Subtitles (embedded and .srt), audio track choice
-- Offline downloads to phone
+- Offline: download a smaller copy of a movie to watch without internet
 
 ## Milestone 3: together
 - Watch parties: rooms, invite links, synced play/pause/seek over WebSocket, chat
 - Shared albums, share links with expiry and password
-- Background backup on Android and iOS
 
 ## Milestone 4: local AI (docker compose --profile ai)
 - Search photos by description (CLIP embeddings in pgvector)
@@ -39,6 +38,11 @@
 - OCR for documents and screenshots
 - Whisper subtitles for movies without them
 - Ask in plain language through a local LLM in Ollama
+
+## Remote access (done)
+- Private app over Tailscale, public share-links-only site via Funnel, server-side gateway guard
+- Security headers and CSP, secure cookies, URL tokens limited to video links, per-address throttle
+- Security check panel for the admin
 
 ## Platform
 - Alembic database migrations (needed before the first schema change after release)

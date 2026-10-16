@@ -32,6 +32,7 @@ test("a password-protected link opens for someone without an account", async ({ 
 
   // deleting the link stops it working
   await dialog.getByRole("button", { name: "Delete link" }).first().click();
+  await expect(dialog.getByLabel("Share link")).toHaveCount(0);
   const gone = await page.request.get(`/api/s/${link.split("/s/")[1]}`);
   expect(gone.status()).toBe(404);
 });

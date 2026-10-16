@@ -1,7 +1,8 @@
 # GharBox
 
 Your own Google Drive + Jellyfin, running on your PC. Free, open source, and private: your
-photos, documents and movies never leave your home.
+photos, documents and movies never leave your home. Everything works in a web browser, on
+your PC, phone and TV.
 
 - **Backup**: phone camera roll and any files, with resumable uploads. Photo backup skips
   anything already saved
@@ -86,10 +87,17 @@ Your backed-up files are stored under readable names in
 `GHARBOX_DATA_PATH/storage/<username>/...`, so you can still browse them in Explorer even
 if GharBox is not running.
 
-## Phone app
+## On your phone
 
-The backup app lives in [mobile/](mobile/README.md) (Flutter, Android and iPhone). Until it's
-installed, you can upload from your phone's browser at the address from step 4.
+GharBox runs in the phone's browser, so there's no app to install from a store. Open your GharBox
+address and choose **Add to Home Screen** (Safari: Share button; Chrome: menu). It then opens full
+screen with its own icon, like an app.
+
+To back up your camera roll, open **Photos > Upload photos** and pick everything you want. Files
+already saved are skipped, and uploads continue where they stopped if the connection drops. The
+screen stays awake while uploading, but keep GharBox open until it finishes: browsers can't back up
+in the background. On iPhone, Safari may hand over JPEG copies of HEIC photos and only the still
+image of Live Photos; to keep the originals, copy them to a PC first and upload from there.
 
 ## Watch categories
 
@@ -159,16 +167,11 @@ for example `gharbox-k2v9x7q`, then paste `https://ntfy.sh/gharbox-k2v9x7q` into
 **Settings > Your account > Phone notifications** and press **Send test**. To keep everything
 inside your home, you can run your own ntfy server instead (it's open source).
 
-## Watching from outside your home
+## Using it away from home
 
-Don't open ports to the internet. Use a free VPN that you host yourself:
-**WireGuard** (or **Headscale**, the open-source Tailscale server). Your phone connects to your
-home network and GharBox works as if you were on Wi-Fi.
-
-If you do want a public HTTPS address, get a free name from DuckDNS, set
-`GHARBOX_SITE_ADDRESS=yourname.duckdns.org`, forward ports 80 and 443 to this PC and map them in
-`docker-compose.yml`. Caddy fetches a free Let's Encrypt certificate automatically. Note that
-many ISPs in Bangladesh use CGNAT, which blocks incoming connections; the VPN route avoids that.
+Follow [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md). In short: the full app stays private and is
+reached through Tailscale (free, encrypted, works behind CGNAT, no router changes), and only share
+links get a public address. `docker compose --profile remote up -d` starts it.
 
 ## Developing
 

@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from "react";
-import { RefreshCw, Trash2, Pencil, ArrowUp, ArrowDown, FolderSearch, ShieldCheck, Bell, Smartphone } from "lucide-react";
+import { RefreshCw, Trash2, Pencil, ArrowUp, ArrowDown, FolderSearch, ShieldCheck, Bell, Smartphone, Check, AlertTriangle } from "lucide-react";
 import { api, ApiError, formatBytes, type Activity, type AdminUser, type AuditEvent, type Library, type LibraryKind,
-  type Me, type Stats } from "../api";
+  type Me, type SecurityItem, type Stats } from "../api";
 import { useAuth } from "../App";
 import { usePrefs } from "../prefs";
 import Dialog from "../components/Dialog";
@@ -30,7 +30,7 @@ export default function AdminPage() {
         ))}
       </nav>
       {tab === "account" && <><AccountPanel /><TwoFactorPanel /><NotificationsPanel /><Password /></>}
-      {tab === "server" && user.is_admin && <><StatsPanel /><ActivityPanel /><Libraries /></>}
+      {tab === "server" && user.is_admin && <><SecurityPanel /><StatsPanel /><ActivityPanel /><Libraries /></>}
       {tab === "people" && user.is_admin && <Users />}
       {tab === "log" && user.is_admin && <AuditPanel />}
     </div>
@@ -281,6 +281,27 @@ function NotificationsPanel() {
 }
 
 // ------------------------------------------------------------------- server
+
+function SecurityPanel() {
+  const [items, setItems] = useState<SecurityItem[] | null>(null);
+  useEffect(() => { api.security().then(setItems).catch(() => undefined); }, []);
+  if (!items) return null;
+  const problems = items.filter((i) => !i.ok && i.level !== "info").length;
+  return (
+    <section className="panel">
+      <h2><ShieldCheck size={18} aria-hidden /> Security check</h2>
+      <p className={problems ? "error" : "muted"}>{problems ? `${problems} thing${problems === 1 ? "" : "s"} to fix` : "Everything important is in place."}</p>
+      <ul className="checks">
+        {items.map((i) => (
+          <li key={i.title} className={i.ok ? "ok" : i.level}>
+            <span className="mark" aria-hidden>{i.ok ? <Check size={15} /> : <AlertTriangle size={15} />}</span>
+            <div><strong>{i.title}</strong>{i.fix && <p>{i.fix}</p>}</div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
 
 function ActivityPanel() {
   const [a, setA] = useState<Activity | null>(null);

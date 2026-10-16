@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 import time
 from collections import defaultdict
 from datetime import datetime, timedelta, timezone
@@ -58,12 +59,20 @@ def read_scope(token: str | None, prefix: str) -> str | None:
     return scope[len(prefix):] if scope.startswith(prefix) else None
 
 
+_STREAM_PATH = re.compile(r"^/api/media/[0-9a-f]{32}/stream$")
+
+
 def _token_from_request(request: Request) -> str | None:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
         return auth[7:].strip()
-    # <img>/<video> tags can't send headers: accept the cookie or a ?token= query param.
-    return request.cookies.get(COOKIE_NAME) or request.query_params.get("token")
+    if request.cookies.get(COOKIE_NAME):
+        return request.cookies[COOKIE_NAME]
+    # Tokens in URLs end up in logs and history, so ?token= only works for the video
+    # stream link made for players like VLC that can't send cookies.
+    if _STREAM_PATH.match(request.url.path):
+        return request.query_params.get("token")
+    return None
 
 
 async def optional_user(request: Request, session: AsyncSession = Depends(get_session)) -> User | None:
@@ -114,8 +123,24 @@ class Throttle:
         self._fails.pop(key, None)
 
 
-login_throttle = Throttle()
+login_throttle = Throttle()  # per address + username
+login_ip_throttle = Throttle(limit=30)  # per address, any username
 share_throttle = Throttle(limit=20)
+
+
+def is_https(request: Request) -> bool:
+    # Tailscale serves *.ts.net names over HTTPS only, then hands the request to Caddy over
+    # plain http inside the PC, so the scheme alone would say "http".
+    return request.url.scheme == "https" or (request.url.hostname or "").endswith(".ts.net")
+
+
+def use_secure_cookie(request: Request) -> bool:
+    mode = get_settings().secure_cookies.lower()
+    if mode in ("true", "1", "yes"):
+        return True
+    if mode in ("false", "0", "no"):
+        return False
+    return is_https(request)
 
 
 def client_ip(request: Request) -> str:

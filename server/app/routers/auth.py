@@ -17,14 +17,15 @@ from ..schemas import (CodeIn, LoginIn, MeOut, MySettingsIn, PasswordChangeIn, P
                        RecoveryCodesOut, SetupIn, TokenOut, TwoFactorSetupOut, UserAdminOut,
                        UserCreateIn, UserOut, UserUpdateIn)
 from ..security import (COOKIE_NAME, admin_user, client_ip, create_token, current_user,
-                        hash_password, login_throttle, verify_password)
+                        hash_password, login_ip_throttle, login_throttle, use_secure_cookie,
+                        verify_password)
 from ..services.events import audit, notify
 
 router = APIRouter(prefix="/api", tags=["auth"])
 
 
-def _set_cookie(response: Response, token: str) -> None:
-    response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax",
+def _set_cookie(request: Request, response: Response, token: str) -> None:
+    response.set_cookie(COOKIE_NAME, token, httponly=True, samesite="lax", secure=use_secure_cookie(request),
                         max_age=get_settings().access_token_days * 86400, path="/")
 
 
@@ -56,7 +57,7 @@ async def setup(body: SetupIn, request: Request, response: Response,
     await audit(session, "setup", user, request=request)
     await session.commit()
     token = create_token(user)
-    _set_cookie(response, token)
+    _set_cookie(request, response, token)
     return TokenOut(token=token, user=UserOut.model_validate(user))
 
 
@@ -78,11 +79,14 @@ async def _check_second_factor(session: AsyncSession, user: User, code: str | No
 async def login(body: LoginIn, request: Request, response: Response,
                 session: AsyncSession = Depends(get_session)):
     username = body.username.lower().strip()
-    key = f"{client_ip(request)}:{username}"
+    ip = client_ip(request)
+    key = f"{ip}:{username}"
+    login_ip_throttle.check(ip)
     login_throttle.check(key)
     user = await session.scalar(select(User).where(User.username == username))
     if user is None or not verify_password(body.password, user.password_hash):
         login_throttle.fail(key)
+        login_ip_throttle.fail(ip)
         await audit(session, "login_failed", username=username, request=request)
         await session.commit()
         raise HTTPException(401, "Wrong username or password")
@@ -92,6 +96,7 @@ async def login(body: LoginIn, request: Request, response: Response,
                                       "message": "Enter the 6-digit code from your authenticator app"})
         if not await _check_second_factor(session, user, body.code):
             login_throttle.fail(key)
+            login_ip_throttle.fail(ip)
             await audit(session, "login_failed_2fa", user, request=request)
             await session.commit()
             raise HTTPException(401, {"code": "2fa_invalid", "message": "That code didn't work. Try the newest one."})
@@ -99,7 +104,7 @@ async def login(body: LoginIn, request: Request, response: Response,
     await audit(session, "login", user, request=request)
     await session.commit()
     token = create_token(user)
-    _set_cookie(response, token)
+    _set_cookie(request, response, token)
     return TokenOut(token=token, user=UserOut.model_validate(user))
 
 
@@ -151,7 +156,7 @@ async def change_password(body: PasswordChangeIn, request: Request, response: Re
     await audit(session, "password_changed", user, request=request)
     await session.commit()
     token = create_token(user)
-    _set_cookie(response, token)
+    _set_cookie(request, response, token)
     return TokenOut(token=token, user=UserOut.model_validate(user))
 
 

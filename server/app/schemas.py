@@ -421,3 +421,10 @@ class ActivityOut(BaseModel):
     disks: list[DiskOut]
     cache_bytes: int
     started_at: datetime
+
+
+class SecurityCheck(BaseModel):
+    ok: bool
+    title: str
+    fix: str | None
+    level: str  # high | medium | info
