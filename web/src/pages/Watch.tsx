@@ -3,6 +3,7 @@ import { Link, NavLink, useParams } from "react-router-dom";
 import { Search, ChevronRight } from "lucide-react";
 import { api, url, episodeCode, formatDuration, VIDEO_KINDS, type Library, type Media, type Title } from "../api";
 import { useAuth } from "../App";
+import { LinkedShelves } from "./Linked";
 
 import { t as tr } from "../i18n";
 /** Category tabs shared by every Watch page: Home, English Movies, Web Series, ... */
@@ -27,8 +28,10 @@ export function WatchTabs({ libraries, query, onQuery }:
   );
 }
 
-export function TitleCard({ t }: { t: Title }) {
-  const to = t.type === "series" ? `/watch/series/${t.id}` : `/play/${t.id}`;
+export function TitleCard({ t, link }: { t: Title; link?: string }) {
+  const to = link
+    ? (t.type === "series" ? `/watch/link/${link}/series/${t.id}` : `/play/link/${link}/${t.id}`)
+    : t.type === "series" ? `/watch/series/${t.id}` : `/play/${t.id}`;
   const pct = t.type === "movie"
     ? (t.duration && t.position && !t.finished ? Math.min(100, (t.position / t.duration) * 100) : 0)
     : (t.episode_count ? (t.watched_count / t.episode_count) * 100 : 0);
@@ -38,7 +41,7 @@ export function TitleCard({ t }: { t: Title }) {
   return (
     <Link to={to} className="poster">
       <div className="poster-art">
-        {t.poster_ready ? <img src={url.titlePoster(t)} alt="" loading="lazy" /> : <span className="poster-blank">{t.title}</span>}
+        {t.poster_ready ? <img src={link ? url.linkPoster(link, t) : url.titlePoster(t)} alt="" loading="lazy" /> : <span className="poster-blank">{t.title}</span>}
         {t.type === "series" && <span className="poster-flag">{tr("Series")}</span>}
         {pct > 0 && <span className="poster-progress"><span style={{ width: `${pct}%` }} /></span>}
       </div>
@@ -122,6 +125,7 @@ export default function WatchHome() {
             <div className="shelf">{(shelves[l.id] ?? []).map((t) => <TitleCard key={t.id} t={t} />)}</div>
           </section>
         ))}
+        <LinkedShelves />
         {libs && visible.length === 0 && (
           <div className="empty">
             <h2>{tr("Nothing to watch yet")}</h2>

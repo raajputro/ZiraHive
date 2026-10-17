@@ -88,8 +88,16 @@
 - Picture-based subtitles (PGS) burned in; automatic intro detection by audio fingerprint
 - Converted streams for DLNA TVs that can't play a file
 
-## Batch 7
-- Passkeys, plugins, linking two GharBox servers; voice chat in watch parties
+## Batch 7: together and extendable (done)
+- Passkeys (WebAuthn): sign in with fingerprint, face or screen lock; one-use challenges, address
+  checks, notification when one is added; tested with a software key and Chrome's virtual authenticator
+- Voice chat in watch parties: WebRTC between devices, set up over the party socket, mute,
+  talking lights, the film turned down while people talk
+- Plugins: plugin.json + plugin.py, loaded only when turned on; events, settings, pages; built-in
+  signed webhook and Telegram messages; docs/PLUGINS.md
+- Linked GharBox servers: invite codes for chosen categories with an age limit, server-to-server
+  tokens, browsing and streaming proxied through the guest's server, progress kept there, revocable
+- setup.ps1 asks for one media folder; README rewritten
 
 ## Milestone 4: local AI (docker compose --profile ai)
 - Search photos by description (CLIP embeddings in pgvector)

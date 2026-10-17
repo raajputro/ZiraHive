@@ -93,6 +93,7 @@ export interface Media {
   series_id: string | null; series_title: string | null; season: number | null; episode: number | null;
   episode_title: string | null; next_id: string | null;
   intro_start: number | null; intro_end: number | null; credits_start: number | null; age: number | null;
+  base?: string; link_id?: string;  // a title on a linked GharBox, fetched through this server
 }
 export type Quality = "original" | "1080p" | "720p" | "480p" | "360p";
 export interface Tracks {
@@ -134,6 +135,7 @@ export async function loadConfig() {
   } catch { /* offline: fall back to this address */ }
 }
 export const hasPublicBase = () => !!publicBase;
+export const publicAddress = () => publicBase;
 
 export class ApiError extends Error {
   constructor(public status: number, message: string, public code?: string) { super(message); }
@@ -198,6 +200,9 @@ export interface Plugin {
   enabled: boolean; events: string[]; settings: PluginSetting[]; error: string | null;
   last_error: string | null; last_error_at: string | null; last_ok_at: string | null; has_pages: boolean;
 }
+
+export interface LinkedServer { id: string; name: string; url: string | null; ok: boolean; last_error: string | null; libraries: { id: string; name: string; kind: string }[] }
+export interface LinkGuest { id: string; name: string; library_ids: string[]; max_age: number | null; created_at: string; last_seen_at: string | null; code: string | null }
 
 export interface Passkey { id: string; name: string; rp_id: string; created_at: string; last_used_at: string | null }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -278,6 +283,20 @@ export const api = {
   testNotification: () => request<void>("POST", "/api/auth/me/test-notification"),
   changePassword: (current_password: string, new_password: string) =>
     request<{ user: User }>("POST", "/api/auth/password", { current_password, new_password }),
+  links: () => request<LinkedServer[]>("GET", "/api/links"),
+  addLink: (code: string, name?: string) => request<LinkedServer>("POST", "/api/admin/links", { code, name: name || undefined }),
+  removeLink: (id: string) => request<void>("DELETE", `/api/admin/links/${id}`),
+  linkGuests: () => request<LinkGuest[]>("GET", "/api/admin/link-guests"),
+  createLinkGuest: (body: { name: string; library_ids: string[]; max_age: number | null; url: string }) =>
+    request<LinkGuest>("POST", "/api/admin/link-guests", body),
+  removeLinkGuest: (id: string) => request<void>("DELETE", `/api/admin/link-guests/${id}`),
+  linkTitles: (linkId: string, libraryId: string) =>
+    request<Title[]>("GET", `/api/links/${linkId}/titles?library_id=${encodeURIComponent(libraryId)}`),
+  linkSeries: (linkId: string, seriesId: string) => request<SeriesDetail>("GET", `/api/links/${linkId}/series/${seriesId}`),
+  linkMedia: (linkId: string, mediaId: string) => request<Media>("GET", `/api/links/${linkId}/media/${mediaId}`),
+  linkTracks: (linkId: string, mediaId: string) => request<Tracks>("GET", `/api/links/${linkId}/media/${mediaId}/tracks`),
+  linkProgress: (linkId: string, mediaId: string, position: number, duration: number | undefined, title: string) =>
+    request<void>("PUT", `/api/links/${linkId}/media/${mediaId}/progress`, { position, duration, title }),
   plugins: () => request<Plugin[]>("GET", "/api/admin/plugins"),
   updatePlugin: (id: string, change: { enabled?: boolean; settings?: Record<string, unknown> }) =>
     request<Plugin>("PUT", `/api/admin/plugins/${id}`, change),
@@ -388,6 +407,8 @@ export const api = {
   uploadStatus: (id: string) => request<UploadResult>("GET", `/api/uploads/${id}`),
 };
 
+const mediaBase = (m: { id: string; base?: string }) => m.base ?? `/api/media/${m.id}`;
+
 export const url = {
   thumb: (a: { id: string }) => `/api/assets/${a.id}/thumb`,
   preview: (a: { id: string }) => `/api/assets/${a.id}/preview`,
@@ -398,12 +419,14 @@ export const url = {
   publicThumb: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/thumb${q({ key })}`,
   publicPreview: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/preview${q({ key })}`,
   file: (a: Asset, download = false) => `/api/assets/${a.id}/file${download ? "?download=true" : ""}`,
-  poster: (m: { id: string }) => `/api/media/${m.id}/poster`,
+  poster: (m: { id: string; base?: string }) => `${mediaBase(m)}/poster`,
   seriesPoster: (s: { id: string }) => `/api/series/${s.id}/poster`,
   titlePoster: (t: Title) => (t.type === "series" ? `/api/series/${t.id}/poster` : `/api/media/${t.id}/poster`),
-  stream: (m: Media) => `/api/media/${m.id}/stream`,
-  hls: (m: { id: string }, quality: string, audio: number) => `/api/media/${m.id}/hls/${quality}/${audio}/index.m3u8`,
-  subtitle: (m: { id: string }, subId: string) => `/api/media/${m.id}/subtitles/${subId}.vtt`,
+  stream: (m: Media) => `${mediaBase(m)}/stream`,
+  hls: (m: { id: string; base?: string }, quality: string, audio: number) => `${mediaBase(m)}/hls/${quality}/${audio}/index.m3u8`,
+  subtitle: (m: { id: string; base?: string }, subId: string) => `${mediaBase(m)}/subtitles/${subId}.vtt`,
+  linkPoster: (linkId: string, t: { id: string; type: "movie" | "series" }) =>
+    `/api/links/${linkId}/${t.type === "series" ? "series" : "media"}/${t.id}/poster`,
   offlineFile: (c: { id: string }) => `/api/offline/${c.id}/file`,
   albumCover: (a: { id: string }) => `/api/music/albums/${a.id}/cover`,
   trackStream: (t: { id: string }, converted = false) => `/api/music/tracks/${t.id}/stream${converted ? "?converted=true" : ""}`,

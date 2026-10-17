@@ -7,8 +7,8 @@ Free, open source and private: nothing leaves your home unless you share it.
 Everything runs in the web browser on phones, PCs and TVs. There are no apps to install from a
 store.
 
-> **Status:** batches 1 to 6 are done. Batch 7 (passkeys, voice chat in watch parties, plugins,
-> linking two GharBox servers) is in progress. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** batches 1 to 7 are done. Next: local AI (search photos by description, faces,
+> subtitles for films without them). See [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contents
 
@@ -21,6 +21,7 @@ store.
 - [On your phone](#on-your-phone)
 - [Away from home](#away-from-home)
 - [Keeping it safe](#keeping-it-safe)
+- [Plugins](#plugins)
 - [Running it day to day](#running-it-day-to-day)
 - [For developers](#for-developers)
 
@@ -33,13 +34,16 @@ store.
 | **Files** | Folders, a 30-day trash, and version history: upload a document with the same name and the old copy is kept. |
 | **Search and scan** | Find documents by the words inside them, in Bangla and English, even in scanned papers. Turn paper into a searchable PDF with the phone's camera. |
 | **Watch** | Movies and series from your own folders, with posters, seasons, "next episode" and skip intro. Every format plays: what the browser can't play is converted while you watch. |
-| **Watch parties** | Watch together from different places, in step, with chat and reactions. |
+| **Watch parties** | Watch together from different places, in step, with chat, reactions and voice chat. |
+| **Linked servers** | Share some categories with family who have their own GharBox, and watch theirs. |
 | **On the TV** | Cast to a Chromecast, or browse GharBox from any smart TV's media menu (DLNA). |
 | **Listen** | Music by album and artist, playlists, and audiobooks that remember where you stopped. |
 | **Read** | EPUB and PDF books and comics, with your page saved on every device. |
 | **Vault** | A locked space for ID scans and private papers, encrypted on your device. Not even the admin can open it. |
 | **PC sync** | The GharBox Sync app keeps a folder on your Windows PC and in GharBox the same, both ways. |
 | **Family** | An account for each person, storage limits, and age limits for children. |
+| **Passkeys** | Sign in with your phone's or laptop's fingerprint, face or screen lock. |
+| **Plugins** | Add-ons for Telegram messages, webhooks to Home Assistant or n8n, or your own. |
 | **বাংলা** | The whole interface in Bangla, with Bangla digits and dates. |
 
 ## Get started on Windows
@@ -158,6 +162,27 @@ friends. Everyone's video stays in step. Anyone (or only the host) can pause and
 waits when someone's video is loading, and there's chat, emoji reactions and "next episode for
 everyone". Each person still picks their own quality, audio and subtitles.
 
+**Voice chat:** press **Join voice chat** in the party. Everyone who joins hears each other, with a
+glowing mic next to whoever is talking, and the film turns down while people talk. Devices talk to
+each other directly and encrypted (WebRTC); it needs a secure page (your `https://` Tailscale
+address, or `http://localhost` on the PC) and the browser's microphone permission.
+
+### Linked GharBox servers
+
+Your brother has his own GharBox? Share some categories with each other.
+
+1. On yours, **Settings > Server > Linked GharBox servers > Share with another GharBox**: name it,
+   tick the categories, choose an age limit, and enter your address as his server can reach it
+   (your public share address `https://…ts.net:8443`, or your Tailscale address if his server is
+   on your Tailscale). Press **Make a link code** and send him the code privately.
+2. On his, paste the code under **Watch another GharBox**.
+
+His family then sees your categories on their Watch page, marked "from ...", and plays them like
+their own. His server fetches the films for them: nobody gets an account on yours, and his
+server can reach only the categories you ticked. Where each person stopped is kept on his side.
+Remove the link on your side and it stops at once. Set `GHARBOX_SERVER_NAME` in `.env` for the
+name his side sees.
+
 ### On the TV
 
 - **Chromecast**, and TVs with Chromecast built in (most Android and Google TVs): press **Cast to
@@ -255,13 +280,24 @@ options.
 
 ## Keeping it safe
 
-- **Sign-in:** two-factor sign-in with recovery codes, "sign out everywhere", password changes end
-  other sessions, slowed-down password guessing, and an activity log for the admin.
+- **Sign-in:** passkeys (**Settings > Your account > Passkeys**), two-factor sign-in with recovery
+  codes, "sign out everywhere", password changes end other sessions, slowed-down password
+  guessing, and an activity log for the admin. A passkey works on the address it was made on, so
+  add one on each address you use (for example on your Tailscale address).
 - **Security check:** **Settings > Server > Security check** lists anything that needs attention.
 - **Offsite backup:** a daily encrypted copy of photos, files, the vault and the database to a USB
   disk, another computer or a cloud bucket, with regular checks. Set it up in **Settings > Server >
   Offsite backup**; restoring is in [docs/BACKUP.md](docs/BACKUP.md).
 - **Your media is read-only** to GharBox: it can never change or delete it.
+
+## Plugins
+
+**Settings > Server > Plugins** has two built in:
+
+- **Telegram messages**: a message when new movies arrive, a backup fails or a watch party starts.
+- **Webhook**: every event as signed JSON to Home Assistant, n8n, Node-RED or your own script.
+
+You can write your own in a few lines of Python; see [docs/PLUGINS.md](docs/PLUGINS.md).
 
 ## Running it day to day
 

@@ -13,7 +13,7 @@ test("two-factor sign-in: set up, then a code is needed to sign in", async ({ pa
     await p.goto("/");
     await p.getByLabel("Username").fill(user);
     await p.getByLabel("Password").fill(password);
-    await p.getByRole("button", { name: "Sign in" }).click();
+    await p.getByRole("button", { name: "Sign in", exact: true }).click();
     if (code) {
       await p.getByLabel("Code from your authenticator app").fill(code);
       await p.getByRole("button", { name: "Verify and sign in" }).click();

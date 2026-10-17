@@ -54,7 +54,8 @@
 }
 
 # ---------------------------------------------------------------------------
-# Public site: share links ONLY (/s/<token>). Tailscale Funnel publishes this one.
+# Public site: share links ONLY (/s/<token>), plus the API for linked GharBox servers.
+# Tailscale Funnel publishes this one.
 # Sign-in, files, photos and movies are not reachable here at all; the server
 # double-checks this using the X-GharBox-Gateway header set below.
 # ---------------------------------------------------------------------------
@@ -63,6 +64,11 @@
 	encode zstd gzip
 
 	handle /api/s/* {
+		request_header X-GharBox-Gateway public
+		import api_proxy
+	}
+	# Linked GharBox servers (Settings > Server > Linked servers); answers only their tokens
+	handle /api/fed/* {
 		request_header X-GharBox-Gateway public
 		import api_proxy
 	}

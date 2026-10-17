@@ -597,3 +597,50 @@ class PluginState(Base):
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class FedGuest(Base):
+    """Another GharBox this server shares some categories with (this server is the host)."""
+
+    __tablename__ = "fed_guests"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(100))          # e.g. "Rahim's house"
+    token_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    library_ids: Mapped[str] = mapped_column(Text, default="[]")  # JSON list of shared categories
+    max_age: Mapped[int | None] = mapped_column(Integer, nullable=True)  # age limit for what they see
+    created_by: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_seen_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    revoked_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class FedLink(Base):
+    """Another GharBox whose shared categories people here can watch (this server is the guest)."""
+
+    __tablename__ = "fed_links"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    name: Mapped[str] = mapped_column(String(100))
+    url: Mapped[str] = mapped_column(String(512))
+    token: Mapped[str] = mapped_column(String(128))
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+
+
+class RemoteProgress(Base):
+    """Where someone here stopped in a title on a linked GharBox."""
+
+    __tablename__ = "remote_progress"
+    __table_args__ = (UniqueConstraint("user_id", "link_id", "media_id"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    link_id: Mapped[str] = mapped_column(ForeignKey("fed_links.id", ondelete="CASCADE"), index=True)
+    media_id: Mapped[str] = mapped_column(String(32))
+    title: Mapped[str] = mapped_column(String(512), default="")
+    position: Mapped[float] = mapped_column(Float, default=0)
+    duration: Mapped[float | None] = mapped_column(Float, nullable=True)
+    finished: Mapped[bool] = mapped_column(Boolean, default=False)
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)

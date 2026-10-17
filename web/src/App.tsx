@@ -15,6 +15,7 @@ import FilesPage from "./pages/Files";
 import WatchHome, { LibraryPage } from "./pages/Watch";
 import SeriesPage from "./pages/Series";
 import PlayerRoute from "./pages/Player";
+import { LinkLibraryPage, LinkPlayerPage, LinkSeriesPage } from "./pages/Linked";
 import PartyRoute from "./pages/Party";
 import PartiesPage from "./pages/Parties";
 import TrashPage from "./pages/Trash";
@@ -73,6 +74,9 @@ function SignedInApp() {
               <Route path="/watch/c/:id" element={<LibraryPage />} />
               <Route path="/watch/series/:id" element={<SeriesPage />} />
               <Route path="/play/:id" element={<PlayerRoute />} />
+              <Route path="/watch/link/:linkId/series/:seriesId" element={<LinkSeriesPage />} />
+              <Route path="/watch/link/:linkId/:libraryId" element={<LinkLibraryPage />} />
+              <Route path="/play/link/:linkId/:mediaId" element={<LinkPlayerPage />} />
               <Route path="/watch/parties" element={<PartiesPage />} />
               <Route path="/party/:id" element={<PartyRoute />} />
               <Route path="/movies" element={<Navigate to="/watch" replace />} />

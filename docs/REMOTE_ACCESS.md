@@ -5,7 +5,7 @@ GharBox gets two addresses:
 | Address | Who can open it | What it shows |
 |---|---|---|
 | `https://gharbox.<your-tailnet>.ts.net` | Only your and your family's devices, signed in to Tailscale | Everything: sign in, photos, files, watch, settings |
-| `https://gharbox.<your-tailnet>.ts.net:8443` | Anyone on the internet | **Share links only** (`/s/...`). Nothing else exists there |
+| `https://gharbox.<your-tailnet>.ts.net:8443` | Anyone on the internet | **Share links only** (`/s/...`), plus the API for linked GharBox servers, which answers only their link codes |
 
 Why this design:
 

@@ -11,7 +11,7 @@ from sqlalchemy import select
 from . import db
 from .config import get_settings
 from .models import Library
-from .routers import admin, albums, auth, backup, books, dlna, passkeys, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
+from .routers import admin, albums, auth, backup, books, dlna, federation, links, passkeys, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
 from .services import jobs, transcode
 from .services.libraries import discover
 
@@ -63,7 +63,8 @@ def create_app() -> FastAPI:
     async def public_gateway_guard(request: Request, call_next):
         """Requests from the public share-link site may only reach share endpoints.
         Caddy already limits that site to /api/s/*; this is the second lock."""
-        if request.headers.get("x-gharbox-gateway") == "public" and not request.url.path.startswith("/api/s/"):
+        # (and to /api/fed/*, which only answers linked GharBox servers' tokens)
+        if request.headers.get("x-gharbox-gateway") == "public" and not request.url.path.startswith(("/api/s/", "/api/fed/")):
             return JSONResponse({"detail": "Not found"}, status_code=404)
         return await call_next(request)
     origins = [o.strip() for o in get_settings().cors_origins.split(",") if o.strip()]
@@ -72,7 +73,7 @@ def create_app() -> FastAPI:
                            allow_methods=["*"], allow_headers=["*"],
                            expose_headers=["Upload-Offset", "Content-Range"])
     for r in (auth.router, passkeys.router, uploads.router, files.router, albums.router, shares.router,
-              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, admin.router):
+              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, federation.router, links.router, admin.router):
         app.include_router(r)
 
     @app.get("/api/health", tags=["system"])

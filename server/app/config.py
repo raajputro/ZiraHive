@@ -24,7 +24,8 @@ class Settings(BaseSettings):
     # (e.g. /media/English Movies, /media/Web Series). Docker mounts MEDIA_PATH here.
     media_root: str = ""
     media_host_path: str = ""
-    ice_servers: str = ""  # voice chat: extra STUN servers, comma separated  # the media folder as Windows sees it (G:/Media), for showing paths
+    ice_servers: str = ""
+    server_name: str = ""  # how linked GharBox servers see this one, e.g. "Mahbub's GharBox"  # voice chat: extra STUN servers, comma separated  # the media folder as Windows sees it (G:/Media), for showing paths
     # Extra libraries outside media_root: "Name:/path[:kind],Name2:/path2"
     media_libraries: str = ""
     # Your drives, mounted read-only by Docker as /drives/c, /drives/d, ... (DRIVE_D=D:/ in .env).

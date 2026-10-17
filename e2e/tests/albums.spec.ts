@@ -41,7 +41,7 @@ test("select photos, make an album and share it with a family member", async ({ 
   await m.goto("/");
   await m.getByLabel("Username").fill(member);
   await m.getByLabel("Password").fill("family-pass-1");
-  await m.getByRole("button", { name: "Sign in" }).click();
+  await m.getByRole("button", { name: "Sign in", exact: true }).click();
   await m.getByRole("link", { name: "Photos" }).first().click();
   await m.getByRole("link", { name: "Albums" }).click();
   await expect(m.getByRole("link", { name: new RegExp(album) })).toContainText("from");

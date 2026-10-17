@@ -27,7 +27,7 @@ test("a password-protected link opens for someone without an account", async ({ 
   expect(await file.text()).toBe("Wedding on Friday");
   // the visitor can't reach the signed-in app
   await v.goto("/files");
-  await expect(v.getByRole("button", { name: "Sign in" })).toBeVisible();
+  await expect(v.getByRole("button", { name: "Sign in", exact: true })).toBeVisible();
   await visitor.close();
 
   // deleting the link stops it working

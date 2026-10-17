@@ -249,3 +249,116 @@ async def test_telegram_messages():
     assert tg.message(plugins.Event("backup.finished", {"status": "ok"}), s) is None
     assert "failed" in tg.message(plugins.Event("backup.finished", {"status": "failed", "message": "disk"}), s)
     assert tg.message(plugins.Event("party.created", {"host": "a", "title": "b"}), s) is None
+
+
+# ------------------------------------------------------------ linked servers
+
+from app.routers import links as links_router  # noqa: E402
+from conftest import make_video  # noqa: E402
+
+
+async def test_linked_servers(app, client, admin, tmp_path, monkeypatch):
+    """This server shares a category with 'another' GharBox, which here is itself: the whole
+    protocol (code, token, proxying, limits) runs in one process."""
+    def in_process(link):
+        return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=link.url,
+                                 headers={"Authorization": f"GharBox-Link {link.token}"})
+    monkeypatch.setattr(links_router, "client_for", in_process)
+
+    make_video(tmp_path / "shared" / "Monpura (2009).mp4", seconds=3)
+    make_video(tmp_path / "shared" / "Late Night (2020).mp4", seconds=2)
+    make_video(tmp_path / "shared" / "Bhai Bhai" / "Bhai Bhai S01E01.mp4", seconds=2)
+    make_video(tmp_path / "private" / "Home Video (2021).mp4", seconds=2)
+    libs = {}
+    for name, kind in (("shared", "mixed"), ("private", "movies")):
+        r = await client.post("/api/libraries", json={"name": name.title(), "path": str(tmp_path / name), "kind": kind})
+        libs[name] = r.json()["id"]
+    await jobs_drain()
+    media = {m["title"]: m for m in (await client.get("/api/media")).json()}
+    for title in ("Monpura", "Home Video"):
+        await client.put(f"/api/media/{media[title]['id']}/rating", json={"age_rating": 7})
+    await client.put(f"/api/media/{media['Late Night']['id']}/rating", json={"age_rating": 18})
+    series_id = next(t["id"] for t in (await client.get("/api/titles")).json() if t["type"] == "series")
+    await client.put(f"/api/series/{series_id}/rating", json={"age_rating": 7})
+
+    # the host makes an invite for the shared category, up to 13+
+    r = await client.post("/api/admin/link-guests", json={"name": "Rahim's house", "library_ids": [libs["shared"]],
+                                                         "max_age": 13, "url": "http://test"})
+    assert r.status_code == 201, r.text
+    code = r.json()["code"]
+    assert code.startswith("ghx1.")
+    assert "code" not in (await client.get("/api/admin/link-guests")).json()[0] or \
+        (await client.get("/api/admin/link-guests")).json()[0]["code"] is None
+    bad = await client.post("/api/admin/link-guests", json={"name": "x", "library_ids": ["nope"], "url": "http://test"})
+    assert bad.status_code == 400
+
+    # the other side adds the code
+    assert (await client.post("/api/admin/links", json={"code": "hello there, not a code"})).status_code == 400
+    r = await client.post("/api/admin/links", json={"code": code})
+    assert r.status_code == 201, r.text
+    link = r.json()
+    assert link["name"] == "GharBox" and [lib["name"] for lib in link["libraries"]] == ["Shared"]
+    lid = link["id"]
+
+    # only the shared category, and only what suits 13+ (Late Night is 18+)
+    titles = (await client.get(f"/api/links/{lid}/titles", params={"library_id": libs["shared"]})).json()
+    assert sorted(t["title"] for t in titles) == ["Bhai Bhai", "Monpura"]
+    assert (await client.get(f"/api/links/{lid}/titles", params={"library_id": libs["private"]})).status_code == 404
+    assert (await client.get(f"/api/links/{lid}/media/{media['Home Video']['id']}")).status_code == 404
+    assert (await client.get(f"/api/links/{lid}/media/{media['Late Night']['id']}/stream")).status_code == 404
+
+    film = next(t for t in titles if t["title"] == "Monpura")
+    m = (await client.get(f"/api/links/{lid}/media/{film['id']}")).json()
+    assert m["base"] == f"/api/links/{lid}/media/{film['id']}" and m["position"] == 0
+    part = await client.get(f"{m['base']}/stream", headers={"Range": "bytes=0-99"})
+    assert part.status_code == 206 and len(part.content) == 100 and part.headers["content-range"].startswith("bytes 0-99/")
+    assert (await client.get(f"{m['base']}/poster")).status_code == 200
+    tracks = (await client.get(f"{m['base']}/tracks")).json()
+    assert tracks["audio"]
+    pl = await client.get(f"{m['base']}/hls/360p/0/index.m3u8")
+    assert pl.status_code == 200 and "seg/0.ts" in pl.text
+    seg = await client.get(f"{m['base']}/hls/360p/0/seg/0.ts")
+    assert seg.status_code == 200 and seg.content[0] == 0x47
+    assert (await client.get(f"{m['base']}/offline")).status_code == 404  # only the listed kinds of file
+
+    show = next(t for t in titles if t["type"] == "series")
+    s = (await client.get(f"/api/links/{lid}/series/{show['id']}")).json()
+    assert s["seasons"][0]["episodes"][0]["base"].startswith(f"/api/links/{lid}/media/")
+
+    # progress is kept here, per person
+    await client.put(f"{m['base']}/progress", json={"position": 1.5, "duration": 3, "title": "Monpura"})
+    assert (await client.get(f"/api/links/{lid}/media/{film['id']}")).json()["position"] == 1.5
+
+    # a child here (7+) sees less, even though the link allows 13+
+    await client.post("/api/users", json={"username": "nabil", "password": "kidpassword"})
+    kid = next(u for u in (await client.get("/api/users")).json() if u["username"] == "nabil")
+    await client.patch(f"/api/users/{kid['id']}", json={"max_age": 7})
+    tok = (await client.post("/api/auth/login", json={"username": "nabil", "password": "kidpassword"})).json()["token"]
+    kid_h = {"Authorization": f"Bearer {tok}"}
+    links = (await client.get("/api/links", headers=kid_h)).json()
+    assert links[0]["ok"] and links[0]["url"] is None  # not shown to non-admins
+    kid_titles = (await client.get(f"/api/links/{lid}/titles", params={"library_id": libs["shared"]}, headers=kid_h)).json()
+    assert sorted(t["title"] for t in kid_titles) == ["Bhai Bhai", "Monpura"]
+    assert (await client.post("/api/admin/links", json={"code": code}, headers=kid_h)).status_code == 403
+
+    # the fed API answers only link tokens, and not the normal sign-in
+    assert (await client.get("/api/fed/info")).status_code == 401
+    assert (await client.get("/api/fed/info", headers={"Authorization": "GharBox-Link nope"})).status_code == 401
+
+    # removing the invite on the host ends it
+    guest_id = (await client.get("/api/admin/link-guests")).json()[0]["id"]
+    assert (await client.delete(f"/api/admin/link-guests/{guest_id}")).status_code == 204
+    r = await client.get(f"/api/links/{lid}/titles", params={"library_id": libs["shared"]})
+    assert r.status_code == 502 and "removed" in r.json()["detail"]
+    assert (await client.get("/api/links")).json()[0]["ok"] is False
+
+
+async def test_public_gateway_reaches_only_share_links_and_fed(client, admin):
+    pub = {"X-GharBox-Gateway": "public"}
+    assert (await client.get("/api/auth/me", headers=pub)).status_code == 404
+    assert (await client.get("/api/fed/info", headers=pub)).status_code == 401  # reached, but needs a link token
+
+
+async def jobs_drain():
+    from app.services import jobs
+    await jobs.drain_local()
