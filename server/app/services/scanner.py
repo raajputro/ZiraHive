@@ -238,6 +238,7 @@ async def scan(library_id: str) -> dict:
     from . import shelf_scan
 
     stats = {"added": 0, "updated": 0, "missing": 0, "total": 0}
+    added_titles: list[MediaItem] = []
     async with sessionmaker()() as session:
         lib = await session.get(Library, library_id)
         if lib is None:
@@ -272,6 +273,7 @@ async def scan(library_id: str) -> dict:
                     session.add(item)
                     await session.flush()
                     stats["added"] += 1
+                    added_titles.append(item)
                 else:
                     stats["updated"] += 1
 
@@ -331,5 +333,14 @@ async def scan(library_id: str) -> dict:
                 await notify(session, user, "media", f"{n} new {'video' if n == 1 else 'videos'} in {lib.name}",
                              link=f"/watch/c/{lib.id}")
         await session.commit()
+        if added_titles:
+            from .plugins import emit
+
+            names = []
+            for it in added_titles:
+                s = await session.get(Series, it.series_id) if it.series_id else None
+                names.append(f"{s.title} {it.title}" if s else it.title)
+            await emit("media.added", {"library": lib.name, "library_id": lib.id, "kind": lib.kind,
+                                       "count": len(added_titles), "titles": names[:50]})
     log.info("scan of %s finished: %s", library_id, stats)
     return stats

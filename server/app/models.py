@@ -584,3 +584,16 @@ class Passkey(Base):
     transports: Mapped[str | None] = mapped_column(String(255), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
     last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+
+
+class PluginState(Base):
+    """Whether a plugin is on, its settings, and the last thing that went wrong."""
+
+    __tablename__ = "plugin_states"
+
+    id: Mapped[str] = mapped_column(String(40), primary_key=True)  # the plugin's id
+    enabled: Mapped[bool] = mapped_column(Boolean, default=False)
+    settings_json: Mapped[str] = mapped_column(Text, default="{}")
+    last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    last_error_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    last_ok_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

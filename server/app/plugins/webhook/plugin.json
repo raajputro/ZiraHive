@@ -1,0 +1,13 @@
+{
+  "id": "webhook",
+  "name": "Webhook",
+  "description": "Sends each event to a web address as JSON, signed so the receiver can check it came from GharBox. Use it with Home Assistant, n8n, Node-RED or your own scripts.",
+  "version": "1.0",
+  "author": "GharBox",
+  "events": ["*"],
+  "settings": [
+    {"key": "url", "label": "Address to send to", "type": "text", "help": "For example http://192.168.0.20:8123/api/webhook/gharbox"},
+    {"key": "secret", "label": "Signing secret", "type": "secret", "help": "Each request carries X-GharBox-Signature: sha256=<HMAC of the body with this secret>"},
+    {"key": "events", "label": "Events", "type": "text", "default": "*", "help": "Comma-separated, or * for all: file.uploaded, media.added, backup.finished, party.created, user.created"}
+  ]
+}

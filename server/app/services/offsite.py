@@ -184,6 +184,10 @@ async def run_backup(session: AsyncSession) -> BackupRun:
             shutil.rmtree(staging, ignore_errors=True)
             run.finished_at = utcnow()
             await session.commit()
+        from .plugins import emit
+
+        await emit("backup.finished", {"status": run.status, "message": run.message, "snapshot": run.snapshot_id,
+                                       "bytes_added": run.bytes_added})
         if run.status == "failed":
             from .events import notify_admins
 

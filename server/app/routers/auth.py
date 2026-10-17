@@ -257,6 +257,9 @@ async def create_user(body: UserCreateIn, request: Request, admin: User = Depend
         raise HTTPException(409, "That username is taken")
     await audit(session, "user_created", admin, detail=user.username, request=request)
     await session.commit()
+    from ..services.plugins import emit
+
+    await emit("user.created", {"username": user.username, "by": admin.username, "is_admin": user.is_admin})
     return await _admin_out(session, user)
 
 

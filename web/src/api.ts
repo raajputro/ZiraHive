@@ -192,6 +192,13 @@ export interface FolderBrowse {
 }
 export interface SearchHit { asset: Asset; snippet: string | null; in_text: boolean }
 
+export interface PluginSetting { key: string; label: string; type: "text" | "secret" | "bool" | "choice" | "number"; help: string | null; choices: string[]; value: unknown; has_value: boolean }
+export interface Plugin {
+  id: string; name: string; description: string; version: string; author: string | null; builtin: boolean;
+  enabled: boolean; events: string[]; settings: PluginSetting[]; error: string | null;
+  last_error: string | null; last_error_at: string | null; last_ok_at: string | null; has_pages: boolean;
+}
+
 export interface Passkey { id: string; name: string; rp_id: string; created_at: string; last_used_at: string | null }
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export interface PasskeyChallenge { options: any; state: string }
@@ -271,6 +278,10 @@ export const api = {
   testNotification: () => request<void>("POST", "/api/auth/me/test-notification"),
   changePassword: (current_password: string, new_password: string) =>
     request<{ user: User }>("POST", "/api/auth/password", { current_password, new_password }),
+  plugins: () => request<Plugin[]>("GET", "/api/admin/plugins"),
+  updatePlugin: (id: string, change: { enabled?: boolean; settings?: Record<string, unknown> }) =>
+    request<Plugin>("PUT", `/api/admin/plugins/${id}`, change),
+  testPlugin: (id: string) => request<{ ok: boolean; error: string | null }>("POST", `/api/admin/plugins/${id}/test`),
   passkeys: () => request<Passkey[]>("GET", "/api/auth/passkeys"),
   passkeyRegisterOptions: () => request<PasskeyChallenge>("POST", "/api/auth/passkeys/register/options"),
   passkeyRegister: (state: string, credential: unknown, name: string) =>

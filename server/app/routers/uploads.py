@@ -184,6 +184,14 @@ async def _read_text_later(asset: Asset) -> None:
         await jobs.enqueue("extract_text", asset.id)
 
 
+async def _uploaded_event(user: User, asset: Asset, version: bool = False) -> None:
+    from ..services.plugins import emit
+
+    await emit("file.uploaded", {"owner": user.username, "folder": asset.folder, "filename": asset.filename,
+                                 "size": asset.size, "kind": asset.kind, "mime": asset.mime, "new_version": version,
+                                 "asset_id": asset.id})
+
+
 async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> UploadOut:
     part = _part_path(up.id)
     digest = await asyncio.to_thread(_sha256_file, part)
@@ -222,6 +230,7 @@ async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> Upl
             if current.kind in ("photo", "video"):
                 await jobs.enqueue("process_asset", current.id)  # new picture, new thumbnail
             await _read_text_later(current)
+            await _uploaded_event(user, current, version=True)
             return UploadOut(status="complete", size=current.size, offset=current.size,
                              asset=AssetOut.model_validate(current))
     target, rel = storage.unique_target(user.username, up.folder, up.filename)
@@ -237,5 +246,6 @@ async def _finalize(up: UploadSession, user: User, session: AsyncSession) -> Upl
     if asset.kind in ("photo", "video"):
         await jobs.enqueue("process_asset", asset.id)
     await _read_text_later(asset)
+    await _uploaded_event(user, asset)
     return UploadOut(status="complete", size=asset.size, offset=asset.size,
                      asset=AssetOut.model_validate(asset))

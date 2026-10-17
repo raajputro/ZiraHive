@@ -123,6 +123,10 @@ async def create_party(body: PartyIn, request: Request, user: User = Depends(cur
         raise HTTPException(400, f"{label} isn't suitable for {', '.join(too_young)} (age limit)")
     await audit(session, "party_created", user, detail=label, request=request)
     await session.commit()
+    from ..services.plugins import emit
+
+    await emit("party.created", {"host": user.username, "title": label, "party_id": party.id,
+                                 "scheduled_at": party.scheduled_at.isoformat() if party.scheduled_at else None})
     return await _out(session, party, user)
 
 

@@ -879,3 +879,13 @@ body.has-player .tray { bottom: 88px; }
 .voice-panel p { margin: 0; }
 .voice-mic { margin-left: 6px; vertical-align: -2px; color: var(--muted); transition: color .15s; }
 .voice-mic.talking { color: var(--jute); filter: drop-shadow(0 0 4px var(--jute)); }
+
+/* Plugins */
+.plugins article.plugin { border: 1px solid var(--line); border-radius: var(--radius-m, 10px); padding: 12px 14px; margin-top: 10px; }
+.plugins article.plugin.on { border-color: color-mix(in srgb, var(--jute) 60%, var(--line)); }
+.plugins article.plugin header { display: flex; justify-content: space-between; gap: 12px; align-items: flex-start; }
+.plugins article.plugin h3 { margin: 0 0 4px; font-size: 1rem; display: flex; gap: 6px; align-items: baseline; flex-wrap: wrap; }
+.plugins article.plugin p { margin: 4px 0; }
+.plugins article.plugin code { overflow-wrap: anywhere; }
+.plugins details { margin-top: 8px; }
+.plugins .switch { white-space: nowrap; }
