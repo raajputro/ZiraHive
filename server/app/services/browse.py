@@ -38,7 +38,7 @@ def roots() -> list[tuple[Path, str]]:
     s = get_settings()
     out: list[tuple[Path, str]] = []
     if s.media_root and Path(s.media_root).is_dir():
-        out.append((Path(s.media_root), "Media folder"))
+        out.append((Path(s.media_root), display(s.media_root) if s.media_host_path else "Media folder"))
     drives = Path(s.drives_dir)
     if drives.is_dir():
         for d in sorted(drives.iterdir()):
@@ -81,6 +81,13 @@ def display(path: str | Path) -> str:
     """/drives/e/Movies/English -> E:\\Movies\\English (how it looks on the PC)."""
     s = get_settings()
     p = PurePosixPath(str(path).replace("\\", "/"))
+    if s.media_root and s.media_host_path:
+        try:
+            rel = p.relative_to(PurePosixPath(s.media_root))
+            host = s.media_host_path.replace("/", "\\").rstrip("\\")
+            return "\\".join([host, *rel.parts])
+        except ValueError:
+            pass
     drives = PurePosixPath(s.drives_dir)
     try:
         rel = p.relative_to(drives)

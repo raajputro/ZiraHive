@@ -1,8 +1,11 @@
 # GharBox first-time setup for Windows.
 #   Right-click > Run with PowerShell   (or:  powershell -ExecutionPolicy Bypass -File setup.ps1)
 #
-# Creates .env from .env.example with a random database password, finds your drives so you can
-# pick media folders where they already are, and starts GharBox with Docker.
+# Creates .env from .env.example with a random database password, asks where your media folder
+# is (GharBox reads only that folder), and starts GharBox with Docker.
+#   .\setup.ps1 -MediaFolder G:\Media    answers the question up front
+
+param([string]$MediaFolder)
 
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
@@ -39,15 +42,57 @@ if (-not $dataOk) {
     $envText = Set-EnvLine $envText "GHARBOX_DATA_PATH" "$($biggest.Name):/GharBoxData"
 }
 
-# Every drive with a letter from C to J becomes pickable (read-only) in Settings.
-$found = @()
-foreach ($d in Get-PSDrive -PSProvider FileSystem) {
-    if ($d.Name -match "^[C-Jc-j]$" -and (Test-Path "$($d.Name):\")) {
-        $letter = $d.Name.ToUpper()
-        $envText = Set-EnvLine $envText "DRIVE_$letter" "${letter}:/"
-        $found += "${letter}:"
+# The media folder: GharBox reads only this folder (never changes, moves or copies anything),
+# and every folder inside it becomes a category: G:\Media\English Movies -> "English Movies".
+function Get-Kind([string]$name) {
+    if ($name -match "audio ?books?|golpo|story ?tapes?") { return "audiobooks" }
+    if ($name -match "music|songs?\b|gaan|sangeet|sangit|geet|qawwali|mp3|albums?\b|playlist") { return "music" }
+    if ($name -match "comic|manga|manhwa|webtoon|graphic novel") { return "comics" }
+    if ($name -match "books?\b|ebook|novel|pdfs?\b|reading|library|\bboi\b") { return "books" }
+    if ($name -match "series|\bshows?\b|\btv\b|drama|sitcom|season|natok|serial") { return "series" }
+    if ($name -match "anim|cartoon|kids|children|anime") { return "movies + series" }
+    return "movies"
+}
+
+$current = if ($envText -match "(?m)^MEDIA_PATH=([^\r\n]*\S)") { $Matches[1] } else { "" }
+if (-not $MediaFolder) {
+    Write-Host ""
+    Write-Host "Where are your movies, series, music and books? Type the folder, for example G:\Media" -ForegroundColor Cyan
+    Write-Host "GharBox only reads it: nothing is moved, copied or changed. Other folders and drives stay hidden."
+    while ($true) {
+        $prompt = if ($current) { "Media folder (Enter keeps $current)" } else { "Media folder (Enter to skip for now)" }
+        $answer = (Read-Host $prompt).Trim().Trim('"')
+        if ($answer -match '^[A-Za-z]:$') { $answer += "\" }  # a whole drive
+        if (-not $answer) { $MediaFolder = $current; break }
+        if (Test-Path -LiteralPath $answer -PathType Container) { $MediaFolder = $answer; break }
+        Write-Host "  There's no folder $answer. Check the drive letter and the name." -ForegroundColor Yellow
     }
 }
+if ($MediaFolder) {
+    if ($MediaFolder -match '^[A-Za-z]:$') { $MediaFolder += "\" }
+    $full = (Resolve-Path -LiteralPath $MediaFolder).Path.TrimEnd("\")
+    if ($full -match '^[A-Za-z]:$') { $full += "\" }  # G:\ stays G:\ (Docker needs the slash)
+    $dataPath = if ($envText -match "(?m)^GHARBOX_DATA_PATH=([^\r\n]*\S)") { $Matches[1].Replace("/", "\").TrimEnd("\") } else { "" }
+    if ($dataPath -and ($dataPath -ieq $full -or $dataPath.StartsWith($full.TrimEnd("\") + "\", "OrdinalIgnoreCase"))) {
+        Write-Host "  That folder holds GharBox's own data ($dataPath); it won't show up as media." -ForegroundColor Yellow
+    }
+    $envText = Set-EnvLine $envText "MEDIA_PATH" ($full.Replace("\", "/"))
+    $folders = @(Get-ChildItem -LiteralPath $full -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -notmatch '^[.$]' -and $_.Name -ne "System Volume Information" })
+    Write-Host ""
+    if ($folders.Count -eq 0) {
+        Write-Host "  $full has no folders inside yet. Make one per kind (English Movies, Web Series, Music, ...)."
+    } else {
+        Write-Host "  These become your categories (rename them or change the type later in Settings):"
+        foreach ($f in $folders) {
+            $name = (($f.Name -split "[\s_.\-]+" | Where-Object { $_ } |
+                ForEach-Object { if ($_ -cmatch "[A-Z]") { $_ } else { $_.Substring(0,1).ToUpper() + $_.Substring(1) } }) -join " ")
+            Write-Host ("    {0,-32} {1}" -f $name, (Get-Kind $name))
+        }
+    }
+    Write-Host "  New folders you make there later are added by themselves (every night, or Settings > Find new folders)."
+}
+
 $port = if ($envText -match "(?m)^GHARBOX_HTTP_PORT=(\d+)") { $Matches[1] } else { "8080" }
 
 # This PC's address on the home network, for Chromecasts and smart TVs.
@@ -61,7 +106,6 @@ if ($lan -and $envText -notmatch "(?m)^GHARBOX_LAN_URL=\S") {
 }
 
 Set-Content -Path .env -Value $envText -Encoding UTF8 -NoNewline
-Write-Host ("Drives GharBox can read (read-only): " + ($found -join ", "))
 
 Write-Host "Starting GharBox. The first time takes 10-20 minutes while Docker builds it..."
 docker compose up -d --build
@@ -70,6 +114,6 @@ if ($LASTEXITCODE -ne 0) { Write-Host "Docker couldn't start GharBox. Is Docker 
 Write-Host ""
 Write-Host "GharBox is running: http://localhost:$port" -ForegroundColor Green
 if ($lan) { Write-Host "On phones and TVs at home: http://${lan}:$port" }
-Write-Host "Create your admin account there, then Settings > Server > Categories > Choose folder"
-Write-Host "to add your movie, music and book folders where they already are."
+Write-Host "Create your admin account there. Your categories appear in Watch, Listen and Read as soon as"
+Write-Host "the first scan finishes. To use another media folder later, run this again."
 Start-Process "http://localhost:$port"

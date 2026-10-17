@@ -187,3 +187,17 @@ async def test_old_database_is_upgraded(tmp_path, monkeypatch):
     assert {"series_id", "season", "episode", "episode_title"} <= item_cols
     assert db.execute("SELECT sort_order FROM libraries").fetchone()[0] == 0
     get_settings.cache_clear()
+
+
+def test_media_folder_shown_as_on_the_pc(monkeypatch, tmp_path):
+    from app.config import get_settings
+    from app.services.browse import display
+
+    monkeypatch.setenv("GHARBOX_MEDIA_ROOT", str(tmp_path))
+    monkeypatch.setenv("GHARBOX_MEDIA_HOST_PATH", "G:/Media/")
+    get_settings.cache_clear()
+    try:
+        assert display(tmp_path / "English Movies") == "G:\\Media\\English Movies"
+        assert display(tmp_path) == "G:\\Media"
+    finally:
+        get_settings.cache_clear()

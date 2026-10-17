@@ -68,18 +68,20 @@ You need **Docker Desktop** (free for personal use) with the WSL 2 backend. Star
 1. In this folder, right-click **setup.ps1** > **Run with PowerShell**. It:
    - creates `.env` with a random database password,
    - puts GharBox's own data (photos, files, database) on the drive with the most free space,
-   - lets GharBox **read** your drives (never change them), so you can pick media folders where they
-     already are,
+   - asks where your media folder is, for example `G:\Media`. GharBox **reads only that folder** (it
+     never moves, copies or changes anything there, and other folders and drives stay hidden), and
+     shows which categories its folders will become,
    - builds and starts everything (10 to 20 minutes the first time) and opens GharBox.
 
    Prefer doing it by hand? `copy .env.example .env`, fill in `POSTGRES_PASSWORD`,
-   `GHARBOX_DATA_PATH` and a `DRIVE_X=X:/` line per drive, then `docker compose up -d --build`.
+   `GHARBOX_DATA_PATH` and `MEDIA_PATH=G:/Media`, then `docker compose up -d --build`.
 
 2. Open **http://localhost:8080** and create the admin account.
 
-3. **Settings > Server > Categories > Choose folder**: click through to a folder, for example
-   `E:\Movies\English`, check the name and type, press **Add category**. Repeat for every folder:
-   movies, series, music, audiobooks, books, comics, on any drive. Nothing is moved or copied.
+3. Every folder inside your media folder is now a category: `G:\Media\english_movies` becomes
+   "English Movies", `G:\Media\Web Series` becomes series. Rename them or change a type in
+   **Settings > Server > Categories**. Make a new folder there later and it's added by itself
+   overnight, or straight away with **Find new folders**.
 
 4. To use it from your phone or TV, find your PC's address with `ipconfig` (the IPv4 address,
    such as `192.168.0.105`) and open `http://192.168.0.105:8080`. If it doesn't load, allow
@@ -119,8 +121,9 @@ image of Live Photos; to keep the originals, copy them to a PC first and upload 
 
 ## Categories
 
-A category is one folder of one kind of media, read where it is. Add each in **Settings > Server >
-Categories > Choose folder**; they can be on different drives:
+A category is one folder of one kind of media, read where it is. The folders inside your media
+folder become categories by themselves. Media in other places too? Share that drive (below) and add
+folders from it in **Settings > Server > Categories > Choose folder**:
 
 ```
 E:\Movies\English\Inception (2010)\Inception (2010).mkv      -> "English Movies" (movies)
@@ -133,9 +136,7 @@ D:\Books\The River Journey.epub, Cooking.pdf                -> "Ebooks"
 D:\Comics\Sky Rider\Sky Rider 001.cbz                        -> "Comics"
 ```
 
-**Or one media folder for everything:** set `MEDIA_PATH=D:/Media` in `.env`; every folder inside it
-(`D:\Media\English Movies`, `D:\Media\Web Series`, ...) becomes a category by itself. Both ways work
-together.
+The media folder is `MEDIA_PATH` in `.env` (`setup.ps1` sets it). Both ways work together.
 
 Inside `MEDIA_PATH`, GharBox finds new folders on start, every night, and when you press **Find new
 folders** in Settings. Every category is scanned again each night, and on **Scan now**. Folder names like `english_movies` are tidied to "English Movies". Each category has a
@@ -160,8 +161,8 @@ Episodes are recognised from `S01E02`, `1x02`, `E03`, `Episode 7` or a leading n
 When an episode ends, the next one starts by itself, and Continue watching shows the next
 episode of every series you're following.
 
-A drive that isn't listed yet (a new USB disk, say): run `setup.ps1` again, or add `DRIVE_X=X:/` to
-`.env` and run `docker compose up -d`. A category whose drive is unplugged is hidden until it's back.
+Sharing a drive: only drives you list are visible to GharBox. Add `DRIVE_E=E:/` to `.env` and run
+`docker compose up -d`; to change the media folder, run `setup.ps1` again. A category whose drive is unplugged is hidden until it's back.
 GharBox's own data folder never shows up as media, even when its drive is shared.
 
 ### Playing anything

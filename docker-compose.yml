@@ -15,6 +15,7 @@ x-server-env: &server-env
   GHARBOX_SECRET_KEY: ${GHARBOX_SECRET_KEY:-}
   # Every folder inside MEDIA_PATH (English Movies, Web Series, ...) becomes a Watch category.
   GHARBOX_MEDIA_ROOT: /media
+  GHARBOX_MEDIA_HOST_PATH: ${MEDIA_PATH:-}
   GHARBOX_MEDIA_LIBRARIES: ${GHARBOX_MEDIA_LIBRARIES:-}
   GHARBOX_TMDB_API_KEY: ${GHARBOX_TMDB_API_KEY:-}
   GHARBOX_PUBLIC_URL: ${GHARBOX_PUBLIC_URL:-}
@@ -30,9 +31,8 @@ x-server-volumes: &server-volumes
   - ${GHARBOX_DATA_PATH:-./gharbox-data}:/data
   # Your media folder (optional), read-only so GharBox can never modify or delete it.
   - ${MEDIA_PATH:-./media}:/media:ro
-  # Your drives, read-only, so you can pick media folders where they already are:
-  # Settings > Server > Categories > Choose folder. setup.ps1 fills these in for you,
-  # or set DRIVE_D=D:/ etc. in .env. Drives not listed show nothing.
+  # Optional: whole drives, read-only, to pick more folders in Settings > Server > Categories >
+  # Choose folder. Only drives you list in .env (DRIVE_E=E:/) are shared; the rest show nothing.
   - ${DRIVE_C:-./no-drive}:/drives/c:ro
   - ${DRIVE_D:-./no-drive}:/drives/d:ro
   - ${DRIVE_E:-./no-drive}:/drives/e:ro
