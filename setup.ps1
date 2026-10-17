@@ -1,13 +1,14 @@
-# ZiraHive first-time setup for Windows.
+﻿# ZiraHive first-time setup for Windows.
 #   Right-click > Run with PowerShell   (or:  powershell -ExecutionPolicy Bypass -File setup.ps1)
 #
 # Creates .env from .env.example with a random database password, asks where your media folder
 # is (ZiraHive reads only that folder) and whether to turn on the local AI, then starts ZiraHive
 # with Docker and opens it once it answers.
-#   .\setup.ps1 -MediaFolder G:\Media -AI no    answers the questions up front
+#   .\setup.ps1 -MediaFolder G:\Media -AI no -Firewall yes    answers the questions up front
 #   .\setup.ps1 -Update                         no questions: keep the settings, rebuild, restart
 
-param([string]$MediaFolder, [ValidateSet("", "yes", "no")][string]$AI = "", [switch]$Update)
+param([string]$MediaFolder, [ValidateSet("", "yes", "no")][string]$AI = "",
+      [ValidateSet("", "yes", "no")][string]$Firewall = "", [switch]$Update)
 
 $ErrorActionPreference = "Stop"
 Set-Location -Path $PSScriptRoot
@@ -131,6 +132,8 @@ if ($MediaFolder) {
 # An install from before the rename keeps its database and Tailscale sign-in (Docker volumes),
 # and its old containers are stopped so they don't hold the port.
 $volumes = Get-Quiet { docker volume ls -q }
+# Remote access was in use if a Tailscale container ever ran (before or after the rename)
+$usedTailscale = (Get-Quiet { docker ps -aq --filter "label=com.docker.compose.service=tailscale" }).Count -gt 0
 function Use-OldVolume([string]$kind, [string]$key) {
     if (($volumes -contains "gharbox_$kind") -and -not ($volumes -contains "zirahive_$kind") -and
         ($script:envText -notmatch "(?m)^$key=\S")) {
@@ -163,22 +166,27 @@ $port = if ($envText -match "(?m)^ZIRAHIVE_HTTP_PORT=(\d+)") { $Matches[1] } els
 
 # Local AI (optional): photo search, faces, subtitles, questions. COMPOSE_PROFILES in .env makes
 # "docker compose up -d" start those containers too.
-$profiles = if ($envText -match "(?m)^COMPOSE_PROFILES=([^\r\n]*)") { @($Matches[1].Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ }) } else { $null }
-if ($null -eq $profiles) { $profiles = @() }
-$asked = $envText -match "(?m)^COMPOSE_PROFILES="
-if (-not $AI -and -not $asked -and -not $Update) {
+# (a list, always: PowerShell turns a one-item list into plain text unless told otherwise)
+[string[]]$profiles = @()
+if ($envText -match "(?m)^COMPOSE_PROFILES=([^\r\n]*)") {
+    $profiles = @($Matches[1].Split(",") | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+}
+if (-not $AI -and -not $Update) {
     $gb = 0
     try { $gb = [math]::Round((Get-CimInstance Win32_ComputerSystem).TotalPhysicalMemory / 1GB) } catch { }
     Write-Host ""
     Write-Host "Turn on the local AI? Search photos by what's in them, group faces, make subtitles and ask" -ForegroundColor Cyan
     Write-Host "questions about your documents, all on this PC. It downloads about 3-4 GB once and needs"
     Write-Host "8 GB of memory or more$(if ($gb) { " (this PC has $gb GB)" }). You can change your mind later by running this again."
-    $AI = if ((Read-Host "Local AI? (y/N)").Trim().ToLower().StartsWith("y")) { "yes" } else { "no" }
+    $now = $profiles -contains "ai"
+    $reply = (Read-Host "Local AI? (y/n, Enter keeps it $(if ($now) { 'on' } else { 'off' }))").Trim().ToLower()
+    $AI = if ($reply.StartsWith("y")) { "yes" } elseif ($reply.StartsWith("n")) { "no" } elseif ($now) { "yes" } else { "no" }
 }
 if ($AI -eq "yes" -and $profiles -notcontains "ai") { $profiles += "ai" }
 if ($AI -eq "no") { $profiles = @($profiles | Where-Object { $_ -ne "ai" }) }
+if (-not $profiles) { $profiles = @() }
 # remote access starts by itself once Tailscale has been set up (docs/REMOTE_ACCESS.md)
-if (($envText -match "(?m)^TS_AUTHKEY=\S") -or ($volumes -contains "zirahive_tailscale-state") -or ($envText -match "(?m)^TAILSCALE_VOLUME=\S")) {
+if (($envText -match "(?m)^TS_AUTHKEY=\S") -or $usedTailscale) {
     if ($profiles -notcontains "remote") { $profiles += "remote" }
 }
 $envText = Set-EnvLine $envText "COMPOSE_PROFILES" ($profiles -join ",")
@@ -224,11 +232,17 @@ if ($LASTEXITCODE -ne 0) {
     exit 1
 }
 
-Write-Host "Waiting for ZiraHive to answer..."
+# 127.0.0.1, not localhost: Windows tries IPv6 (::1) first for localhost, which Docker doesn't always
+# answer (WSL "mirrored" networking), and PowerShell 5.1 then waits instead of trying IPv4.
+$started = Get-Date
 $up = $false
-for ($i = 0; $i -lt 120 -and -not $up; $i++) {
-    try { $up = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 5 "http://localhost:$port/api/health").StatusCode -eq 200 } catch { Start-Sleep -Seconds 5 }
+while (-not $up -and ((Get-Date) - $started).TotalMinutes -lt 20) {
+    $secs = [int]((Get-Date) - $started).TotalSeconds
+    Write-Host -NoNewline ("`rWaiting for ZiraHive to answer... {0}:{1:00}  " -f [int][math]::Floor($secs / 60), ($secs % 60))
+    try { $up = (Invoke-WebRequest -UseBasicParsing -TimeoutSec 3 "http://127.0.0.1:$port/api/health").StatusCode -eq 200 } catch { }
+    if (-not $up) { Start-Sleep -Seconds 2 }
 }
+Write-Host ""
 if (-not $up) {
     Write-Host "ZiraHive started but isn't answering yet. What it says:" -ForegroundColor Yellow
     docker compose logs --tail 30 api
@@ -236,17 +250,53 @@ if (-not $up) {
     exit 1
 }
 
-# Phones and TVs at home need the port open in Windows Firewall (only possible as administrator).
-$admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
-$rule = Get-NetFirewallRule -DisplayName "ZiraHive" -ErrorAction SilentlyContinue
-if (-not $rule) {
-    if ($admin) {
-        New-NetFirewallRule -DisplayName "ZiraHive" -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow -Profile Private | Out-Null
-        Write-Host "Allowed ZiraHive through Windows Firewall on your home network."
-    } else {
-        Write-Host "If phones can't open it: run this once as administrator, or allow port $port in Windows Firewall." -ForegroundColor Yellow
-    }
+# Phones and TVs at home need the port open in Windows Firewall. With WSL's "mirrored" networking,
+# Docker's ports also pass WSL's own (Hyper-V) firewall, which blocks other devices by default.
+$wslMirrored = $false
+try {
+    $wslcfg = Join-Path $env:USERPROFILE ".wslconfig"
+    if (Test-Path $wslcfg) { $wslMirrored = [bool](Select-String -Path $wslcfg -Pattern '^\s*networkingMode\s*=\s*mirrored' -Quiet) }
+} catch { }
+$wslVm = "{40E0AC32-46A5-438A-A0B2-2B479E8F2E90}"  # WSL's id in the Hyper-V firewall
+$need = @()
+if (-not (Get-NetFirewallRule -DisplayName "ZiraHive" -ErrorAction SilentlyContinue)) {
+    $need += "New-NetFirewallRule -DisplayName 'ZiraHive' -Direction Inbound -Protocol TCP -LocalPort $port -Action Allow -Profile Private | Out-Null"
 }
+if ($wslMirrored -and (Get-Command New-NetFirewallHyperVRule -ErrorAction SilentlyContinue) -and
+    -not (Get-NetFirewallHyperVRule -Name "ZiraHive" -ErrorAction SilentlyContinue)) {
+    $need += "New-NetFirewallHyperVRule -Name 'ZiraHive' -DisplayName 'ZiraHive' -Direction Inbound -VMCreatorId '$wslVm' -Protocol TCP -LocalPorts $port -Action Allow -Profiles Private | Out-Null"
+}
+if ($need) {
+    $admin = $false
+    try { $admin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator) } catch { }
+    $script = "`$ErrorActionPreference='Stop'; " + ($need -join "; ")
+    $ok = $false
+    if ($admin) {
+        try { Invoke-Expression $script; $ok = $true } catch { Write-Host $_.Exception.Message -ForegroundColor Yellow }
+    } else {
+        $reply = $Firewall
+        if (-not $reply -and -not $Update) {
+            Write-Host ""
+            $reply = (Read-Host "Let phones and TVs on your home Wi-Fi open ZiraHive? Windows will ask for permission (y/n)").Trim().ToLower()
+        }
+        if ($reply -in @("y", "yes")) {
+            try {
+                $enc = [Convert]::ToBase64String([Text.Encoding]::Unicode.GetBytes($script))
+                $p = Start-Process powershell -Verb RunAs -Wait -PassThru -WindowStyle Hidden -ArgumentList "-NoProfile", "-EncodedCommand", $enc
+                $ok = $p.ExitCode -eq 0
+            } catch { }
+        }
+    }
+    if ($ok) { Write-Host "Allowed ZiraHive through Windows Firewall on your home network." }
+    else { Write-Host "Phones may not reach it until port $port is allowed: run this again and answer y." -ForegroundColor Yellow }
+}
+try {
+    $public = Get-NetConnectionProfile -ErrorAction Stop | Where-Object { $_.NetworkCategory -eq "Public" -and $_.IPv4Connectivity -eq "Internet" }
+    foreach ($n in $public) {
+        Write-Host "Your network '$($n.Name)' is set to Public, so Windows blocks phones from reaching ZiraHive." -ForegroundColor Yellow
+        Write-Host "  If it's your home Wi-Fi: Settings > Network & internet > $($n.InterfaceAlias) > $($n.Name) > Private network." -ForegroundColor Yellow
+    }
+} catch { }
 
 # A shortcut on the desktop
 try {
