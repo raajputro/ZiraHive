@@ -1,340 +1,344 @@
 # GharBox
 
-Your own Google Drive + Jellyfin, running on your PC. Free, open source, and private: your
-photos, documents and movies never leave your home. Everything works in a web browser, on
-your PC, phone and TV.
+**Your own Google Drive and Jellyfin, on your own PC.** Back up phones, keep your files, and watch
+your movies, series, music and books on any screen in the house, or anywhere with your family.
+Free, open source and private: nothing leaves your home unless you share it.
 
-- **Backup**: phone camera roll and any files, with resumable uploads. Photo backup skips
-  anything already saved
-- **Photos**: timeline grouped by date, "On this day" memories, albums you can share with
-  family, full-screen previews that work for iPhone HEIC in every browser
-- **Files**: folders, rename, move, download, a 30-day trash, and version history: upload a
-  document with the same name and the old copy is kept (last 20)
-- **Sharing**: links for a file, folder or album, with an optional password, an expiry date and
-  a view-only mode. Visitors don't need an account
-- **Watch**: one category per folder (English Movies, Hindi Movies, Bangla Movies, Web Series,
-  Animation, ...). Movies get titles, years and posters; web series get seasons, episodes and
-  "next episode". Every format plays in the browser: anything the browser can't play is converted
-  on the fly. Pick the quality (down to 360p for mobile data), the audio language and subtitles,
-  skip intros, and download a smaller copy to watch offline
-- **Watch parties**: press Watch together on any movie or episode, start now or pick a time, and
-  invite family or friends. Everyone's video stays in step, anyone (or only the host) can pause and
-  skip, the party waits when someone's video is loading, and there's chat, emoji reactions and
-  "next episode for everyone". Each person still picks their own quality, audio and subtitles
-- **Listen**: music by album, artist and song, favourites, playlists, shuffle and repeat, and a
-  player that keeps going while you browse, with lock-screen and headset controls on phones.
-  Audiobooks remember where you stopped, with chapters, speed and a sleep timer. WMA, ALAC and
-  other formats browsers can't play are converted once, by themselves
-- **Read**: EPUB and PDF books and comics (CBZ, CBR, CB7, or a folder of page pictures) in the
-  browser, with your place saved on every device. Light, sepia and dark pages, text size, a contents
-  list, right-to-left for manga and a scrolling mode for webtoons
-- **Kids**: give a profile an age limit and it only sees titles rated for that age
-- **Family**: several accounts with their own private space, admin and member roles, and
-  storage limits
-- **Vault**: a locked space for ID scans, bank papers and private photos, encrypted on your device
-  with your own passphrase before upload. The server only stores scrambled data: not even the
-  admin can open it. A recovery key gets you in if you forget the passphrase
-- **Offsite backup**: a daily encrypted copy of photos, files, the vault and the database on a USB
-  disk, another computer or a free cloud bucket (restic), with checks and a written restore guide
-  ([docs/BACKUP.md](docs/BACKUP.md))
-- **PC sync**: the GharBox Sync app keeps a folder on your Windows PC and a folder in GharBox the
-  same, both ways, like the Google Drive app ([sync-client/README.md](sync-client/README.md))
-- **বাংলা**: the whole interface in Bangla, with Bangla digits and dates. Each person picks their
-  language in Settings and it follows them to every device
-- **Security**: two-factor sign-in with recovery codes, "sign out everywhere", password changes
-  end other sessions, slowed-down password guessing, and an activity log for the admin
-- **Notifications**: a bell in the app for backups, shared albums, new movies and a nearly full
-  disk, and on your phone through the free ntfy app
-- **Admin dashboard**: who is watching what, background jobs, and free space on every disk
+Everything runs in the web browser on phones, PCs and TVs. There are no apps to install from a
+store.
 
-> Status: milestone 1, batches 1 to 6 and remote access. Next up: passkeys, plugins, linking two
-> GharBox servers and voice chat in watch parties. See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** batches 1 to 6 are done. Batch 7 (passkeys, voice chat in watch parties, plugins,
+> linking two GharBox servers) is in progress. See [docs/ROADMAP.md](docs/ROADMAP.md).
 
-## How it fits together
+## Contents
 
-| Container | Does |
+- [What it does](#what-it-does)
+- [Get started on Windows](#get-started-on-windows)
+- [Your media](#your-media)
+- [Watching](#watching)
+- [Listening and reading](#listening-and-reading)
+- [Photos, files and sharing](#photos-files-and-sharing)
+- [On your phone](#on-your-phone)
+- [Away from home](#away-from-home)
+- [Keeping it safe](#keeping-it-safe)
+- [Running it day to day](#running-it-day-to-day)
+- [For developers](#for-developers)
+
+## What it does
+
+| | |
 |---|---|
-| `web` | Caddy: serves the web app, proxies `/api`, does HTTPS when you give it a domain |
-| `api` | FastAPI server (Python): logins, uploads, files, photos, movies, streaming |
-| `worker` | Background jobs: thumbnails, movie scans, nightly trash cleanup |
-| `postgres` | Database (includes pgvector, ready for AI search later) |
-| `redis` | Job queue between `api` and `worker` |
-| `ollama` | Optional local AI, only with `--profile ai` |
+| **Backup** | The phone's camera roll and any files, with uploads that resume after a dropped connection. Photos already saved are skipped. |
+| **Photos** | A timeline by date, "On this day" memories, albums to share with family, iPhone HEIC photos shown in every browser. |
+| **Files** | Folders, a 30-day trash, and version history: upload a document with the same name and the old copy is kept. |
+| **Search and scan** | Find documents by the words inside them, in Bangla and English, even in scanned papers. Turn paper into a searchable PDF with the phone's camera. |
+| **Watch** | Movies and series from your own folders, with posters, seasons, "next episode" and skip intro. Every format plays: what the browser can't play is converted while you watch. |
+| **Watch parties** | Watch together from different places, in step, with chat and reactions. |
+| **On the TV** | Cast to a Chromecast, or browse GharBox from any smart TV's media menu (DLNA). |
+| **Listen** | Music by album and artist, playlists, and audiobooks that remember where you stopped. |
+| **Read** | EPUB and PDF books and comics, with your page saved on every device. |
+| **Vault** | A locked space for ID scans and private papers, encrypted on your device. Not even the admin can open it. |
+| **PC sync** | The GharBox Sync app keeps a folder on your Windows PC and in GharBox the same, both ways. |
+| **Family** | An account for each person, storage limits, and age limits for children. |
+| **বাংলা** | The whole interface in Bangla, with Bangla digits and dates. |
 
-## Run it on Windows
+## Get started on Windows
 
-You need **Docker Desktop** (free for personal use) with the WSL 2 backend. Start it once.
+You need **Docker Desktop** (free for personal use) with the WSL 2 backend. Install it and start
+it once.
 
-1. In this folder, right-click **setup.ps1** > **Run with PowerShell**. It:
+1. **Run the setup.** In this folder, right-click **setup.ps1** and choose **Run with PowerShell**.
+   It asks one question, where your media folder is, for example `G:\Media`, and then:
    - creates `.env` with a random database password,
-   - puts GharBox's own data (photos, files, database) on the drive with the most free space,
-   - asks where your media folder is, for example `G:\Media`. GharBox **reads only that folder** (it
-     never moves, copies or changes anything there, and other folders and drives stay hidden), and
-     shows which categories its folders will become,
+   - puts GharBox's own data (backed-up photos, files, the database) on the drive with the most
+     free space,
+   - shows which categories your media folders will become,
+   - fills in this PC's home-network address for TVs,
    - builds and starts everything (10 to 20 minutes the first time) and opens GharBox.
 
-   Prefer doing it by hand? `copy .env.example .env`, fill in `POSTGRES_PASSWORD`,
-   `GHARBOX_DATA_PATH` and `MEDIA_PATH=G:/Media`, then `docker compose up -d --build`.
+2. **Create the admin account** at **http://localhost:8080**.
 
-2. Open **http://localhost:8080** and create the admin account.
-
-3. Every folder inside your media folder is now a category: `G:\Media\english_movies` becomes
-   "English Movies", `G:\Media\Web Series` becomes series. Rename them or change a type in
-   **Settings > Server > Categories**. Make a new folder there later and it's added by itself
-   overnight, or straight away with **Find new folders**.
-
-4. To use it from your phone or TV, find your PC's address with `ipconfig` (the IPv4 address,
-   such as `192.168.0.105`) and open `http://192.168.0.105:8080`. If it doesn't load, allow
-   port 8080 through Windows Firewall:
+3. **Open it on other devices at home.** Use the address setup printed, for example
+   `http://192.168.0.105:8080`. If it doesn't load, allow GharBox through Windows Firewall, in
+   PowerShell as administrator:
 
    ```powershell
    New-NetFirewallRule -DisplayName "GharBox" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow
    ```
 
-   Tip: give your PC a fixed address in your router's DHCP settings so this never changes.
+   Give the PC a fixed address in your router (often called "DHCP reservation") so it never changes.
 
-### Everyday commands
+4. **Add your family** in **Settings > People**, and turn on two-factor sign-in for yourself in
+   **Settings > Your account**.
 
-```powershell
-docker compose ps                 # what's running
-docker compose logs -f api worker # watch the logs
-docker compose pull; docker compose up -d --build   # update after pulling new code
-docker compose down               # stop (your data stays in GHARBOX_DATA_PATH)
-```
+Prefer doing it by hand? `copy .env.example .env`, fill in `POSTGRES_PASSWORD`,
+`GHARBOX_DATA_PATH` and `MEDIA_PATH`, then run `docker compose up -d --build`.
 
-Your backed-up files are stored under readable names in
-`GHARBOX_DATA_PATH/storage/<username>/...`, so you can still browse them in Explorer even
-if GharBox is not running.
+## Your media
 
-## On your phone
+### The media folder
 
-GharBox runs in the phone's browser, so there's no app to install from a store. Open your GharBox
-address and choose **Add to Home Screen** (Safari: Share button; Chrome: menu). It then opens full
-screen with its own icon, like an app.
+GharBox reads your media **where it already is**. Nothing is copied, moved or changed, and it
+can't see any other folder or drive.
 
-To back up your camera roll, open **Photos > Upload photos** and pick everything you want. Files
-already saved are skipped, and uploads continue where they stopped if the connection drops. You can
-lock the phone: the browser pauses the upload and carries on when you open GharBox again. When a
-backup finishes, or a file fails, you get a notification (on the phone too, with ntfy set up), so
-there's no need to keep the screen on. On iPhone, Safari may hand over JPEG copies of HEIC photos and only the still
-image of Live Photos; to keep the originals, copy them to a PC first and upload from there.
-
-## Categories
-
-A category is one folder of one kind of media, read where it is. The folders inside your media
-folder become categories by themselves. Media in other places too? Share that drive (below) and add
-folders from it in **Settings > Server > Categories > Choose folder**:
+Every folder inside your media folder becomes a category by itself, named and typed from the
+folder name:
 
 ```
-E:\Movies\English\Inception (2010)\Inception (2010).mkv      -> "English Movies" (movies)
-E:\Movies\Hindi\3 Idiots (2009).mp4                         -> "Hindi Movies" (movies)
-F:\Series\Mirzapur\Season 1\Mirzapur.S01E01.mkv             -> "Web Series" (series)
-D:\Kids\Kung Fu Panda (2008).mkv                             -> "Animation" (movies and series)
-D:\Music\Shonar Band\Monsoon Songs (2021)\01 - Rain on Tin.mp3 -> "Music"
-D:\Audiobooks\Rabindra Thakur\Short Stories\01 ....mp3       -> "Audiobooks"
-D:\Books\The River Journey.epub, Cooking.pdf                -> "Ebooks"
-D:\Comics\Sky Rider\Sky Rider 001.cbz                        -> "Comics"
+G:\Media\English Movies   -> "English Movies"  movies
+G:\Media\hindi_movies     -> "Hindi Movies"    movies
+G:\Media\Web Series       -> "Web Series"      series
+G:\Media\Animation        -> "Animation"       movies and series
+G:\Media\Music            -> "Music"           music
+G:\Media\Audiobooks       -> "Audiobooks"      audiobooks
+G:\Media\Ebooks           -> "Ebooks"          books
+G:\Media\Comics           -> "Comics"          comics
 ```
 
-The media folder is `MEDIA_PATH` in `.env` (`setup.ps1` sets it). Both ways work together.
+- Rename a category, change its type, set its order or an age rating in **Settings > Server >
+  Categories**.
+- A new folder is added by itself overnight, or straight away with **Find new folders**.
+- Every category is scanned again each night, and when you press **Scan now**.
+- To use a different media folder, run `setup.ps1` again. It's `MEDIA_PATH` in `.env`.
 
-Inside `MEDIA_PATH`, GharBox finds new folders on start, every night, and when you press **Find new
-folders** in Settings. Every category is scanned again each night, and on **Scan now**. Folder names like `english_movies` are tidied to "English Movies". Each category has a
-type, guessed from its name and changeable in Settings:
+**Media in more than one place?** Share that whole drive (read-only) by adding a line like
+`DRIVE_E=E:/` to `.env` and running `docker compose up -d`. Then add any folder on it in
+**Settings > Server > Categories > Choose folder**. Only drives you list are visible. A category
+whose drive is unplugged is hidden until it's back.
+
+### Category types
 
 | Type | Use for | How files are read |
 |---|---|---|
-| Movies | English, Hindi, Bangla movies | every file is a movie |
-| Series | Web Series, TV Shows, Natok | every file is an episode, grouped by the show's folder |
-| Movies and series | Animation, Kids | files named like `S01E02` are episodes, the rest are movies |
-| Music | Music, Bangla Songs, Rabindra Sangeet | every audio file is a song; songs in one folder with the same album tag are an album |
-| Audiobooks | Audiobooks | one file is one book; a folder of files (CD1/CD2 folders too) is one book in parts |
+| Movies | English, Hindi, Bangla movies | every video is a movie |
+| Series | Web Series, TV Shows, Natok | every video is an episode, grouped by the show's folder |
+| Movies and series | Animation, Kids | names like `S01E02` are episodes, the rest are movies |
+| Music | Music, Bangla Songs, Rabindra Sangeet | every audio file is a song; one folder with one album tag is an album |
+| Audiobooks | Audiobooks | one file is one book; a folder of files (CD1/CD2 too) is one book in parts |
 | Books | Ebooks, Novels | EPUB and PDF; series from Calibre's metadata |
-| Comics | Comics, Manga | CBZ, CBR, CB7, CBT, or a folder of page pictures; series and issue from the name or ComicInfo.xml |
+| Comics | Comics, Manga | CBZ, CBR, CB7, CBT, or a folder of page pictures |
 
-Music uses the tags inside the files (title, artist, album, track number, year, cover picture). Files
-without tags still work: the song name comes from the file name, the album from its folder and the
-artist from the folder above, and a `cover.jpg` or `folder.jpg` next to the songs becomes the cover.
+### Naming files
 
-Episodes are recognised from `S01E02`, `1x02`, `E03`, `Episode 7` or a leading number
-(`01 - Pilot.mkv`), with the season taken from the name or a `Season 2` / `Book 2` folder.
-When an episode ends, the next one starts by itself, and Continue watching shows the next
-episode of every series you're following.
+- **Movies:** `Movie Name (2019).mkv` or the common `Movie.Name.2019.1080p.mkv` both work. Samples
+  and trailers are skipped.
+- **Episodes:** `S01E02`, `1x02`, `E03`, `Episode 7` or a leading number (`01 - Pilot.mkv`). The
+  season comes from the name or a `Season 2` folder.
+- **Music:** the tags inside the files (title, artist, album, track, cover). Files without tags
+  still work: the album comes from the folder name, the artist from the folder above, and a
+  `cover.jpg` or `folder.jpg` becomes the cover.
+- **Subtitles:** inside the file, or a file next to it with the same name: `Movie.srt`,
+  `Movie.en.srt`, `Movie.bn.srt`.
+- **Posters and plot summaries:** add a free key from themoviedb.org as `GHARBOX_TMDB_API_KEY` in
+  `.env`. Without it, a frame from the video becomes the poster.
 
-Sharing a drive: only drives you list are visible to GharBox. Add `DRIVE_E=E:/` to `.env` and run
-`docker compose up -d`; to change the media folder, run `setup.ps1` again. A category whose drive is unplugged is hidden until it's back.
-GharBox's own data folder never shows up as media, even when its drive is shared.
+## Watching
 
 ### Playing anything
 
-- **Files the browser can play** (MP4 with H.264, WebM) play as they are, with seeking.
-- **Everything else** (MKV with AC-3/DTS sound, HEVC, AVI, ...) is converted while you watch.
-  The seek bar still shows the whole film and you can jump anywhere; GharBox converts from that
-  point. Conversion pauses when it's far ahead of you and stops when nobody is watching.
-- **Quality**: Original, 1080p, 720p, 480p or 360p. With **Low-data mode** on (Settings > Your
-  account) videos start at 480p.
-- **Audio and subtitles**: every audio track is listed by language (handy for dual-audio Hindi and
-  Bangla releases). Subtitles come from inside the file or from a file next to it with the same name:
-  `Movie.srt`, `Movie.en.srt`, `Movie.bn.srt`. Picture-based subtitles (Blu-ray PGS) aren't shown yet.
-- **Watch offline**: under the player, **Make a copy** creates a smaller MP4 (480p is about 1 to 1.5 GB for a
-  two-hour film). You get a notification when it's ready, then **Save file** downloads it to your phone or
-  laptop. Copies nobody has used for 14 days are deleted.
-- **Skip intro and next episode**: files with chapters called Intro or Credits get the buttons
-  automatically. For a series without chapters, an admin opens the series and sets **Intro and credits**
-  once for all episodes. When the credits start, the next episode counts down from 10 and plays.
-- **NVIDIA GPU**: converting on the CPU works, but a GPU makes it effortless. Uncomment the `deploy`
-  block under `api` (and `worker`) in `docker-compose.yml`. Settings > Server shows which is used.
+- **Files the browser can play** (MP4 with H.264, WebM) play as they are.
+- **Everything else** (MKV with AC-3 or DTS sound, HEVC, AVI, ...) is converted while you watch.
+  You can still jump anywhere in the film; GharBox converts from that point.
+- **Quality:** Original, 1080p, 720p, 480p or 360p. **Low-data mode** (Settings > Your account)
+  starts videos at 480p.
+- **Audio and subtitles:** every audio track is listed by language, handy for dual-audio releases.
+- **Skip intro and next episode:** files with chapters called Intro or Credits get the buttons by
+  themselves. For a series without chapters, an admin sets **Intro and credits** once on the
+  series page. When the credits start, the next episode counts down and plays.
+- **Watch offline:** **Make a copy** under the player creates a smaller MP4 to download to a phone
+  or laptop (480p is about 1 to 1.5 GB for a two-hour film).
+- **Another player:** **Open in another player** gives a link for VLC, valid for 24 hours.
+- **NVIDIA GPU:** converting works on the CPU, but a GPU makes it effortless. Uncomment the
+  `deploy` block under `api` and `worker` in `docker-compose.yml`.
 
-### Listening and reading
+### Watch parties
 
-- **The player** sits along the bottom and keeps playing while you look at photos or files. Tap it
-  for the big view with the queue (music) or chapters (audiobooks). On phones the lock screen and
-  Bluetooth headsets can pause, skip and seek.
-- **Audiobooks** save your place every few seconds and when you pause, so you can stop on the phone
-  and carry on from the PC. Speed goes from 0.75× to 2×; the sleep timer stops after some minutes
-  or at the end of the chapter.
-- **Formats**: MP3, AAC/M4A/M4B, FLAC, Ogg and Opus play as they are. WMA, ALAC, APE and AIFF are
-  converted to MP3 the first time they play (a few seconds for a song). If a browser can't play a
-  file it should (some Linux browsers have no AAC), GharBox converts that one too.
-- **Books** open on the page you left, on any device. EPUB text size, font and page colour are up to
-  you; PDFs show one page at a time, sharp on phones. **Download** saves the original file for an
-  e-reader.
-- **Comics** load pages sized for your screen (smaller with Low-data mode) and remember the page.
-  Manga marked right-to-left in ComicInfo.xml open that way; you can switch any comic in the reading
-  settings, and choose **Scroll down** for webtoons.
-- Reading CBR/CB7 comics and showing PDF covers use `bsdtar` and `pdftoppm`, which the Docker image
-  includes.
-
-### Age limits for kids
-
-1. **Settings > People**, edit the child's account, choose **Only rated 7+ or younger** (or 13+).
-2. Give titles an age. With a TMDB key, movies and series get their certificate automatically
-   (India's CBFC first, then the US and UK). For whole categories, pick **Suits 7+** next to e.g.
-   Animation in **Settings > Server**. An admin can also set any single title on its page.
-3. Titles without any age are hidden from limited profiles, to be safe.
-
-### Movie files
-
-- Name files like `Movie Name (2019).mkv`, or the common `Movie.Name.2019.1080p.mkv` style;
-  both are recognised. Samples and trailers are skipped.
-- For posters and plot summaries, add a free TMDB key as `GHARBOX_TMDB_API_KEY`. Without it,
-  GharBox uses a frame from the movie as the poster.
-- Browsers play MP4/WebM with H.264, VP9 or AV1. Other files (for example HEVC in MKV)
-  show a copyable link you can open in VLC on your PC, phone or TV until transcoding lands.
-- Categories rescan every night at 03:00, or press the scan button in Settings.
+Press **Watch together** on any movie or episode, start now or pick a time, and invite family or
+friends. Everyone's video stays in step. Anyone (or only the host) can pause and skip, the party
+waits when someone's video is loading, and there's chat, emoji reactions and "next episode for
+everyone". Each person still picks their own quality, audio and subtitles.
 
 ### On the TV
 
-- **Chromecast** (and TVs with Chromecast built in, like most Android and Google TVs): press
-  **Cast to TV** under the player in Chrome or Edge and pick the TV. The TV fetches the film from
-  GharBox by itself; the page becomes the remote (pause, seek, stop), and where you stopped is saved.
-  Files a Chromecast can't play are converted on the fly, with subtitles. Two things are needed:
-  - GharBox's home-network address in `.env` as `GHARBOX_LAN_URL` (`setup.ps1` fills it in, e.g.
-    `http://192.168.0.10:8080`). Give the PC a fixed address in your router so it doesn't change.
-  - A secure page, as Google requires: open GharBox at `http://localhost:8080` on the PC itself, or
-    at your Tailscale `https://` address on a phone or laptop.
+- **Chromecast**, and TVs with Chromecast built in (most Android and Google TVs): press **Cast to
+  TV** under the player in Chrome or Edge. The TV fetches the film from GharBox by itself, and the
+  page becomes the remote. Casting needs a secure page, as Google requires: open GharBox at
+  `http://localhost:8080` on the PC itself, or at your Tailscale `https://` address on a phone.
+- **Other smart TVs** (Samsung, LG, Sony, ...) use **DLNA**. In the GharBox Sync app on the PC,
+  tick **Show on TVs at home**. The TV's media or source menu then lists *GharBox (your PC)* with
+  your categories, series by season and music albums. Anyone on your Wi-Fi can browse what the
+  signed-in account can see, so sign the app in with a family account rather than the admin.
+- **iPhone, iPad, Mac:** AirPlay from the video's own controls.
 
-  The links the TV gets play only that one title, for 12 hours; they can't open anything else.
-- **Smart TVs without Chromecast** (Samsung, LG, Sony, most others) use **DLNA**. In the GharBox
-  Sync app on the PC, tick **Show on TVs at home** in the tray menu (allow it if Windows asks about the
-  firewall). The TV's media or source menu then lists *GharBox (your PC)* with your categories,
-  series by season, Continue watching and your music albums. TVs play the original files, so
-  MKV with AC-3 sound usually works without conversion. Anyone on your Wi-Fi can browse what the
-  signed-in account can see, so sign the app in with the family's account rather than the admin,
-  and age limits then apply. No Windows PC? `gharbox-sync tv` does the same on any computer at home.
-- **iPhone, iPad, Mac**: AirPlay from the video's own controls.
+Both need this PC's home-network address as `GHARBOX_LAN_URL` in `.env`; `setup.ps1` fills it in.
+Links given to a TV play only that one title, for 12 hours.
 
-## Search and scanning
+### Age limits for children
 
-- **Search** in Files finds documents by the words inside them, not just their names: PDFs,
-  Word, PowerPoint and OpenDocument files, text files, and the text in scanned PDFs and photos of
-  pages, in Bangla and English (Tesseract). New uploads are read in the background; older files are
-  read overnight. `GHARBOX_OCR=all` in `.env` also reads every photo (slower), `off` turns it off.
-- **Scan** in Files turns paper into a searchable PDF using the phone's camera: GharBox finds the
-  page, straightens it (drag the corners if it guessed wrong), and cleans it up (Enhanced, Colour,
-  Grey or Black and white). Add as many pages as you like, reorder them, then **Save as PDF**.
-  Everything until saving happens on the phone.
+1. In **Settings > People**, edit the child's account and choose **Only rated 7+ or younger** (or
+   13+).
+2. Give titles an age. With a TMDB key, movies and series get their certificate automatically
+   (India's CBFC first, then the US and UK). For a whole category, choose **Suits 7+** next to it in
+   **Settings > Server**. An admin can also set the age on any single title.
+3. Titles without any age are hidden from limited profiles, to be safe.
 
-## Sharing and family
+## Listening and reading
 
-- **Albums**: in Photos, press **Select**, pick photos and choose **Add to album**. In the album,
-  **Share with family** lets other GharBox accounts see it, and add their own photos if you allow.
-- **Links**: the link button on any file, folder or album makes a link anyone can open. Add a
-  password, choose when it stops working, and untick **Allow downloads** for view-only (photos are
-  then shown as previews and the original is never handed out).
-- **Uploading again**: in **Files**, a document with the same name in the same folder becomes a
-  new version (see the clock button). Photos are never versioned, because phones reuse names like
-  `IMG_0001.JPG`. Uploading the same file into a different folder keeps a separate copy.
+- **The player** sits along the bottom and keeps playing while you browse. Tap it for the queue or
+  chapters. On phones, the lock screen and Bluetooth headsets can pause and skip.
+- **Audiobooks** save your place as you listen, so you can stop on the phone and carry on from the
+  PC. Speed 0.75× to 2×, and a sleep timer.
+- **Formats:** MP3, AAC/M4A/M4B, FLAC, Ogg and Opus play as they are. WMA, ALAC, APE and AIFF are
+  converted to MP3 the first time they play.
+- **Books** open on the page you left, on any device, with your choice of text size, font and page
+  colour. **Download** saves the original for an e-reader.
+- **Comics** load pages sized for your screen. Manga can read right to left, and webtoons scroll
+  down.
 
-## Notifications on your phone
+## Photos, files and sharing
 
-Install the free **ntfy** app (Android or iPhone), subscribe to a topic with a long random name,
-for example `gharbox-k2v9x7q`, then paste `https://ntfy.sh/gharbox-k2v9x7q` into
-**Settings > Your account > Phone notifications** and press **Send test**. To keep everything
-inside your home, you can run your own ntfy server instead (it's open source).
+- **Albums:** in Photos, press **Select**, pick photos and choose **Add to album**. **Share with
+  family** lets other accounts see it, and add their own photos if you allow.
+- **Links:** the link button on any file, folder or album makes a link anyone can open, with an
+  optional password, an end date and a view-only mode. Visitors don't need an account.
+- **Versions:** in Files, uploading a document with the same name into the same folder keeps the
+  old copy (the clock button shows them). Photos are never versioned, because phones reuse names
+  like `IMG_0001.JPG`.
+- **Search:** the search box in Files finds documents by the words inside them: PDFs, Word,
+  PowerPoint, OpenDocument and text files, and the text in scanned PDFs and photos of pages, in
+  Bangla and English. `GHARBOX_OCR=all` in `.env` also reads every photo (slower); `off` turns it
+  off.
+- **Scan:** **Scan** in Files turns paper into a searchable PDF with the phone's camera. GharBox
+  finds the page, straightens it and cleans it up; add as many pages as you like.
+- **Vault:** for papers no one else should see. Files are encrypted on your device with your own
+  passphrase before upload. Keep the recovery key you're shown somewhere safe: without the
+  passphrase or the key, nobody can open the vault, including you.
+- **PC sync:** the GharBox Sync app for Windows keeps a folder on your PC and one in GharBox the
+  same, both ways. See [sync-client/README.md](sync-client/README.md).
 
-## Using it away from home
+Backed-up files are stored under readable names in `GHARBOX_DATA_PATH\storage\<username>\...`, so
+you can browse them in Explorer even when GharBox isn't running.
 
-Follow [docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md). In short: the full app stays private and is
-reached through Tailscale (free, encrypted, works behind CGNAT, no router changes), and only share
-links get a public address. `docker compose --profile remote up -d` starts it.
+## On your phone
 
-## Developing
+Open your GharBox address and choose **Add to Home Screen** (Safari: the Share button; Chrome: the
+menu). It then opens full screen with its own icon, like an app.
+
+**Back up the camera roll:** **Photos > Upload photos**, then pick everything. Photos already
+saved are skipped, and uploads continue where they stopped. You can lock the phone: the upload
+pauses and carries on when you open GharBox again, and you're notified when it finishes or a file
+fails. On iPhone, Safari may hand over JPEG copies of HEIC photos and only the still part of Live
+Photos; to keep the originals, copy them to a PC first and upload from there.
+
+**Notifications:** install the free **ntfy** app, subscribe to a topic with a long random name
+(for example `gharbox-k2v9x7q`), paste `https://ntfy.sh/gharbox-k2v9x7q` into **Settings > Your
+account > Phone notifications**, and press **Send test**.
+
+## Away from home
+
+GharBox is reached from outside through **Tailscale**: free, encrypted, no router changes, and it
+works behind the CGNAT most Bangladeshi internet providers use. The app itself is never on the
+public internet; only your devices and your family's can reach the sign-in page.
+
+1. Make a free account at https://login.tailscale.com. In its admin console, under **DNS**, keep
+   **MagicDNS** on and press **Enable HTTPS**.
+2. Under **Settings > Keys**, generate an auth key and put it in `.env` as `TS_AUTHKEY=...`.
+3. Run `docker compose --profile remote up -d --build`. The PC appears as something like
+   `gharbox.tail1234.ts.net`.
+4. On each phone and laptop, install the Tailscale app, sign in, and open
+   `https://gharbox.tail1234.ts.net`.
+5. Invite family under **Users** in the Tailscale console (the free plan covers 6 people).
+
+Share links can get their own public address that serves share links and nothing else.
+[docs/REMOTE_ACCESS.md](docs/REMOTE_ACCESS.md) has the full guide, including that and the other
+options.
+
+## Keeping it safe
+
+- **Sign-in:** two-factor sign-in with recovery codes, "sign out everywhere", password changes end
+  other sessions, slowed-down password guessing, and an activity log for the admin.
+- **Security check:** **Settings > Server > Security check** lists anything that needs attention.
+- **Offsite backup:** a daily encrypted copy of photos, files, the vault and the database to a USB
+  disk, another computer or a cloud bucket, with regular checks. Set it up in **Settings > Server >
+  Offsite backup**; restoring is in [docs/BACKUP.md](docs/BACKUP.md).
+- **Your media is read-only** to GharBox: it can never change or delete it.
+
+## Running it day to day
+
+```powershell
+docker compose ps                     # what's running
+docker compose logs -f api worker     # watch the logs
+docker compose up -d --build          # after updating the code
+docker compose down                   # stop (your data stays in GHARBOX_DATA_PATH)
+```
+
+The admin dashboard in **Settings > Server** shows who is watching what, background jobs, and free
+space on every disk.
+
+## For developers
+
+### How it fits together
+
+| Container | Does |
+|---|---|
+| `web` | Caddy: serves the web app and proxies `/api` |
+| `api` | FastAPI (Python): accounts, uploads, files, photos, media, streaming |
+| `worker` | Background jobs: thumbnails, scans, text reading, backups, nightly cleanup |
+| `postgres` | Database (with pgvector, ready for AI search) |
+| `redis` | Job queue between `api` and `worker` |
+| `tailscale` | Remote access, only with `--profile remote` |
+| `ollama` | Local AI, only with `--profile ai` |
+
+### Running from source
 
 ```powershell
 # server (Python 3.12+)
 cd server
 python -m venv .venv; .venv\Scripts\activate
 pip install -r requirements-dev.txt
-pytest                                   # 35 API tests
-uvicorn app.main:app --reload --port 8000   # SQLite + in-process jobs, no Docker needed
+uvicorn app.main:app --reload --port 8000   # SQLite and in-process jobs, no Docker needed
 
 # web (Node 20+), in a second terminal
 cd web
 npm install
-npm run dev                              # http://localhost:5173, proxies /api to :8000
+npm run dev                                 # http://localhost:5173, proxies /api to :8000
 ```
 
-Without `GHARBOX_DATABASE_URL` and `GHARBOX_REDIS_URL`, the server uses SQLite in `server/data`
-and runs background jobs inside the API process, which is handy for development. You need
-`ffmpeg` on your PATH for video thumbnails (`winget install ffmpeg`).
+Without `GHARBOX_DATABASE_URL` and `GHARBOX_REDIS_URL`, the server uses SQLite in `server/data` and
+runs background jobs inside the API process. Video features need `ffmpeg` on your PATH
+(`winget install ffmpeg`). API docs are at http://localhost:8000/docs while the server runs.
 
-API docs are at http://localhost:8000/docs while the server runs.
+Every text in the interface needs a Bangla translation in `web/src/locales/bn.ts`;
+`npm run check:i18n` lists any that are missing.
 
-## Testing
-
-GharBox is tested at three levels:
+### Testing
 
 | What | Where | Run |
 |---|---|---|
-| API tests (pytest, 68 tests) | `server/tests` | `cd server; pytest` |
+| API tests (pytest) | `server/tests` | `cd server; pytest` |
 | End-to-end tests in a real browser (Playwright) | `e2e/tests` | see below |
 | Load test (Locust) | `loadtest/locustfile.py` | see the file's header |
 
-End-to-end tests run against a running GharBox. On a fresh install they create the admin
-account themselves; on yours, pass your admin login:
+End-to-end tests run against a running GharBox. On a fresh install they create the admin account
+themselves; on yours, pass your admin sign-in:
 
 ```powershell
 cd e2e
 npm install
-npx playwright install chromium
+npx playwright install chromium chrome
 $env:E2E_BASE_URL="http://localhost:8080"; $env:E2E_ADMIN="mahbub"; $env:E2E_PASSWORD="..."
-npx playwright test          # npx playwright show-report for the HTML report
+npx playwright test          # then: npx playwright show-report
 ```
 
-They cover folders and trash, version history, password-protected links opened by a visitor,
-albums shared with a family member, two-factor sign-in with recovery codes, the Watch pages, the
-phone layout, and the player: converting a film the browser can't play, skip intro, switching audio
-and subtitles, offline copies and the next-episode countdown. The player tests need real Google
-Chrome (`npx playwright install chrome`), because the open-source Chromium can't decode H.264; they
-skip themselves otherwise. They create their own uniquely named test data, so they're safe to run against
-your real server, though the test users and folders stay afterwards.
+The player tests need real Google Chrome, because open-source Chromium can't decode H.264; they
+skip themselves otherwise. Tests make their own uniquely named data, so they're safe against your
+real server, though test users and folders stay afterwards.
 
-GitHub Actions (`.github/workflows/ci.yml`) runs the API tests, builds the web app and the Docker
-images, then starts the full stack with Postgres, Redis and sample media
+GitHub Actions (`.github/workflows/ci.yml`) runs the API tests, builds the web app, the Docker
+images and the Windows sync app, then starts the full stack with sample media
 (`scripts/make-sample-media.sh`) and runs the Playwright suite on every push.
 
 ## License
 
-AGPL-3.0, so GharBox stays free: anyone who runs a modified version as a service must share
-their changes.
+AGPL-3.0, so GharBox stays free: anyone who runs a modified version as a service must share their
+changes.
