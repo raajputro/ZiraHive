@@ -99,11 +99,18 @@
   tokens, browsing and streaming proxied through the guest's server, progress kept there, revocable
 - setup.ps1 asks for one media folder; README rewritten
 
-## Milestone 4: local AI (docker compose --profile ai)
-- Search photos by description (CLIP embeddings in pgvector)
-- Face grouping, duplicate and blurry photo cleanup
-- Whisper subtitles for movies without them
-- Ask in plain language through a local LLM in Ollama
+## Batch 8: local AI (done)
+- Optional `ai` container (fastembed CLIP, OpenCV YuNet + SFace, faster-whisper; ONNX/CTranslate2,
+  no PyTorch) and Ollama, switched on with `--profile ai`; everything degrades with a clear message
+- Photo search by description, with Bangla queries translated by the local model first
+- People: faces per account, grouped as photos arrive, names, merge, "not this person" that sticks
+- Clean up without AI: dHash near-duplicates (banded, no all-pairs compare), Laplacian blur score,
+  keep-the-best suggestion
+- AI subtitles with Whisper, listed with the file's own tracks (also on Chromecast and DLNA)
+- Ask your files: passages of each person's documents embedded with BGE-M3, answered by Qwen2.5 3B
+  with numbered sources; nothing leaves the PC
+- Nightly catch-up and a Catch up now button; Settings > Server > Local AI; docs/AI.md
+- Fixed: the nightly job ran under the 5-minute job limit
 
 ## Remote access (done)
 - Private app over Tailscale, public share-links-only site via Funnel, server-side gateway guard

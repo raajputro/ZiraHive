@@ -6,6 +6,7 @@ import { useUploads } from "../uploads";
 import { usePrefs } from "../prefs";
 import { DropZone } from "./Files";
 import { AddToAlbumDialog } from "./Albums";
+import { PhotoSearchBox } from "./SmartPhotos";
 
 import { locale, t as tr } from "../i18n";
 const monthFmt = new Intl.DateTimeFormat(locale(), { month: "long", year: "numeric" });
@@ -13,10 +14,15 @@ const dayFmt = new Intl.DateTimeFormat(locale(), { weekday: "short", day: "numer
 
 export function PhotoTabs() {
   return (
-    <nav className="lib-tabs photo-tabs" aria-label={tr("Photos")}>
-      <NavLink to="/photos" end>{tr("Timeline")}</NavLink>
-      <NavLink to="/photos/albums">{tr("Albums")}</NavLink>
-    </nav>
+    <div className="watch-bar photo-bar">
+      <nav className="lib-tabs photo-tabs" aria-label={tr("Photos")}>
+        <NavLink to="/photos" end>{tr("Timeline")}</NavLink>
+        <NavLink to="/photos/albums">{tr("Albums")}</NavLink>
+        <NavLink to="/photos/people">{tr("People")}</NavLink>
+        <NavLink to="/photos/cleanup">{tr("Clean up")}</NavLink>
+      </nav>
+      <PhotoSearchBox />
+    </div>
   );
 }
 
@@ -142,7 +148,7 @@ export default function PhotosPage() {
         {!loading && !error && items.length === 0 && (
           <div className="empty">
             <h2>{tr("No photos yet")}</h2>
-            <p>{tr("Drop photos and videos here, or install the phone app to back up your camera roll automatically.")}</p>
+            <p>{tr("Drop photos and videos here, or open ZiraHive on your phone and press Upload photos to back up the camera roll.")}</p>
           </div>
         )}
         {groups.map((m) => (

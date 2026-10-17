@@ -22,6 +22,11 @@ x-server-env: &server-env
   ZIRAHIVE_LAN_URL: ${ZIRAHIVE_LAN_URL:-}
   ZIRAHIVE_SERVER_NAME: ${ZIRAHIVE_SERVER_NAME:-}
   ZIRAHIVE_ICE_SERVERS: ${ZIRAHIVE_ICE_SERVERS:-}
+  # Local AI (docker compose --profile ai): used when those containers are running
+  ZIRAHIVE_AI_URL: ${ZIRAHIVE_AI_URL:-http://ai:8001}
+  ZIRAHIVE_OLLAMA_URL: ${ZIRAHIVE_OLLAMA_URL:-http://ollama:11434}
+  ZIRAHIVE_LLM_MODEL: ${ZIRAHIVE_LLM_MODEL:-qwen2.5:3b}
+  ZIRAHIVE_EMBED_MODEL: ${ZIRAHIVE_EMBED_MODEL:-bge-m3}
   ZIRAHIVE_OCR: ${ZIRAHIVE_OCR:-documents}
   ZIRAHIVE_API_DOCS: "false"
   ZIRAHIVE_HW_ACCEL: ${ZIRAHIVE_HW_ACCEL:-auto}
@@ -148,6 +153,24 @@ services:
       - web
 
   # ---- optional: local AI (docker compose --profile ai up -d) -------------
+  # Photo search by description, faces, AI subtitles. Models download once (about 700 MB)
+  # into the data folder's cache, which offsite backup skips.
+  ai:
+    build: ./ai
+    profiles: ["ai"]
+    restart: unless-stopped
+    environment:
+      ZIRAHIVE_AI_MODELS: /data/cache/ai-models
+      HF_HOME: /data/cache/ai-models/hf
+      ZIRAHIVE_WHISPER_MODEL: ${ZIRAHIVE_WHISPER_MODEL:-small}
+      ZIRAHIVE_AI_GPU: ${ZIRAHIVE_AI_GPU:-0}   # 1 with an NVIDIA card (uncomment deploy below)
+    volumes: *server-volumes
+    # deploy:
+    #   resources:
+    #     reservations:
+    #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
+
+  # A local language model for "Ask your files" (ollama.com). Pulls its models on first use.
   ollama:
     image: ollama/ollama:latest
     profiles: ["ai"]

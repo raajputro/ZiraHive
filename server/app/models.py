@@ -69,6 +69,10 @@ class Asset(Base):
     sha256: Mapped[str] = mapped_column(String(64))
     storage_path: Mapped[str] = mapped_column(Text)  # relative to storage_dir
     thumb_ready: Mapped[bool] = mapped_column(Boolean, default=False)
+    # Photo clean-up (no AI needed): a 64-bit picture fingerprint and how sharp it is
+    phash: Mapped[str | None] = mapped_column(String(16), nullable=True, index=True)
+    sharpness: Mapped[float | None] = mapped_column(Float, nullable=True)
+    ai_indexed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     width: Mapped[int | None] = mapped_column(Integer, nullable=True)
     height: Mapped[int | None] = mapped_column(Integer, nullable=True)
     duration: Mapped[float | None] = mapped_column(Float, nullable=True)
@@ -178,6 +182,8 @@ class MediaItem(Base):
     credits_start: Mapped[float | None] = mapped_column(Float, nullable=True)
     certification: Mapped[str | None] = mapped_column(String(16), nullable=True)
     age_rating: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    # AI subtitles: None, "queued", "working", "done:<language>" or "failed:<reason>"
+    ai_subtitles: Mapped[str | None] = mapped_column(String(300), nullable=True)
 
 
 class WatchProgress(Base):
@@ -644,3 +650,53 @@ class RemoteProgress(Base):
     duration: Mapped[float | None] = mapped_column(Float, nullable=True)
     finished: Mapped[bool] = mapped_column(Boolean, default=False)
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, onupdate=utcnow)
+
+
+
+class PhotoVector(Base):
+    """What a photo shows, as a CLIP vector, for searching by description (local AI)."""
+
+    __tablename__ = "photo_vectors"
+
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), primary_key=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    vector: Mapped[bytes] = mapped_column(LargeBinary)  # float32, unit length
+
+
+class Person(Base):
+    """Faces that look like the same person, in one account's photos."""
+
+    __tablename__ = "people"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    hidden: Mapped[bool] = mapped_column(Boolean, default=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Face(Base):
+    __tablename__ = "faces"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    person_id: Mapped[str | None] = mapped_column(ForeignKey("people.id", ondelete="SET NULL"), nullable=True, index=True)
+    box: Mapped[str] = mapped_column(String(100))  # JSON [x, y, w, h] as parts of the picture
+    score: Mapped[float] = mapped_column(Float, default=0)
+    vector: Mapped[bytes] = mapped_column(LargeBinary)
+    confirmed: Mapped[bool] = mapped_column(Boolean, default=False)  # put there by a person, not guessed
+
+
+class DocChunk(Base):
+    """A passage of a document's text with its meaning as a vector, for Ask your files."""
+
+    __tablename__ = "doc_chunks"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    asset_id: Mapped[str] = mapped_column(ForeignKey("assets.id", ondelete="CASCADE"), index=True)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    n: Mapped[int] = mapped_column(Integer, default=0)
+    text: Mapped[str] = mapped_column(Text)
+    vector: Mapped[bytes] = mapped_column(LargeBinary)
+    sha256: Mapped[str] = mapped_column(String(64))  # of the file the passage came from

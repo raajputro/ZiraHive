@@ -18,7 +18,8 @@ from ..security import admin_user, create_media_token, current_user
 from ..services import activity, jobs, transcode
 from ..services.events import audit
 from ..services.ranged import ranged_file_response
-from ..services.tracks import probe_tracks, to_vtt
+from ..services.ai_jobs import subtitle_path
+from ..services.tracks import language_name, probe_tracks, to_vtt
 from .media import _get_media, browser_playable, get_series
 
 router = APIRouter(prefix="/api", tags=["playback"])
@@ -38,7 +39,12 @@ async def _tracks(session: AsyncSession, item: MediaItem, src: Path) -> dict:
     if not item.tracks_json:
         item.tracks_json = json.dumps(await asyncio.to_thread(probe_tracks, src))
         await session.commit()
-    return json.loads(item.tracks_json)
+    data = json.loads(item.tracks_json)
+    if (item.ai_subtitles or "").startswith("done:") and subtitle_path(item.id).exists():
+        lang = language_name(item.ai_subtitles[5:])
+        data["subtitles"].append({"id": "ai", "source": "ai", "label": f"{lang or 'Speech'} (AI)", "language": lang,
+                                  "usable": True, "forced": False})
+    return data
 
 
 @router.get("/media/{media_id}/tracks", response_model=TracksOut)
@@ -48,7 +54,7 @@ async def media_tracks(media_id: str, user: User = Depends(current_user),
     tracks = await _tracks(session, item, await _source(session, item))
     return TracksOut(audio=tracks["audio"], subtitles=[s for s in tracks["subtitles"]],
                      qualities=transcode.qualities_for(item.height), direct_play=browser_playable(item),
-                     encoder=transcode.encoder())
+                     encoder=transcode.encoder(), ai_subtitles=item.ai_subtitles)
 
 
 # ------------------------------------------------------------------- HLS
@@ -108,6 +114,12 @@ async def hls_segment(media_id: str, quality: str, audio: int, n: int, request: 
 async def subtitle(media_id: str, sub_id: str, request: Request, user: User = Depends(current_user),
                    session: AsyncSession = Depends(get_session)):
     item = await _get_media(media_id, session, user)
+    if sub_id == "ai":  # made by Whisper (Settings: local AI)
+        path = subtitle_path(item.id)
+        if not path.exists():
+            raise HTTPException(404, "Subtitle not available")
+        return FileResponse(path, media_type="text/vtt",
+                            headers=_device_headers(request, {"Cache-Control": "private, max-age=3600"}))
     src = await _source(session, item)
     tracks = await _tracks(session, item, src)
     sub = next((s for s in tracks["subtitles"] if s["id"] == sub_id), None)

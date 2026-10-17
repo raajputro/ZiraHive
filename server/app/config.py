@@ -25,7 +25,12 @@ class Settings(BaseSettings):
     media_root: str = ""
     media_host_path: str = ""
     ice_servers: str = ""
-    server_name: str = ""  # how linked ZiraHive servers see this one, e.g. "Mahbub's ZiraHive"  # voice chat: extra STUN servers, comma separated  # the media folder as Windows sees it (G:/Media), for showing paths
+    server_name: str = ""
+    # Local AI (optional): the ai container and Ollama. Empty = off.
+    ai_url: str = ""
+    ollama_url: str = ""
+    llm_model: str = "qwen2.5:3b"     # answers questions; speaks Bangla reasonably
+    embed_model: str = "bge-m3"        # finds the passages; multilingual, Bangla included  # how linked ZiraHive servers see this one, e.g. "Mahbub's ZiraHive"  # voice chat: extra STUN servers, comma separated  # the media folder as Windows sees it (G:/Media), for showing paths
     # Extra libraries outside media_root: "Name:/path[:kind],Name2:/path2"
     media_libraries: str = ""
     # Your drives, mounted read-only by Docker as /drives/c, /drives/d, ... (DRIVE_D=D:/ in .env).

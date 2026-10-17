@@ -16,3 +16,4 @@ segno>=1.6
 mutagen>=1.47
 pypdf>=5.0
 webauthn>=2.5,<4
+numpy>=1.26

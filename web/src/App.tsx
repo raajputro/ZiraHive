@@ -10,6 +10,8 @@ import NowPlaying from "./components/NowPlaying";
 import HiveMark from "./components/HiveMark";
 import NotificationBell from "./components/Notifications";
 import PhotosPage from "./pages/Photos";
+import { CleanupPage, PeoplePage, PersonPage, PhotoSearchPage } from "./pages/SmartPhotos";
+import AskPage from "./pages/Ask";
 import AlbumsPage, { AlbumPage } from "./pages/Albums";
 import PublicSharePage from "./pages/PublicShare";
 import FilesPage from "./pages/Files";
@@ -69,6 +71,11 @@ function SignedInApp() {
               <Route path="/" element={<Navigate to="/photos" replace />} />
               <Route path="/photos" element={<PhotosPage />} />
               <Route path="/photos/albums" element={<AlbumsPage />} />
+              <Route path="/photos/search" element={<PhotoSearchPage />} />
+              <Route path="/photos/people" element={<PeoplePage />} />
+              <Route path="/photos/people/:id" element={<PersonPage />} />
+              <Route path="/photos/cleanup" element={<CleanupPage />} />
+              <Route path="/ask" element={<AskPage />} />
               <Route path="/photos/albums/:id" element={<AlbumPage />} />
               <Route path="/files/*" element={<FilesPage />} />
               <Route path="/watch" element={<WatchHome />} />

@@ -79,6 +79,8 @@ async def process_asset(_ctx: Any, asset_id: str) -> None:
                     asset.taken_at = media_tools.as_utc(taken)
                 await asyncio.to_thread(media_tools.make_image_thumb, src, dest)
                 asset.thumb_ready = True
+                from . import photo_quality
+                asset.phash, asset.sharpness = await asyncio.to_thread(photo_quality.measure, src)
             elif asset.kind == "video":
                 info = await asyncio.to_thread(media_tools.probe, src)
                 asset.width, asset.height, asset.duration = info.width, info.height, info.duration
@@ -91,6 +93,11 @@ async def process_asset(_ctx: Any, asset_id: str) -> None:
         if asset.taken_at is None:
             asset.taken_at = asset.created_at
         await session.commit()
+        kind = asset.kind
+    from ..config import get_settings
+
+    if kind == "photo" and get_settings().ai_url:
+        await enqueue("ai_photo", asset_id)  # does nothing when the ai container isn't running
 
 
 async def make_offline_copy(_ctx: Any, copy_id: str) -> None:
@@ -184,7 +191,11 @@ async def extract_text(_ctx: Any, asset_id: str) -> str:
             session.add(row)
         row.text, row.method, row.pages, row.sha256 = text, method, pages, asset.sha256
         await session.commit()
-        return method
+    from ..config import get_settings
+
+    if text.strip() and get_settings().ollama_url:
+        await enqueue("doc_chunks", asset_id)
+    return method
 
 
 async def text_backfill(_ctx: Any, limit: int = 300) -> int:
@@ -206,3 +217,8 @@ async def text_backfill(_ctx: Any, limit: int = 300) -> int:
 
 
 JOBS.update({"extract_text": extract_text, "text_backfill": text_backfill})
+
+from . import ai_jobs  # noqa: E402
+
+JOBS.update({"photo_quality": ai_jobs.photo_quality_job, "ai_photo": ai_jobs.ai_photo, "doc_chunks": ai_jobs.doc_chunks,
+             "transcribe": ai_jobs.transcribe, "ai_backfill": ai_jobs.ai_backfill})

@@ -7,8 +7,8 @@ Free, open source and private: nothing leaves your home unless you share it.
 Everything runs in the web browser on phones, PCs and TVs. There are no apps to install from a
 store.
 
-> **Status:** batches 1 to 7 are done. Next: local AI (search photos by description, faces,
-> subtitles for films without them). See [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** batches 1 to 8 are done, including the optional local AI. See
+> [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contents
 
@@ -21,6 +21,7 @@ store.
 - [On your phone](#on-your-phone)
 - [Away from home](#away-from-home)
 - [Keeping it safe](#keeping-it-safe)
+- [Local AI](#local-ai-optional)
 - [Plugins](#plugins)
 - [Running it day to day](#running-it-day-to-day)
 - [For developers](#for-developers)
@@ -30,7 +31,8 @@ store.
 | | |
 |---|---|
 | **Backup** | The phone's camera roll and any files, with uploads that resume after a dropped connection. Photos already saved are skipped. |
-| **Photos** | A timeline by date, "On this day" memories, albums to share with family, iPhone HEIC photos shown in every browser. |
+| **Photos** | A timeline by date, "On this day" memories, albums to share with family, iPhone HEIC photos shown in every browser. Clean up duplicates and blurry shots. |
+| **Local AI** (optional) | Search photos by what's in them, People grouped by face, subtitles for films without them, and questions answered from your documents. All on your PC. |
 | **Files** | Folders, a 30-day trash, and version history: upload a document with the same name and the old copy is kept. |
 | **Search and scan** | Find documents by the words inside them, in Bangla and English, even in scanned papers. Turn paper into a searchable PDF with the phone's camera. |
 | **Watch** | Movies and series from your own folders, with posters, seasons, "next episode" and skip intro. Every format plays: what the browser can't play is converted while you watch. |
@@ -290,6 +292,23 @@ options.
   Offsite backup**; restoring is in [docs/BACKUP.md](docs/BACKUP.md).
 - **Your media is read-only** to ZiraHive: it can never change or delete it.
 
+## Local AI (optional)
+
+```powershell
+docker compose --profile ai up -d --build
+```
+
+turns on free AI models that run on your PC; nothing is sent anywhere. Then:
+
+- **Photos > search**: "beach at sunset", "birthday cake", "লাল গাড়ি".
+- **Photos > People**: photos grouped by face. Give people names, fix mistakes, merge doubles.
+- **Make subtitles with AI** in the player (admins): Whisper listens to a film and writes subtitles.
+- **Files > Ask**: "When does my passport expire?" answered from your own documents, with where it
+  was found.
+
+**Photos > Clean up** (duplicates and blurry photos) works without AI. See [docs/AI.md](docs/AI.md)
+for memory needs, model choices and graphics cards.
+
 ## Plugins
 
 **Settings > Server > Plugins** has two built in:
@@ -323,7 +342,8 @@ space on every disk.
 | `postgres` | Database (with pgvector, ready for AI search) |
 | `redis` | Job queue between `api` and `worker` |
 | `tailscale` | Remote access, only with `--profile remote` |
-| `ollama` | Local AI, only with `--profile ai` |
+| `ai` | Local AI: CLIP, faces, Whisper; only with `--profile ai` |
+| `ollama` | Local language models for Ask; only with `--profile ai` |
 
 ### Running from source
 

@@ -99,7 +99,7 @@ export type Quality = "original" | "1080p" | "720p" | "480p" | "360p";
 export interface Tracks {
   audio: { index: number; label: string; language: string | null; codec: string | null; default: boolean }[];
   subtitles: { id: string; label: string; language: string | null; usable: boolean; forced: boolean }[];
-  qualities: Exclude<Quality, "original">[]; direct_play: boolean; encoder: string;
+  qualities: Exclude<Quality, "original">[]; direct_play: boolean; encoder: string; ai_subtitles?: string | null;
 }
 export interface OfflineCopy {
   id: string; media_id: string; quality: string; status: "queued" | "working" | "ready" | "failed";
@@ -201,6 +201,11 @@ export interface Plugin {
   last_error: string | null; last_error_at: string | null; last_ok_at: string | null; has_pages: boolean;
 }
 
+export interface AiStatus { ai: boolean; ollama: boolean; models: Record<string, string>; photos: number; photos_indexed: number; people: number; documents_ready: number; llm_model: string; embed_model: string }
+export interface PersonSummary { id: string; name: string | null; photos: number; cover_face: string | null; hidden: boolean }
+export interface Cleanup { duplicates: { keep: string; photos: Asset[] }[]; blurry: Asset[]; measured: number; waiting: number }
+export interface AskAnswer { answer: string; sources: { n: number; asset_id: string; filename: string; folder: string; passage: string }[] }
+
 export interface LinkedServer { id: string; name: string; url: string | null; ok: boolean; last_error: string | null; libraries: { id: string; name: string; kind: string }[] }
 export interface LinkGuest { id: string; name: string; library_ids: string[]; max_age: number | null; created_at: string; last_seen_at: string | null; code: string | null }
 
@@ -283,6 +288,21 @@ export const api = {
   testNotification: () => request<void>("POST", "/api/auth/me/test-notification"),
   changePassword: (current_password: string, new_password: string) =>
     request<{ user: User }>("POST", "/api/auth/password", { current_password, new_password }),
+  aiStatus: () => request<AiStatus>("GET", "/api/ai/status"),
+  aiCatchUp: () => request<void>("POST", "/api/admin/ai/catch-up"),
+  searchPhotos: (text: string) => request<{ query: string; searched_for: string; hits: { asset: Asset; score: number }[] }>(
+    "GET", `/api/photos/search?q=${encodeURIComponent(text)}`),
+  people: (hidden = false) => request<PersonSummary[]>("GET", `/api/people${hidden ? "?hidden=true" : ""}`),
+  personPhotos: (id: string) => request<Asset[]>("GET", `/api/people/${id}/photos`),
+  personFaces: (id: string) => request<{ id: string; asset_id: string }[]>("GET", `/api/people/${id}/faces`),
+  updatePerson: (id: string, change: { name?: string; hidden?: boolean }) => request<PersonSummary>("PATCH", `/api/people/${id}`, change),
+  mergePeople: (id: string, into: string) => request<void>("POST", `/api/people/${id}/merge`, { into }),
+  notThisPerson: (id: string, faceId: string) => request<void>("DELETE", `/api/people/${id}/faces/${faceId}`),
+  cleanup: () => request<Cleanup>("GET", "/api/photos/cleanup"),
+  trashAsset: (id: string) => request<void>("DELETE", `/api/assets/${id}`),
+  makeSubtitles: (mediaId: string, language?: string) =>
+    request<{ status: string }>("POST", `/api/media/${mediaId}/ai-subtitles`, { language: language || undefined }),
+  ask: (question: string) => request<AskAnswer>("POST", "/api/ask", { question }),
   links: () => request<LinkedServer[]>("GET", "/api/links"),
   addLink: (code: string, name?: string) => request<LinkedServer>("POST", "/api/admin/links", { code, name: name || undefined }),
   removeLink: (id: string) => request<void>("DELETE", `/api/admin/links/${id}`),
@@ -349,7 +369,6 @@ export const api = {
   createFolder: (path: string) => request<{ path: string }>("POST", "/api/folders", { path }),
   deleteFolder: (path: string) => request<void>("DELETE", `/api/folders${q({ path })}`),
   updateAsset: (id: string, change: { filename?: string; folder?: string }) => request<Asset>("PATCH", `/api/assets/${id}`, change),
-  trashAsset: (id: string) => request<void>("DELETE", `/api/assets/${id}`),
   trash: () => request<Asset[]>("GET", "/api/trash"),
   restore: (id: string) => request<Asset>("POST", `/api/trash/${id}/restore`),
   deleteForever: (id: string) => request<void>("DELETE", `/api/trash/${id}`),
@@ -423,6 +442,7 @@ export const url = {
   seriesPoster: (s: { id: string }) => `/api/series/${s.id}/poster`,
   titlePoster: (t: Title) => (t.type === "series" ? `/api/series/${t.id}/poster` : `/api/media/${t.id}/poster`),
   stream: (m: Media) => `${mediaBase(m)}/stream`,
+  face: (faceId: string) => `/api/faces/${faceId}/crop`,
   hls: (m: { id: string; base?: string }, quality: string, audio: number) => `${mediaBase(m)}/hls/${quality}/${audio}/index.m3u8`,
   subtitle: (m: { id: string; base?: string }, subId: string) => `${mediaBase(m)}/subtitles/${subId}.vtt`,
   linkPoster: (linkId: string, t: { id: string; type: "movie" | "series" }) =>

@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { ArrowLeft, Cast, Pause, Play, Square, SkipForward, Download, ExternalLink, FastForward, PartyPopper } from "lucide-react";
+import { ArrowLeft, Cast, Pause, Play, Sparkles, Square, SkipForward, Download, ExternalLink, FastForward, PartyPopper } from "lucide-react";
 import { castProblem, castTo, loadCast, type CastControl, type CastState } from "../cast";
 import PartyDialog from "../components/PartyDialog";
 import { api, ApiError, url, episodeCode, formatBytes, formatDuration, AGE_LABEL, AGE_OPTIONS,
@@ -209,6 +209,7 @@ function Player({ id }: { id: string }) {
           subtitle={subtitle} setSubtitle={setSubtitle} />
         {m.next_id && <button onClick={() => void playNext()}><SkipForward size={16} />{" "}{tr("Next episode")}</button>}
         <button onClick={() => { video.current?.pause(); setTogether(true); }}><PartyPopper size={16} />{" "}{tr("Watch together")}</button>
+        {user.is_admin && <AiSubtitles media={m} tracks={tracks} onDone={() => api.tracks(m.id).then(setTracks).catch(() => undefined)} />}
         {!cast && <button onClick={() => void startCast()} disabled={castBusy}><Cast size={16} />{" "}{castBusy ? tr("Connecting…") : tr("Cast to TV")}</button>}
       </div>
       {castHelp && <p className="notice" role="status">{castHelp}</p>}
@@ -298,5 +299,35 @@ export function RatingControl({ value, onChange, label }: { value: number | null
       </select>
       {saved && <span className="muted small">{" "}{tr("Saved")}</span>}
     </label>
+  );
+}
+
+/** For admins: subtitles made by the local AI (Whisper) from the film's speech. */
+function AiSubtitles({ media, tracks, onDone }: { media: Media; tracks: Tracks; onDone: () => void }) {
+  const [status, setStatus] = useState(tracks.ai_subtitles ?? null);
+  const [msg, setMsg] = useState("");
+  useEffect(() => { setStatus(tracks.ai_subtitles ?? null); }, [tracks]);
+  useEffect(() => {
+    if (status !== "queued" && status !== "working") return;
+    const t = setInterval(() => {
+      api.tracks(media.id).then((x) => { if (x.ai_subtitles !== status) { setStatus(x.ai_subtitles ?? null); if (x.ai_subtitles?.startsWith("done")) onDone(); } })
+        .catch(() => undefined);
+    }, 15_000);
+    return () => clearInterval(t);
+  }, [status, media.id, onDone]);
+  if (status?.startsWith("done")) return null;
+  const start = async () => {
+    setMsg("");
+    try { setStatus((await api.makeSubtitles(media.id)).status); }
+    catch (e) { setMsg(e instanceof ApiError ? e.message : tr("That didn't work")); }
+  };
+  return (
+    <span className="ai-subs">
+      {status === "queued" || status === "working"
+        ? <span className="muted small" role="status"><Sparkles size={15} aria-hidden />{" "}{tr("Making subtitles with AI… about as long as the film takes on a CPU.")}</span>
+        : <button onClick={() => void start()} title={tr("Listens to the film and writes subtitles, on this PC")}><Sparkles size={16} />{" "}{tr("Make subtitles with AI")}</button>}
+      {status?.startsWith("failed:") && <span className="error small">{" "}{tr("Last try failed: {why}", { why: status.slice(7) })}</span>}
+      {msg && <span className="error small">{" "}{msg}</span>}
+    </span>
   );
 }

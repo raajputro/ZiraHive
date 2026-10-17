@@ -493,6 +493,7 @@ class TracksOut(BaseModel):
     qualities: list[str]
     direct_play: bool
     encoder: str
+    ai_subtitles: str | None = None  # None, queued, working, done:<lang>, failed:<reason>
 
 
 class OfflineIn(BaseModel):

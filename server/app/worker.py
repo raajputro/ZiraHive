@@ -3,7 +3,7 @@ from __future__ import annotations
 
 import asyncio
 
-from arq import cron
+from arq import cron, func
 from arq.connections import RedisSettings
 from sqlalchemy import select
 
@@ -11,6 +11,7 @@ from . import db
 from .config import get_settings
 from .models import Library
 from .routers.files import purge_expired_trash
+from .services.ai_jobs import ai_backfill, ai_photo, doc_chunks, photo_quality_job, transcribe
 from .services.jobs import (extract_text, make_offline_copy, offsite_backup, offsite_check, process_asset, scan_library,
                             text_backfill)
 from .services.libraries import discover
@@ -21,6 +22,8 @@ async def startup(ctx) -> None:
     settings.ensure_dirs()
     db.init_engine(settings.db_url)
     await db.create_all()
+    from .services import jobs
+    await jobs.init_queue()  # so jobs started from here (uploads' follow-ups, catch-up) are queued too
 
 
 async def shutdown(ctx) -> None:
@@ -41,6 +44,8 @@ async def nightly(ctx) -> None:
     for lib_id in ids:
         await scan_library(ctx, lib_id)
     await text_backfill(ctx)
+    from .services.jobs import enqueue
+    await enqueue("ai_backfill")  # its own job: it can take hours
 
 
 async def purge_old_offline_copies(session) -> int:
@@ -110,8 +115,12 @@ async def weekly_check(ctx) -> None:
 
 
 class WorkerSettings:
-    functions = [process_asset, scan_library, make_offline_copy, offsite_backup, offsite_check, extract_text, text_backfill]
-    cron_jobs = [cron(nightly, hour={3}, minute={0}), cron(disk_check, minute={17}),
+    functions = [process_asset, scan_library, make_offline_copy, offsite_backup, offsite_check, extract_text, text_backfill,
+                 ai_photo, doc_chunks,
+                 func(transcribe, timeout=8 * 3600),     # Whisper on a CPU: about real time for "small"
+                 func(ai_backfill, timeout=8 * 3600),
+                 func(photo_quality_job, name="photo_quality")]
+    cron_jobs = [cron(nightly, hour={3}, minute={0}, timeout=6 * 3600), cron(disk_check, minute={17}),
                  cron(party_reminders, second={5}), cron(backup_if_due, minute={41}),
                  cron(weekly_check, weekday={2}, hour={5}, minute={11})]
     on_startup = startup
