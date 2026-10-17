@@ -16,19 +16,19 @@ from .cli import login, startup, sync_all, tv_server
 from .config import Config, Pair, load_token
 from .i18n import set_language, t
 
-log = logging.getLogger("gharbox_sync")
+log = logging.getLogger("zirahive_sync")
 
 
 def _icon_image(state: str):
-    """A small house-shaped icon, coloured by state: indigo ok, jute syncing, red problem, grey paused."""
-    from PIL import Image, ImageDraw
+    """The ZiraHive honeycomb cell, coloured by state: indigo ok, jute syncing, red problem, grey paused."""
+    from PIL import Image
+
+    from .dlna import hive
 
     colour = {"ok": (46, 74, 139), "busy": (201, 166, 107), "error": (179, 38, 30), "paused": (120, 125, 135)}[state]
-    im = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
-    d = ImageDraw.Draw(im)
-    d.polygon([(32, 6), (60, 30), (52, 30), (52, 58), (12, 58), (12, 30), (4, 30)], fill=colour)
-    d.rectangle([26, 38, 38, 58], fill=(255, 255, 255, 255))
-    return im
+    big = Image.new("RGBA", (256, 256), (0, 0, 0, 0))
+    hive(big, colour + (255,), (0, 0, 0, 0), radius=124)
+    return big.resize((64, 64), Image.LANCZOS)
 
 
 def setup_window(cfg: Config) -> bool:
@@ -37,7 +37,7 @@ def setup_window(cfg: Config) -> bool:
     from tkinter import filedialog, messagebox, ttk
 
     root = tk.Tk()
-    root.title(t("Set up GharBox Sync"))
+    root.title(t("Set up ZiraHive Sync"))
     root.resizable(False, False)
     frm = ttk.Frame(root, padding=16)
     frm.grid()
@@ -50,15 +50,15 @@ def setup_window(cfg: Config) -> bool:
         e.grid(row=r, column=1, sticky="we", pady=4)
         return e
 
-    row(0, t("GharBox address"), "server", cfg.server or "https://gharbox.your-tailnet.ts.net")
+    row(0, t("ZiraHive address"), "server", cfg.server or "https://zirahive.your-tailnet.ts.net")
     row(1, t("Username"), "user", cfg.username)
     row(2, t("Password"), "password", show="•")
     code_entry = row(3, t("Code from your authenticator app"), "code")
-    default_local = str(Path.home() / "GharBox")
+    default_local = str(Path.home() / "ZiraHive")
     row(4, t("Folder on this PC"), "local", cfg.pairs[0].local if cfg.pairs else default_local)
     ttk.Button(frm, text=t("Choose…"), command=lambda: fields["local"].set(
         filedialog.askdirectory(initialdir=fields["local"].get()) or fields["local"].get())).grid(row=4, column=2, padx=4)
-    row(5, t("Folder in GharBox"), "remote", cfg.pairs[0].remote if cfg.pairs else "/PC Sync")
+    row(5, t("Folder in ZiraHive"), "remote", cfg.pairs[0].remote if cfg.pairs else "/PC Sync")
     auto = tk.BooleanVar(value=True)
     ttk.Checkbutton(frm, text=t("Start with Windows"), variable=auto).grid(row=6, column=1, sticky="w", pady=6)
     status = ttk.Label(frm, text="", foreground="#B3261E", wraplength=420)
@@ -111,15 +111,15 @@ class TrayApp:
             pystray.MenuItem(lambda _: t("Resume") if cfg.paused else t("Pause"), lambda: self.toggle()),
             pystray.MenuItem(t("Open the folder"), lambda: self.open_folder()),
             pystray.MenuItem(t("Show on TVs at home"), lambda: self.toggle_tv(), checked=lambda _: cfg.tv_sharing),
-            pystray.MenuItem(t("Open GharBox"), lambda: webbrowser.open(cfg.server + "/files")),
+            pystray.MenuItem(t("Open ZiraHive"), lambda: webbrowser.open(cfg.server + "/files")),
             pystray.MenuItem(t("Quit"), lambda: self.quit()),
         )
-        self.icon = pystray.Icon("gharbox-sync", _icon_image("ok"), t("GharBox Sync"), menu)
+        self.icon = pystray.Icon("zirahive-sync", _icon_image("ok"), t("ZiraHive Sync"), menu)
 
     def set(self, state: str, status: str) -> None:
         self.state, self.status = state, status
         self.icon.icon = _icon_image(state)
-        self.icon.title = f"{t('GharBox Sync')}: {status}"
+        self.icon.title = f"{t('ZiraHive Sync')}: {status}"
         try:
             self.icon.update_menu()
         except Exception:
@@ -127,7 +127,7 @@ class TrayApp:
 
     def notify(self, text: str) -> None:
         try:
-            self.icon.notify(text, t("GharBox Sync"))
+            self.icon.notify(text, t("ZiraHive Sync"))
         except Exception:
             pass
 
@@ -148,7 +148,7 @@ class TrayApp:
         except OSError as exc:  # e.g. another DLNA server holds the port
             log.warning("TV sharing failed: %s", exc)
             self.tv = None
-            self.notify(t("Couldn't show GharBox on TVs: {error}", error=exc))
+            self.notify(t("Couldn't show ZiraHive on TVs: {error}", error=exc))
 
     def toggle_tv(self) -> None:
         self.cfg.tv_sharing = not self.cfg.tv_sharing
@@ -188,7 +188,7 @@ class TrayApp:
                     changes = sum(r.changes for _, r in results)
                     for _, r in results:
                         for name in r.conflicts:
-                            self.notify(t("Kept both copies of {name}: it changed on the PC and in GharBox.", name=name))
+                            self.notify(t("Kept both copies of {name}: it changed on the PC and in ZiraHive.", name=name))
                     if stopped:
                         self.set("error", stopped[0][:120])
                         self.notify(stopped[0])
@@ -201,7 +201,7 @@ class TrayApp:
                     self.notify(self.status)
                 except Exception as exc:
                     log.warning("sync failed: %s", exc)
-                    self.set("error", t("Can't reach GharBox. Trying again soon."))
+                    self.set("error", t("Can't reach ZiraHive. Trying again soon."))
             self.wake.wait(self.cfg.interval)
             self.wake.clear()
 

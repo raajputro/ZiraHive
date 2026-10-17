@@ -30,13 +30,13 @@ export interface ReaderSettings {
   rtl: boolean;              // comics: right to left (manga)
 }
 
-const SETTINGS_KEY = "gharbox.reader";
+const SETTINGS_KEY = "zirahive.reader";
 function loadSettings(): ReaderSettings {
   const base: ReaderSettings = { theme: "light", fontSize: 100, font: "publisher", zoom: 1, fit: "width", mode: "pages", rtl: false };
   try { return { ...base, ...JSON.parse(localStorage.getItem(SETTINGS_KEY) ?? "{}") }; } catch { return base; }
 }
 function saveSettings(s: ReaderSettings) { try { localStorage.setItem(SETTINGS_KEY, JSON.stringify(s)); } catch { /* private mode */ } }
-const rtlKey = (id: string) => `gharbox.rtl.${id}`;
+const rtlKey = (id: string) => `zirahive.rtl.${id}`;
 
 export default function ReaderRoute() {
   const { id } = useParams();
@@ -258,7 +258,7 @@ function ComicView({ book, settings, onLocation, register, onTapMiddle }: ViewPr
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [settings.mode]);
 
-  if (!pages) return <div className="reader-msg">{tr("This comic has no pages GharBox can read.")}</div>;
+  if (!pages) return <div className="reader-msg">{tr("This comic has no pages ZiraHive can read.")}</div>;
   if (settings.mode === "scroll") {
     return (
       <div className="comic-scroll" ref={stage} onClick={onTapMiddle}>

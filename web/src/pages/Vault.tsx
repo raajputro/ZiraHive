@@ -25,7 +25,7 @@ export default function VaultPage() {
       <Shell>
         <div className="empty">
           <h2>{tr("The vault needs a secure connection")}</h2>
-          <p>{tr("Open GharBox through https (for example your Tailscale address) or on this computer as localhost. Over plain http the browser doesn't allow encryption.")}</p>
+          <p>{tr("Open ZiraHive through https (for example your Tailscale address) or on this computer as localhost. Over plain http the browser doesn't allow encryption.")}</p>
         </div>
       </Shell>
     );
@@ -74,17 +74,17 @@ function SetUp({ onDone }: { onDone: () => void }) {
 
   if (recovery) {
     const download = () => {
-      const blob = new Blob([`GharBox vault recovery key\n\n${recovery}\n\nKeep this somewhere safe. With it you can open your vault if you forget the passphrase.\n`], { type: "text/plain" });
+      const blob = new Blob([`ZiraHive vault recovery key\n\n${recovery}\n\nKeep this somewhere safe. With it you can open your vault if you forget the passphrase.\n`], { type: "text/plain" });
       const a = document.createElement("a");
       a.href = URL.createObjectURL(blob);
-      a.download = "gharbox-vault-recovery-key.txt";
+      a.download = "zirahive-vault-recovery-key.txt";
       a.click();
       URL.revokeObjectURL(a.href);
     };
     return (
       <section className="panel vault-setup">
         <h2><KeyRound size={20} aria-hidden /> {tr("Your recovery key")}</h2>
-        <p>{tr("If you forget your passphrase, this key is the only other way in. Nobody else can open your vault, not even the GharBox admin, so nobody can reset it for you.")}</p>
+        <p>{tr("If you forget your passphrase, this key is the only other way in. Nobody else can open your vault, not even the ZiraHive admin, so nobody can reset it for you.")}</p>
         <code className="recovery-key" aria-label={tr("Recovery key")}>{recovery}</code>
         <div className="admin-row">
           <button onClick={() => void navigator.clipboard?.writeText(recovery)}>{tr("Copy")}</button>
@@ -104,7 +104,7 @@ function SetUp({ onDone }: { onDone: () => void }) {
   return (
     <section className="panel vault-setup">
       <h2>{tr("A locked space for private files")}</h2>
-      <p>{tr("Files in the vault are encrypted on this device before they're sent. The server only stores scrambled data: the GharBox admin can't open them, and neither can anyone who takes the disk.")}</p>
+      <p>{tr("Files in the vault are encrypted on this device before they're sent. The server only stores scrambled data: the ZiraHive admin can't open them, and neither can anyone who takes the disk.")}</p>
       <p className="muted small">{tr("Choose a passphrase you don't use anywhere else. You'll also get a recovery key to keep somewhere safe.")}</p>
       <form className="stack-form" onSubmit={create}>
         <label>{tr("Vault passphrase")}<input type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" required /></label>
@@ -156,7 +156,7 @@ function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
         {mode === "recovery" && <label>{tr("Recovery key")}<input value={value} onChange={(e) => setValue(e.target.value)} placeholder="ABCD-EFGH-…" required autoFocus spellCheck={false} /></label>}
         {mode === "reset" && <>
           <p className="error">{tr("Without the passphrase or the recovery key nobody can open these files. You can only start over with an empty vault.")}</p>
-          <label>{tr("Your GharBox account password")}<input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" required /></label>
+          <label>{tr("Your ZiraHive account password")}<input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" required /></label>
         </>}
         {error && <p className="error" role="alert">{error}</p>}
         <button className={mode === "reset" ? "danger" : "primary"} disabled={busy}>
@@ -193,7 +193,7 @@ function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8Array; t
       <form className="stack-form" onSubmit={submit}>
         <label>{tr("New vault passphrase")}<input type="password" value={pass} onChange={(e) => setPass(e.target.value)} autoComplete="new-password" required /></label>
         <label>{tr("Type it again")}<input type="password" value={again} onChange={(e) => setAgain(e.target.value)} autoComplete="new-password" required /></label>
-        <label>{tr("Your GharBox account password")}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
+        <label>{tr("Your ZiraHive account password")}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} autoComplete="current-password" required /></label>
         {error && <p className="error" role="alert">{error}</p>}
         <div className="admin-row">
           <button className="primary" disabled={busy}>{tr("Save")}</button>

@@ -1,7 +1,7 @@
 import { expect, test } from "@playwright/test";
 
 // A stand-in for Google's Cast library, so this runs without a Chromecast or the internet.
-// It records what GharBox asks the "TV" to play.
+// It records what ZiraHive asks the "TV" to play.
 const FAKE_SDK = `
 (() => {
   const listeners = [];
@@ -56,7 +56,7 @@ test("casting a film to a Chromecast and controlling it from the page", async ({
   const film = media.find((m: { duration: number | null }) => m.duration);
   test.skip(!film, "Needs sample media (scripts/make-sample-media.sh)");
   const info = await page.request.get(`/api/media/${film.id}/cast`);
-  test.skip(info.status() === 409, "Set GHARBOX_LAN_URL for the server under test");
+  test.skip(info.status() === 409, "Set ZIRAHIVE_LAN_URL for the server under test");
 
   await page.route("https://www.gstatic.com/**", (r) => r.fulfill({ contentType: "text/javascript", body: FAKE_SDK }));
   await page.goto(`/play/${film.id}`);

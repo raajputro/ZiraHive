@@ -51,7 +51,7 @@ def media_root(tmp_path, monkeypatch):
     # must be requested before `client` so the app starts with this setting
     root = tmp_path / "media"
     root.mkdir()
-    monkeypatch.setenv("GHARBOX_MEDIA_ROOT", str(root))
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_ROOT", str(root))
     return root
 
 
@@ -159,7 +159,7 @@ async def test_old_database_is_upgraded(tmp_path, monkeypatch):
     """A database made by the first release (no series columns) gets the new columns."""
     data = tmp_path / "data"
     data.mkdir()
-    db = sqlite3.connect(data / "gharbox.db")
+    db = sqlite3.connect(data / "zirahive.db")
     db.executescript("""
         CREATE TABLE libraries (id VARCHAR(32) PRIMARY KEY, name VARCHAR(128), path TEXT UNIQUE,
             kind VARCHAR(16), last_scan_at DATETIME, created_at DATETIME);
@@ -172,15 +172,15 @@ async def test_old_database_is_upgraded(tmp_path, monkeypatch):
     """)
     db.commit()
     db.close()
-    monkeypatch.setenv("GHARBOX_DATA_DIR", str(data))
-    monkeypatch.setenv("GHARBOX_DATABASE_URL", "")
+    monkeypatch.setenv("ZIRAHIVE_DATA_DIR", str(data))
+    monkeypatch.setenv("ZIRAHIVE_DATABASE_URL", "")
     from app.config import get_settings
     get_settings.cache_clear()
     from app import db as appdb
     appdb.init_engine(get_settings().db_url)
     await appdb.create_all()
     await appdb.dispose()
-    db = sqlite3.connect(data / "gharbox.db")
+    db = sqlite3.connect(data / "zirahive.db")
     lib_cols = {r[1] for r in db.execute("PRAGMA table_info(libraries)")}
     item_cols = {r[1] for r in db.execute("PRAGMA table_info(media_items)")}
     assert "sort_order" in lib_cols
@@ -193,8 +193,8 @@ def test_media_folder_shown_as_on_the_pc(monkeypatch, tmp_path):
     from app.config import get_settings
     from app.services.browse import display
 
-    monkeypatch.setenv("GHARBOX_MEDIA_ROOT", str(tmp_path))
-    monkeypatch.setenv("GHARBOX_MEDIA_HOST_PATH", "G:/Media/")
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_ROOT", str(tmp_path))
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_HOST_PATH", "G:/Media/")
     get_settings.cache_clear()
     try:
         assert display(tmp_path / "English Movies") == "G:\\Media\\English Movies"

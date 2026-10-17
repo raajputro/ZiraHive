@@ -1,5 +1,5 @@
 // Chromecast: Google's Cast library, loaded only when someone presses Cast.
-// The Chromecast fetches the video itself, from GharBox's home-network address, using links
+// The Chromecast fetches the video itself, from ZiraHive's home-network address, using links
 // that work only for that one title (see GET /api/media/{id}/cast).
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import type { CastInfo } from "./api";

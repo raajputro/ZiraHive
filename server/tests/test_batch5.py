@@ -111,7 +111,7 @@ async def test_offsite_backup_to_a_disk(client, admin, tmp_path):
     up = (await client.post("/api/uploads", json={"filename": "will.txt", "size": 11, "folder": "/Papers"})).json()
     await client.patch(f"/api/uploads/{up['id']}", content=b"my will: ok", headers={"Upload-Offset": "0"})
 
-    repo = tmp_path / "usb" / "gharbox"
+    repo = tmp_path / "usb" / "zirahive"
     r = await client.put("/api/admin/backup", json={"repository": str(repo), "hour": 20})
     assert r.status_code == 200, r.text
     out = r.json()
@@ -145,7 +145,7 @@ async def test_offsite_backup_to_a_disk(client, admin, tmp_path):
         assert rc == 0, err
     restored = list(target.rglob("will.txt"))
     assert restored and restored[0].read_bytes() == b"my will: ok"
-    assert list(target.rglob("backup-staging/gharbox.db"))
+    assert list(target.rglob("backup-staging/zirahive.db"))
     assert not list(target.rglob("cache/thumbs"))  # caches are left out
 
     assert (await client.post("/api/admin/backup/check")).status_code == 202

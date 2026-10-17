@@ -1,4 +1,4 @@
-// Watching what a linked GharBox shares: its categories, series and a player. Everything is
+// Watching what a linked ZiraHive shares: its categories, series and a player. Everything is
 // fetched through this server (/api/links/...), which also keeps where you stopped.
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
@@ -11,7 +11,7 @@ import { t as tr } from "../i18n";
 
 const VIDEO = new Set(["movies", "shows", "mixed"]);
 
-/** "From Rahim's GharBox" rows on the Watch home page. */
+/** "From Rahim's ZiraHive" rows on the Watch home page. */
 export function LinkedShelves() {
   const [links, setLinks] = useState<LinkedServer[]>([]);
   const [shelves, setShelves] = useState<Record<string, Title[]>>({});
@@ -185,7 +185,7 @@ export function LinkPlayerPage() {
         {m.series_title ? <><p className="episode-code">{m.series_title}, {episodeCode(m)}</p><h1>{m.episode_title ?? m.title}</h1></> : <h1>{m.title}</h1>}
         <p className="muted">{[m.year, formatDuration(m.duration), m.height ? `${m.height}p` : null].filter(Boolean).join(", ")}</p>
         {m.overview && <p className="overview">{m.overview}</p>}
-        <p className="muted small"><Link2 size={14} aria-hidden />{" "}{tr("From a linked GharBox. Where you stop is saved here.")}</p>
+        <p className="muted small"><Link2 size={14} aria-hidden />{" "}{tr("From a linked ZiraHive. Where you stop is saved here.")}</p>
       </div>
     </div>
   );

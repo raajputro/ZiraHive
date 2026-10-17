@@ -6,7 +6,7 @@ import { locale, t as tr } from "../i18n";
 
 const day = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString(locale()) : tr("not yet"));
 
-/** Settings > Server > Linked GharBox servers: share with another GharBox, or watch one. */
+/** Settings > Server > Linked ZiraHive servers: share with another ZiraHive, or watch one. */
 export default function LinksPanel() {
   const [libs, setLibs] = useState<Library[]>([]);
   const [guests, setGuests] = useState<LinkGuest[]>([]);
@@ -49,10 +49,10 @@ export default function LinksPanel() {
 
   return (
     <section className="panel links-panel">
-      <h2><Link2 size={18} aria-hidden />{" "}{tr("Linked GharBox servers")}</h2>
-      <p className="muted">{tr("Share some of your movie and series categories with family or friends who have their own GharBox, and watch theirs. Their server fetches for their people, so nobody gets an account here, and you choose exactly which categories they see.")}</p>
+      <h2><Link2 size={18} aria-hidden />{" "}{tr("Linked ZiraHive servers")}</h2>
+      <p className="muted">{tr("Share some of your movie and series categories with family or friends who have their own ZiraHive, and watch theirs. Their server fetches for their people, so nobody gets an account here, and you choose exactly which categories they see.")}</p>
 
-      <h3>{tr("Share with another GharBox")}</h3>
+      <h3>{tr("Share with another ZiraHive")}</h3>
       {guests.length > 0 && (
         <ul className="link-list">
           {guests.map((g) => (
@@ -65,7 +65,7 @@ export default function LinksPanel() {
                 </span>
               </div>
               <button className="icon" disabled={busy} aria-label={tr("Stop sharing with {name}", { name: g.name })}
-                onClick={() => { if (confirm(tr("Stop sharing with {name}? Their GharBox loses access straight away.", { name: g.name }))) void act(async () => { await api.removeLinkGuest(g.id); load(); }); }}>
+                onClick={() => { if (confirm(tr("Stop sharing with {name}? Their ZiraHive loses access straight away.", { name: g.name }))) void act(async () => { await api.removeLinkGuest(g.id); load(); }); }}>
                 <Trash2 size={16} /></button>
             </li>
           ))}
@@ -89,14 +89,14 @@ export default function LinksPanel() {
             {AGE_OPTIONS.filter((a) => a > 0).map((a) => <option key={a} value={a}>{tr("Only rated {age} or younger", { age: AGE_LABEL[a] })}</option>)}
           </select>
         </label>
-        <label>{tr("This GharBox's address, as their server reaches it")}
+        <label>{tr("This ZiraHive's address, as their server reaches it")}
           <input value={address} onChange={(e) => setAddress(e.target.value)} required />
           <span className="muted small">{tr("Use your public share address (https://…ts.net:8443) when they are elsewhere, or your Tailscale address if their server is on your Tailscale.")}</span>
         </label>
         <button className="primary" disabled={busy || chosen.length === 0 || !name.trim()}>{tr("Make a link code")}</button>
       </form>
 
-      <h3>{tr("Watch another GharBox")}</h3>
+      <h3>{tr("Watch another ZiraHive")}</h3>
       {links.length > 0 && (
         <ul className="link-list">
           {links.map((l) => (
@@ -115,14 +115,14 @@ export default function LinksPanel() {
         </ul>
       )}
       <form className="inline-form" onSubmit={(e) => { e.preventDefault(); void add(); }}>
-        <label>{tr("Link code from the other GharBox")}<input value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="ghx1.…" required /></label>
+        <label>{tr("Link code from the other ZiraHive")}<input value={paste} onChange={(e) => setPaste(e.target.value)} placeholder="zh1.…" required /></label>
         <button className="primary" disabled={busy}>{tr("Link")}</button>
       </form>
       {msg && <p role="status">{msg}</p>}
 
       {code && (
         <Dialog title={tr("Link code for {name}", { name: code.name })} onClose={() => setCode(null)}>
-          <p>{tr("Send this code to the admin of their GharBox, privately (it works like a key). They paste it in Settings > Server > Linked GharBox servers. It's shown only once.")}</p>
+          <p>{tr("Send this code to the admin of their ZiraHive, privately (it works like a key). They paste it in Settings > Server > Linked ZiraHive servers. It's shown only once.")}</p>
           <textarea className="link-code" readOnly value={code.code} rows={4} onFocus={(e) => e.target.select()} aria-label={tr("Link code")} />
           <button className="primary" onClick={() => void navigator.clipboard?.writeText(code.code)}><Copy size={16} />{" "}{tr("Copy code")}</button>
         </Dialog>

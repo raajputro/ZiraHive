@@ -55,7 +55,7 @@ async def save_backup(body: BackupConfigIn, request: Request, user: User = Depen
         raise HTTPException(422, f"Unknown setting: {', '.join(sorted(set(body.env) - ENV_ALLOWED))}")
     repo = body.repository.strip()
     if not (repo.startswith("/") or repo.split(":", 1)[0] in ("s3", "b2", "sftp", "rest", "rclone", "azure", "gs", "swift")):
-        raise HTTPException(422, "Use a folder like /backup-disk/gharbox, or an address starting with s3:, b2:, sftp:, rest: or rclone:")
+        raise HTTPException(422, "Use a folder like /backup-disk/zirahive, or an address starting with s3:, b2:, sftp:, rest: or rclone:")
     cfg = await session.get(BackupConfig, "main")
     made_password = None
     if cfg is None:

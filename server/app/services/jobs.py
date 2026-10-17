@@ -1,6 +1,6 @@
 """Background jobs: asset processing and library scans.
 
-With GHARBOX_REDIS_URL set, jobs go to the `worker` container through arq (Redis).
+With ZIRAHIVE_REDIS_URL set, jobs go to the `worker` container through arq (Redis).
 Without it (local dev, tests), they run as asyncio tasks inside the API process.
 """
 from __future__ import annotations

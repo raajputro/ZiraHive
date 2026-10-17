@@ -192,7 +192,7 @@ async def test_public_album_link(client, admin):
 
 async def test_two_factor_login_and_recovery_codes(client, admin):
     setup = (await client.post("/api/auth/2fa/setup")).json()
-    assert setup["uri"].startswith("otpauth://totp/GharBox:mahbub") and "<svg" in setup["qr_svg"]
+    assert setup["uri"].startswith("otpauth://totp/ZiraHive:mahbub") and "<svg" in setup["qr_svg"]
     assert (await client.post("/api/auth/2fa/enable", json={"code": "000000"})).status_code == 400
     totp = pyotp.TOTP(setup["secret"])
     codes = (await client.post("/api/auth/2fa/enable", json={"code": totp.now()})).json()["recovery_codes"]
@@ -320,7 +320,7 @@ async def test_unique_hash_rule_is_migrated_away(tmp_path, monkeypatch):
     import sqlite3
     data = tmp_path / "data"
     data.mkdir()
-    db = sqlite3.connect(data / "gharbox.db")
+    db = sqlite3.connect(data / "zirahive.db")
     db.executescript("""
         CREATE TABLE users (id VARCHAR(32) PRIMARY KEY, username VARCHAR(64), password_hash VARCHAR(255),
             is_admin BOOLEAN, quota_bytes BIGINT, created_at DATETIME);
@@ -336,15 +336,15 @@ async def test_unique_hash_rule_is_migrated_away(tmp_path, monkeypatch):
     """)
     db.commit()
     db.close()
-    monkeypatch.setenv("GHARBOX_DATA_DIR", str(data))
-    monkeypatch.setenv("GHARBOX_DATABASE_URL", "")
+    monkeypatch.setenv("ZIRAHIVE_DATA_DIR", str(data))
+    monkeypatch.setenv("ZIRAHIVE_DATABASE_URL", "")
     from app.config import get_settings
     get_settings.cache_clear()
     from app import db as appdb
     appdb.init_engine(get_settings().db_url)
     await appdb.create_all()
     await appdb.dispose()
-    db = sqlite3.connect(data / "gharbox.db")
+    db = sqlite3.connect(data / "zirahive.db")
     sql = db.execute("SELECT sql FROM sqlite_master WHERE name='assets'").fetchone()[0]
     assert "UNIQUE (owner_id, sha256)" not in sql
     assert db.execute("SELECT filename FROM assets").fetchall() == [("x.txt",)]

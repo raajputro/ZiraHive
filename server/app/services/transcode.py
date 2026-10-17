@@ -87,7 +87,7 @@ def encoder() -> str:
         except Exception:
             pass
         if mode == "nvenc" and _encoder != "h264_nvenc":
-            log.warning("GHARBOX_HW_ACCEL=nvenc but the NVIDIA encoder doesn't work here; using the CPU")
+            log.warning("ZIRAHIVE_HW_ACCEL=nvenc but the NVIDIA encoder doesn't work here; using the CPU")
     log.info("video encoder: %s", _encoder)
     return _encoder
 

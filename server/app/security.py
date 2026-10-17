@@ -15,7 +15,12 @@ from .config import get_settings
 from .db import get_session
 from .models import User
 
-COOKIE_NAME = "gharbox_token"
+COOKIE_NAME = "zirahive_token"
+OLD_COOKIE_NAME = "gharbox_token"  # from before the rename; still accepted so nobody is signed out
+
+
+def session_cookie(cookies) -> str | None:
+    return cookies.get(COOKIE_NAME) or cookies.get(OLD_COOKIE_NAME)
 _hasher = PasswordHasher()
 _ALGO = "HS256"
 
@@ -85,8 +90,8 @@ def _token_from_request(request: Request) -> tuple[str | None, bool]:
     auth = request.headers.get("authorization", "")
     if auth.lower().startswith("bearer "):
         return auth[7:].strip(), False
-    if request.cookies.get(COOKIE_NAME):
-        return request.cookies[COOKIE_NAME], False
+    if session_cookie(request.cookies):
+        return session_cookie(request.cookies), False
     # Tokens in URLs end up in logs and history, so ?token= only works on media URLs:
     # the VLC link (/stream), and the one-title links made for Chromecasts and TVs.
     if _url_media_id(request.url.path):

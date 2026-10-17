@@ -1,9 +1,9 @@
-"""Linking two GharBox servers: this side shares categories with another GharBox.
+"""Linking two ZiraHive servers: this side shares categories with another ZiraHive.
 
 The admin makes an invite code for, say, "Rahim's house", choosing which video categories to share
-and an age limit. Rahim's GharBox stores the code and from then on asks this server for those
-categories only, with the code's token (Authorization: GharBox-Link <token>). People on Rahim's
-side never talk to this server directly: their GharBox fetches for them.
+and an age limit. Rahim's ZiraHive stores the code and from then on asks this server for those
+categories only, with the code's token (Authorization: ZiraHive-Link <token>). People on Rahim's
+side never talk to this server directly: their ZiraHive fetches for them.
 
 The /api/fed/* endpoints reuse the normal media endpoints with a stand-in account that has the
 guest's age limit, after checking the title is in a shared category.
@@ -32,8 +32,8 @@ from . import playback
 
 router = APIRouter(prefix="/api", tags=["linked servers"])
 
-SCHEME = "GharBox-Link"
-CODE_PREFIX = "ghx1."
+SCHEME = "ZiraHive-Link"
+CODE_PREFIX = "zh1."
 
 
 def token_hash(token: str) -> str:
@@ -48,7 +48,7 @@ def make_code(url: str, token: str) -> str:
 def read_code(code: str) -> tuple[str, str]:
     code = code.strip()
     if not code.startswith(CODE_PREFIX):
-        raise ValueError("not a GharBox link code")
+        raise ValueError("not a ZiraHive link code")
     body = code[len(CODE_PREFIX):]
     data = json.loads(base64.urlsafe_b64decode(body + "=" * (-len(body) % 4)))
     url, token = str(data["u"]), str(data["t"])
@@ -58,7 +58,7 @@ def read_code(code: str) -> tuple[str, str]:
 
 
 def server_name() -> str:
-    return get_settings().server_name or "GharBox"
+    return get_settings().server_name or "ZiraHive"
 
 
 # ------------------------------------------------------------ the guest's requests
@@ -74,14 +74,16 @@ class Guest:
 
 async def fed_guest(request: Request, session: AsyncSession = Depends(get_session)) -> Guest:
     ip = client_ip(request)
-    share_throttle.check(f"fed:{ip}")
     auth = request.headers.get("authorization", "")
     if not auth.startswith(SCHEME + " "):
-        raise HTTPException(401, "This is for linked GharBox servers")
+        raise HTTPException(401, "This is for linked ZiraHive servers")
     row = await session.scalar(select(FedGuest).where(FedGuest.token_hash == token_hash(auth[len(SCHEME) + 1:].strip())))
     if row is None or row.revoked_at:
+        # Only wrong tokens are slowed down: a server with one removed link must still be able to
+        # use its other links (guessing a 256-bit token is hopeless anyway).
+        share_throttle.check(f"fed:{ip}")
         share_throttle.fail(f"fed:{ip}")
-        raise HTTPException(401, "This link was removed on the other GharBox")
+        raise HTTPException(401, "This link was removed on the other ZiraHive")
     now = utcnow()
     seen = row.last_seen_at
     if seen is None or (now - (seen if seen.tzinfo else seen.replace(tzinfo=now.tzinfo))) > timedelta(minutes=5):

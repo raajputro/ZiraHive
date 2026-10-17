@@ -11,16 +11,16 @@ from PIL import Image
 
 @pytest.fixture
 async def app(tmp_path, monkeypatch):
-    monkeypatch.setenv("GHARBOX_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("GHARBOX_REDIS_URL", "")
-    monkeypatch.setenv("GHARBOX_DATABASE_URL", "")
-    monkeypatch.setenv("GHARBOX_MEDIA_LIBRARIES", "")
-    monkeypatch.setenv("GHARBOX_MAX_CHUNK_MB", "1")
+    monkeypatch.setenv("ZIRAHIVE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("ZIRAHIVE_REDIS_URL", "")
+    monkeypatch.setenv("ZIRAHIVE_DATABASE_URL", "")
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_LIBRARIES", "")
+    monkeypatch.setenv("ZIRAHIVE_MAX_CHUNK_MB", "1")
     # a pretend drive "T:" that is the test folder, so tests can add categories anywhere in it
     drives = tmp_path / "drives"
     drives.mkdir()
     (drives / "t").symlink_to(tmp_path)
-    monkeypatch.setenv("GHARBOX_DRIVES_DIR", str(drives))
+    monkeypatch.setenv("ZIRAHIVE_DRIVES_DIR", str(drives))
     from app.config import get_settings
     get_settings.cache_clear()
     from app.main import create_app

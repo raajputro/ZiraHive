@@ -1,4 +1,4 @@
-/* GharBox: Bengal indigo and jute. A light "home" room for photos and files,
+/* ZiraHive: Bengal indigo and jute. A light "home" room for photos and files,
    a dark indigo "cinema" room for movies. */
 :root {
   --indigo-night: #1F2A44;
@@ -100,7 +100,8 @@ label { display: block; font-size: .9rem; font-weight: 500; color: var(--muted);
   display: flex; flex-direction: column; gap: 2px; padding: 22px 12px;
 }
 .brand { color: var(--jute); font-weight: 600; font-size: 1.15rem; padding: 0 10px 22px; letter-spacing: .01em; }
-.brand span { font-size: 1.6rem; margin-right: 4px; }
+.brand { display: flex; align-items: center; gap: 8px; }
+.brand svg { flex: none; }
 .rail a {
   display: flex; align-items: center; gap: 12px; padding: 9px 12px;
   border-radius: var(--radius-s); text-decoration: none; font-weight: 500;
@@ -141,7 +142,7 @@ main { min-width: 0; }
   width: min(380px, 100%); background: #FFFFFF; color: #1A1D24;
   padding: 36px 32px 32px; border-radius: 14px; display: grid; gap: 14px;
 }
-.signin-mark { font-size: 3rem; line-height: 1; color: var(--jute-deep); }
+.signin-mark { line-height: 0; color: var(--jute-deep); }
 .signin h1 { font-size: 1.6rem; }
 .signin p { margin: 0 0 6px; color: #5D6575; }
 .signin label { color: #5D6575; }
@@ -467,7 +468,7 @@ label.check.grow { flex: 1; }
 .bell-panel time { font-size: .75rem; color: #8A92A3; }
 .mobile-top { display: none; }
 .brand-inline { color: var(--jute); font-weight: 600; }
-.brand-inline span { font-size: 1.3rem; margin-right: 3px; }
+.brand-inline { display: inline-flex; align-items: center; gap: 6px; }
 
 /* ---------------------------------------------------------------- photos extras */
 .photo-tabs, .settings-tabs { margin: -6px 0 22px; }
@@ -890,7 +891,7 @@ body.has-player .tray { bottom: 88px; }
 .plugins details { margin-top: 8px; }
 .plugins .switch { white-space: nowrap; }
 
-/* Linked GharBox servers */
+/* Linked ZiraHive servers */
 .links-panel h3 { margin: 18px 0 8px; font-size: 1rem; }
 .link-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
 .link-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px;

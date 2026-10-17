@@ -1,4 +1,4 @@
-"""Albums, which can be shared with family members on the same GharBox."""
+"""Albums, which can be shared with family members on the same ZiraHive."""
 from __future__ import annotations
 
 from fastapi import APIRouter, Depends, HTTPException, Request

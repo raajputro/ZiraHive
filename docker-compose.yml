@@ -1,4 +1,4 @@
-# GharBox: self-hosted backup + media server
+# ZiraHive: self-hosted backup + media server
 #
 #   docker compose up -d --build                   core stack (home network)
 #   docker compose --profile remote up -d --build  + secure access from anywhere (Tailscale)
@@ -6,32 +6,32 @@
 #
 # Settings live in .env (copy .env.example to .env first).
 
-name: gharbox
+name: zirahive
 
 x-server-env: &server-env
-  GHARBOX_DATA_DIR: /data
-  GHARBOX_DATABASE_URL: postgresql+asyncpg://gharbox:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/gharbox
-  GHARBOX_REDIS_URL: redis://redis:6379
-  GHARBOX_SECRET_KEY: ${GHARBOX_SECRET_KEY:-}
+  ZIRAHIVE_DATA_DIR: /data
+  ZIRAHIVE_DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-zirahive}:${POSTGRES_PASSWORD:?set POSTGRES_PASSWORD in .env}@postgres:5432/${POSTGRES_DB:-zirahive}
+  ZIRAHIVE_REDIS_URL: redis://redis:6379
+  ZIRAHIVE_SECRET_KEY: ${ZIRAHIVE_SECRET_KEY:-}
   # Every folder inside MEDIA_PATH (English Movies, Web Series, ...) becomes a Watch category.
-  GHARBOX_MEDIA_ROOT: /media
-  GHARBOX_MEDIA_HOST_PATH: ${MEDIA_PATH:-}
-  GHARBOX_MEDIA_LIBRARIES: ${GHARBOX_MEDIA_LIBRARIES:-}
-  GHARBOX_TMDB_API_KEY: ${GHARBOX_TMDB_API_KEY:-}
-  GHARBOX_PUBLIC_URL: ${GHARBOX_PUBLIC_URL:-}
-  GHARBOX_LAN_URL: ${GHARBOX_LAN_URL:-}
-  GHARBOX_SERVER_NAME: ${GHARBOX_SERVER_NAME:-}
-  GHARBOX_ICE_SERVERS: ${GHARBOX_ICE_SERVERS:-}
-  GHARBOX_OCR: ${GHARBOX_OCR:-documents}
-  GHARBOX_API_DOCS: "false"
-  GHARBOX_HW_ACCEL: ${GHARBOX_HW_ACCEL:-auto}
-  GHARBOX_MAX_TRANSCODES: ${GHARBOX_MAX_TRANSCODES:-3}
+  ZIRAHIVE_MEDIA_ROOT: /media
+  ZIRAHIVE_MEDIA_HOST_PATH: ${MEDIA_PATH:-}
+  ZIRAHIVE_MEDIA_LIBRARIES: ${ZIRAHIVE_MEDIA_LIBRARIES:-}
+  ZIRAHIVE_TMDB_API_KEY: ${ZIRAHIVE_TMDB_API_KEY:-}
+  ZIRAHIVE_PUBLIC_URL: ${ZIRAHIVE_PUBLIC_URL:-}
+  ZIRAHIVE_LAN_URL: ${ZIRAHIVE_LAN_URL:-}
+  ZIRAHIVE_SERVER_NAME: ${ZIRAHIVE_SERVER_NAME:-}
+  ZIRAHIVE_ICE_SERVERS: ${ZIRAHIVE_ICE_SERVERS:-}
+  ZIRAHIVE_OCR: ${ZIRAHIVE_OCR:-documents}
+  ZIRAHIVE_API_DOCS: "false"
+  ZIRAHIVE_HW_ACCEL: ${ZIRAHIVE_HW_ACCEL:-auto}
+  ZIRAHIVE_MAX_TRANSCODES: ${ZIRAHIVE_MAX_TRANSCODES:-3}
   NVIDIA_DRIVER_CAPABILITIES: compute,video,utility
-  GHARBOX_CORS_ORIGINS: ""
+  ZIRAHIVE_CORS_ORIGINS: ""
 
 x-server-volumes: &server-volumes
-  - ${GHARBOX_DATA_PATH:-./gharbox-data}:/data
-  # Your media folder (optional), read-only so GharBox can never modify or delete it.
+  - ${ZIRAHIVE_DATA_PATH:-./zirahive-data}:/data
+  # Your media folder (optional), read-only so ZiraHive can never modify or delete it.
   - ${MEDIA_PATH:-./media}:/media:ro
   # Optional: whole drives, read-only, to pick more folders in Settings > Server > Categories >
   # Choose folder. Only drives you list in .env (DRIVE_E=E:/) are shared; the rest show nothing.
@@ -44,21 +44,21 @@ x-server-volumes: &server-volumes
   - ${DRIVE_I:-./no-drive}:/drives/i:ro
   - ${DRIVE_J:-./no-drive}:/drives/j:ro
   # Offsite backup to a USB or second disk: mount a folder on it here, then choose
-  # /backup-disk/gharbox in Settings > Server > Offsite backup. See docs/BACKUP.md.
-  # - F:/GharBox Backup:/backup-disk
+  # /backup-disk/zirahive in Settings > Server > Offsite backup. See docs/BACKUP.md.
+  # - F:/ZiraHive Backup:/backup-disk
 
 services:
   web:
     build: ./web
     restart: unless-stopped
     ports:
-      # Home network access. Set GHARBOX_BIND=127.0.0.1 to allow only this PC
+      # Home network access. Set ZIRAHIVE_BIND=127.0.0.1 to allow only this PC
       # (then use Tailscale from every other device).
-      - "${GHARBOX_BIND:-0.0.0.0}:${GHARBOX_HTTP_PORT:-8080}:80"
+      - "${ZIRAHIVE_BIND:-0.0.0.0}:${ZIRAHIVE_HTTP_PORT:-8080}:80"
       # The share-links-only site (8081) is NOT published here on purpose:
       # only the tailscale container reaches it, through the Docker network.
     environment:
-      GHARBOX_SITE_ADDRESS: ${GHARBOX_SITE_ADDRESS:-:80}
+      ZIRAHIVE_SITE_ADDRESS: ${ZIRAHIVE_SITE_ADDRESS:-:80}
     volumes:
       - caddy-data:/data
     depends_on:
@@ -109,13 +109,13 @@ services:
     image: pgvector/pgvector:pg16
     restart: unless-stopped
     environment:
-      POSTGRES_USER: gharbox
+      POSTGRES_USER: ${POSTGRES_USER:-zirahive}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
-      POSTGRES_DB: gharbox
+      POSTGRES_DB: ${POSTGRES_DB:-zirahive}
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U gharbox"]
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER}"]
       interval: 5s
       timeout: 5s
       retries: 20
@@ -127,17 +127,17 @@ services:
       - redis-data:/data
 
   # ---- optional: access from anywhere (docker compose --profile remote up -d) ----
-  # Private: https://gharbox.<your-tailnet>.ts.net  -> whole app, your devices only
-  # Public:  https://gharbox.<your-tailnet>.ts.net:8443 -> share links only (Tailscale Funnel)
+  # Private: https://zirahive.<your-tailnet>.ts.net  -> whole app, your devices only
+  # Public:  https://zirahive.<your-tailnet>.ts.net:8443 -> share links only (Tailscale Funnel)
   # Setup steps: docs/REMOTE_ACCESS.md
   tailscale:
     image: tailscale/tailscale:stable
     profiles: ["remote"]
-    hostname: ${TS_HOSTNAME:-gharbox}
+    hostname: ${TS_HOSTNAME:-zirahive}
     restart: unless-stopped
     environment:
       TS_AUTHKEY: ${TS_AUTHKEY:-}
-      TS_HOSTNAME: ${TS_HOSTNAME:-gharbox}
+      TS_HOSTNAME: ${TS_HOSTNAME:-zirahive}
       TS_STATE_DIR: /var/lib/tailscale
       TS_SERVE_CONFIG: /config/${TS_SERVE_FILE:-serve.json}
       TS_USERSPACE: "true"  # no special network driver needed; works with Docker Desktop
@@ -159,9 +159,15 @@ services:
     #     reservations:
     #       devices: [{ driver: nvidia, count: all, capabilities: [gpu] }]
 
+# Installs from before the rename (GharBox) keep their database and Tailscale identity:
+# setup.ps1 points these at the old volumes when it finds them.
 volumes:
   tailscale-state:
+    name: ${TAILSCALE_VOLUME:-zirahive_tailscale-state}
   postgres-data:
+    name: ${DATABASE_VOLUME:-zirahive_postgres-data}
   redis-data:
   caddy-data:
+    name: ${CADDY_VOLUME:-zirahive_caddy-data}
   ollama-models:
+    name: ${OLLAMA_VOLUME:-zirahive_ollama-models}

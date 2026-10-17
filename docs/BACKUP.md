@@ -1,6 +1,6 @@
 # Offsite backup
 
-GharBox keeps your photos and files on one PC. A broken disk, theft, a flood or a fire would take
+ZiraHive keeps your photos and files on one PC. A broken disk, theft, a flood or a fire would take
 them with it. **Offsite backup** keeps an encrypted copy somewhere else and brings it all back
 when you need it.
 
@@ -16,15 +16,15 @@ data. It also only sends what changed, so after the first run a daily backup is 
 - Optional: the movie, music and book folders. They are large and you can usually get them again,
   so they are off by default
 
-Thumbnails, posters and other things GharBox can rebuild are left out.
+Thumbnails, posters and other things ZiraHive can rebuild are left out.
 
 ## Turn it on
 
 **Settings > Server > Offsite backup**, choose where, press **Turn on offsite backup**.
 
-GharBox shows a **backup password** once. **Write it down and keep it away from this PC** (with
+ZiraHive shows a **backup password** once. **Write it down and keep it away from this PC** (with
 your passport, or in a password manager). If the PC is lost, the backup can't be opened without it.
-You can see it again later with **Show password** while GharBox still runs.
+You can see it again later with **Show password** while ZiraHive still runs.
 
 It backs up every day at the hour you pick, retries an hour after a failure, checks once a week
 that the copy can be read back, keeps 7 daily, 5 weekly and 12 monthly copies, and notifies the
@@ -35,8 +35,8 @@ backup is more than 3 days old.
 
 | Choice | Good for | What to enter |
 |---|---|---|
-| USB or second disk | Fast, free, no internet | `/backup-disk/gharbox`, after mounting the disk (below) |
-| S3-compatible storage | Real offsite copy; Backblaze B2 and Cloudflare R2 have 10 GB free | Endpoint and bucket, for example `https://s3.us-west-004.backblazeb2.com/my-gharbox`, plus an access key |
+| USB or second disk | Fast, free, no internet | `/backup-disk/zirahive`, after mounting the disk (below) |
+| S3-compatible storage | Real offsite copy; Backblaze B2 and Cloudflare R2 have 10 GB free | Endpoint and bucket, for example `https://s3.us-west-004.backblazeb2.com/my-zirahive`, plus an access key |
 | Another computer (SFTP) | A relative's PC or a small server | `user@host:/path`, with an SSH key |
 | Google Drive, OneDrive, Dropbox (rclone) | Space you already have | `remote:folder`, after connecting the account once |
 
@@ -45,7 +45,7 @@ The best protection is two of these: a USB disk for quick restores and a cloud b
 **USB or second disk.** In `docker-compose.yml`, under `x-server-volumes`, uncomment and edit:
 
 ```yaml
-  - F:/GharBox Backup:/backup-disk
+  - F:/ZiraHive Backup:/backup-disk
 ```
 
 then `docker compose up -d`. A disk that stays plugged into the same PC protects against a broken
@@ -66,7 +66,7 @@ follow the link it prints):
 docker compose exec worker rclone config --config /data/rclone.conf
 ```
 
-Name the remote, for example `gdrive`, then enter `gdrive:GharBox` in Settings.
+Name the remote, for example `gdrive`, then enter `gdrive:ZiraHive` in Settings.
 
 ## Restore
 
@@ -83,15 +83,15 @@ The commands need the backup's address and password. Inside the worker they are 
 you add them to the command line:
 
 ```bash
-docker compose exec -e RESTIC_REPOSITORY=/backup-disk/gharbox -e RESTIC_PASSWORD='your-backup-password' worker restic snapshots
+docker compose exec -e RESTIC_REPOSITORY=/backup-disk/zirahive -e RESTIC_PASSWORD='your-backup-password' worker restic snapshots
 ```
 
-Then move what you need from `gharbox-data/restore` back into place and press
+Then move what you need from `zirahive-data/restore` back into place and press
 **Settings > Server > Find new folders** (or upload the files again in Files).
 
 ### Everything, on a new PC
 
-1. Install Docker Desktop and GharBox as in the README, with the same `.env` (or a new one with the
+1. Install Docker Desktop and ZiraHive as in the README, with the same `.env` (or a new one with the
    same `POSTGRES_PASSWORD`). Mount the backup disk, or have the cloud keys ready. Don't sign in yet.
 2. Start only the database and the worker:
    `docker compose up -d postgres redis worker`
@@ -104,7 +104,7 @@ Then move what you need from `gharbox-data/restore` back into place and press
 4. Put the database back:
    ```bash
    docker compose exec worker sh -c 'pg_restore --clean --if-exists --no-owner \
-     -h postgres -U gharbox -d gharbox /data/backup-staging/gharbox.pgdump'
+     -h postgres -U zirahive -d zirahive /data/backup-staging/zirahive.pgdump'
    ```
    It asks for `POSTGRES_PASSWORD`.
 5. `docker compose up -d`, sign in as before. Photos, files, albums, the vault and everyone's

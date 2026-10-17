@@ -61,7 +61,7 @@ test("vault: set up, upload encrypted, lock, unlock by passphrase and by recover
   await page.getByRole("button", { name: "Unlock" }).click();
   await page.getByLabel("New vault passphrase").fill("a brand new passphrase");
   await page.getByLabel("Type it again").fill("a brand new passphrase");
-  await page.getByLabel("Your GharBox account password").fill(PASSWORD);
+  await page.getByLabel("Your ZiraHive account password").fill(PASSWORD);
   await page.getByRole("button", { name: "Save" }).click();
   await expect(page.getByRole("button", { name: "Open notes.txt" })).toBeVisible();
   await page.reload();

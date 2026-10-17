@@ -3,7 +3,7 @@
   "name": "Telegram messages",
   "description": "Sends a Telegram message when new movies arrive, a backup fails, or a watch party starts. Make a bot with @BotFather, send it a message, then fill in its token and your chat ID.",
   "version": "1.0",
-  "author": "GharBox",
+  "author": "ZiraHive",
   "events": ["media.added", "backup.finished", "party.created", "user.created", "file.uploaded"],
   "settings": [
     {"key": "token", "label": "Bot token", "type": "secret", "help": "From @BotFather, like 123456:ABC-DEF..."},

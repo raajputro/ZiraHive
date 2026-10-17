@@ -21,7 +21,7 @@ export default function PartiesPage() {
       {parties && parties.length === 0 && (
         <div className="empty">
           <h2>{tr("No watch parties yet")}</h2>
-          <p>{tr("Open any movie or episode and press")}{" "}<strong>{tr("Watch together")}</strong>{tr(". Start now or pick a time, and invite family or friends who have a GharBox account.")}</p>
+          <p>{tr("Open any movie or episode and press")}{" "}<strong>{tr("Watch together")}</strong>{tr(". Start now or pick a time, and invite family or friends who have a ZiraHive account.")}</p>
         </div>
       )}
       <ul className="party-list">

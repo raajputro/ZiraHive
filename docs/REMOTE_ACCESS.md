@@ -1,11 +1,11 @@
-# Using GharBox away from home, safely
+# Using ZiraHive away from home, safely
 
-GharBox gets two addresses:
+ZiraHive gets two addresses:
 
 | Address | Who can open it | What it shows |
 |---|---|---|
-| `https://gharbox.<your-tailnet>.ts.net` | Only your and your family's devices, signed in to Tailscale | Everything: sign in, photos, files, watch, settings |
-| `https://gharbox.<your-tailnet>.ts.net:8443` | Anyone on the internet | **Share links only** (`/s/...`), plus the API for linked GharBox servers, which answers only their link codes |
+| `https://zirahive.<your-tailnet>.ts.net` | Only your and your family's devices, signed in to Tailscale | Everything: sign in, photos, files, watch, settings |
+| `https://zirahive.<your-tailnet>.ts.net:8443` | Anyone on the internet | **Share links only** (`/s/...`), plus the API for linked ZiraHive servers, which answers only their link codes |
 
 Why this design:
 
@@ -14,7 +14,7 @@ Why this design:
   makes normal port forwarding impossible.
 - **Strangers can't even reach the sign-in page.** The private address only answers devices in
   your Tailscale network. The public address is a separate site that serves share links and
-  returns "Not found" for everything else, including the sign-in page and the API. GharBox
+  returns "Not found" for everything else, including the sign-in page and the API. ZiraHive
   checks this a second time on the server, so one mistake doesn't open the rest.
 - **HTTPS everywhere, with real certificates** issued for your `ts.net` name.
 
@@ -48,42 +48,42 @@ Tailscale's free Personal plan covers this: up to 6 people and unlimited devices
    TS_AUTHKEY=tskey-auth-xxxxxxxxxxxx
    ```
 
-6. **Start GharBox with remote access:**
+6. **Start ZiraHive with remote access:**
 
    ```powershell
    docker compose --profile remote up -d --build
    docker compose logs tailscale
    ```
 
-   In the admin console under **Machines** you'll now see `gharbox`, with its full name, for
-   example `gharbox.tail1234.ts.net`. The key is only needed once; you can delete it from
+   In the admin console under **Machines** you'll now see `zirahive`, with its full name, for
+   example `zirahive.tail1234.ts.net`. The key is only needed once; you can delete it from
    `.env` afterwards.
 
-7. **Tell GharBox its public share address.** In `.env`:
+7. **Tell ZiraHive its public share address.** In `.env`:
 
    ```
-   GHARBOX_PUBLIC_URL=https://gharbox.tail1234.ts.net:8443
+   ZIRAHIVE_PUBLIC_URL=https://zirahive.tail1234.ts.net:8443
    ```
 
    then `docker compose --profile remote up -d`. Share links you make now use this address.
 
 8. **On each phone and laptop:** install the free Tailscale app, sign in with the same account,
-   then open `https://gharbox.tail1234.ts.net`. On a phone, use **Add to Home Screen** (Safari:
-   Share button; Chrome: menu) and GharBox opens like an app.
+   then open `https://zirahive.tail1234.ts.net`. On a phone, use **Add to Home Screen** (Safari:
+   Share button; Chrome: menu) and ZiraHive opens like an app.
 
 9. **Family:** in the Tailscale admin console, **Users > Invite users**. Each person installs
-   Tailscale, accepts the invite, and gets their own GharBox account from you in
+   Tailscale, accepts the invite, and gets their own ZiraHive account from you in
    **Settings > People**.
 
-10. **Check the result:** in GharBox, **Settings > Server > Security check** should show no red
+10. **Check the result:** in ZiraHive, **Settings > Server > Security check** should show no red
     items. Turn on two-factor sign-in for every admin (**Settings > Your account**).
 
 ## Options
 
 - **No public share links at all:** set `TS_SERVE_FILE=serve-private-only.json` in `.env` and run
   `docker compose --profile remote up -d`. Links then work only for people on your Tailscale.
-- **Only this PC on the home network:** set `GHARBOX_BIND=127.0.0.1`. Every other device, even at
-  home, must then use Tailscale. Smart TVs without a Tailscale app won't reach GharBox.
+- **Only this PC on the home network:** set `ZIRAHIVE_BIND=127.0.0.1`. Every other device, even at
+  home, must then use Tailscale. Smart TVs without a Tailscale app won't reach ZiraHive.
 - **Big movies to visitors:** public share traffic is relayed through Tailscale's servers and
   isn't meant for heavy streaming. Share photos and documents freely; for movies, invite the
   person to your Tailscale instead.
@@ -112,17 +112,17 @@ a company at all:
 - **WireGuard** directly works if your ISP gives you a real public IP (no CGNAT): forward one
   UDP port to the PC. Ask your ISP whether you have a public IP; some offer one for a fee.
 
-Avoid exposing the main GharBox site directly to the internet with port forwarding. The share-only
+Avoid exposing the main ZiraHive site directly to the internet with port forwarding. The share-only
 design above is safer.
 
 ## Troubleshooting
 
-- **`gharbox` doesn't appear in Machines:** `docker compose logs tailscale`. An expired or used
+- **`zirahive` doesn't appear in Machines:** `docker compose logs tailscale`. An expired or used
   key shows an auth error: make a new one and restart.
 - **Certificate errors on the private address:** HTTPS Certificates aren't enabled (step 2). The
   first visit can take a minute while the certificate is issued.
 - **The public :8443 address doesn't open:** Funnel isn't allowed in the policy (step 3), or you
   used `serve-private-only.json`. `docker compose exec tailscale tailscale funnel status` shows
   what's published.
-- **A share link opens the private address:** set `GHARBOX_PUBLIC_URL` (step 7) and make the link
+- **A share link opens the private address:** set `ZIRAHIVE_PUBLIC_URL` (step 7) and make the link
   again.

@@ -156,7 +156,7 @@ async def test_pick_category_folders_from_drives(client, admin, tmp_path):
     drives = tmp_path / "drives"
     for letter in ("e", "f"):
         (drives / letter).mkdir()
-    (drives / "f" / ".gharbox-no-drive").write_text("")  # a drive not listed in .env
+    (drives / "f" / ".zirahive-no-drive").write_text("")  # a drive not listed in .env
     (drives / "e" / "Movies" / "English").mkdir(parents=True)
     (drives / "e" / "Movies" / "Web Series").mkdir(parents=True)
     (drives / "e" / "$RECYCLE.BIN").mkdir()
@@ -177,13 +177,13 @@ async def test_pick_category_folders_from_drives(client, admin, tmp_path):
     lib = (await client.post("/api/libraries", json={"name": "Web Series", "path": series["path"], "kind": "shows"})).json()
     assert lib["display_path"] == "E:\\Movies\\Web Series"
 
-    # GharBox's own data folder on a shared drive: hidden, refused, and skipped by scans
-    data_on_e = drives / "e" / "GharBoxData"
+    # ZiraHive's own data folder on a shared drive: hidden, refused, and skipped by scans
+    data_on_e = drives / "e" / "ZiraHiveData"
     (data_on_e / "storage" / "rina").mkdir(parents=True)
-    (data_on_e / ".gharbox-data").write_text("")
+    (data_on_e / ".zirahive-data").write_text("")
     (data_on_e / "storage" / "rina" / "private.mp4").write_bytes(b"x")
     inside = (await client.get("/api/admin/folders", params={"path": e["path"]})).json()
-    assert "GharBoxData" not in [f["name"] for f in inside["folders"]]
+    assert "ZiraHiveData" not in [f["name"] for f in inside["folders"]]
     assert (await client.post("/api/libraries", json={"name": "X", "path": str(data_on_e / "storage")})).status_code == 400
     whole = (await client.post("/api/libraries", json={"name": "All of E", "path": e["path"], "kind": "movies"})).json()
     from app.services import jobs
@@ -191,7 +191,7 @@ async def test_pick_category_folders_from_drives(client, admin, tmp_path):
     assert all("private" not in m["title"] for m in (await client.get("/api/media")).json())
     await client.delete(f"/api/libraries/{whole['id']}")
 
-    # GharBox's own data, system folders and ../ tricks can't be picked
+    # ZiraHive's own data, system folders and ../ tricks can't be picked
     from app.config import get_settings
     for bad in (str(get_settings().data_dir.parent.parent / "etc"), "/etc", str(drives / "e" / ".." / ".." / "..")):
         assert (await client.post("/api/libraries", json={"name": "X", "path": bad})).status_code == 400
@@ -261,8 +261,8 @@ async def test_cast_links_work_only_for_that_title(client, admin, tmp_path, monk
 
     # a fixed address from settings wins
     client.headers["Authorization"] = f"Bearer {admin}"
-    monkeypatch.setenv("GHARBOX_LAN_URL", "http://gharbox.lan:8080/")
+    monkeypatch.setenv("ZIRAHIVE_LAN_URL", "http://zirahive.lan:8080/")
     from app.config import get_settings
     get_settings.cache_clear()
     r = (await client.get(f"/api/media/{plain['id']}/cast")).json()
-    assert r["url"].startswith("http://gharbox.lan:8080/api/media/")
+    assert r["url"].startswith("http://zirahive.lan:8080/api/media/")

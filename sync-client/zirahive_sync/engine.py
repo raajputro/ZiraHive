@@ -1,12 +1,12 @@
-"""Two-way sync of one PC folder with one GharBox folder.
+"""Two-way sync of one PC folder with one ZiraHive folder.
 
-For every file it compares three things: the PC now, GharBox now, and what both were at the
+For every file it compares three things: the PC now, ZiraHive now, and what both were at the
 end of the last sync (kept in a small database). That tells an edit from a deletion:
 
-  changed on the PC only        -> upload (GharBox keeps the old copy as a version)
-  changed in GharBox only       -> download
-  deleted on the PC only        -> move to the GharBox trash (30 days to get it back)
-  deleted in GharBox only       -> move to the Windows Recycle Bin
+  changed on the PC only        -> upload (ZiraHive keeps the old copy as a version)
+  changed in ZiraHive only       -> download
+  deleted on the PC only        -> move to the ZiraHive trash (30 days to get it back)
+  deleted in ZiraHive only       -> move to the Windows Recycle Bin
   changed on both, differently  -> keep both: the PC copy is renamed "name (PC copy, date).ext"
 
 Safety: if the PC folder is missing (drive unplugged), nothing happens. If one run would delete
@@ -28,9 +28,9 @@ from pathlib import Path, PurePosixPath
 from .api import Api
 from .config import Pair, app_dir
 
-log = logging.getLogger("gharbox_sync")
+log = logging.getLogger("zirahive_sync")
 
-IGNORE = re.compile(r"^(desktop\.ini|thumbs\.db|\.ds_store|~\$.*|.*\.tmp|.*\.partial|\.gharbox-sync-.*|.*\.crdownload)$", re.I)
+IGNORE = re.compile(r"^(desktop\.ini|thumbs\.db|\.ds_store|~\$.*|.*\.tmp|.*\.partial|\.zirahive-sync-.*|.*\.crdownload)$", re.I)
 _BAD = re.compile(r'[<>:"\\|?*\x00-\x1f]')
 _RESERVED = {"con", "prn", "aux", "nul", *(f"com{i}" for i in range(1, 10)), *(f"lpt{i}" for i in range(1, 10))}
 SETTLE_SECONDS = 2.0      # skip files still being written
@@ -38,7 +38,7 @@ MASS_DELETE = 0.5         # stop if a run would delete more than this share of t
 
 
 def server_name(name: str) -> str:
-    """The name GharBox will store (same rules as the server)."""
+    """The name ZiraHive will store (same rules as the server)."""
     name = _BAD.sub("_", name.replace("/", "_")).strip().strip(".")
     if not name or name.split(".")[0].lower() in _RESERVED:
         name = f"_{name or 'file'}"
@@ -105,7 +105,7 @@ def scan_local(root: Path, report: Report) -> dict[str, os.stat_result]:
             p = Path(dirpath) / fn
             rel = PurePosixPath(*p.relative_to(root).parts).as_posix()
             if server_name(fn) != fn:
-                report.skipped.append(f"{rel} (GharBox can't keep this name)")
+                report.skipped.append(f"{rel} (ZiraHive can't keep this name)")
                 continue
             try:
                 st = p.stat()
@@ -118,7 +118,7 @@ def scan_local(root: Path, report: Report) -> dict[str, os.stat_result]:
 
 
 def trash_local(path: Path) -> None:
-    """To the Recycle Bin, so a deletion from GharBox can be undone on the PC too."""
+    """To the Recycle Bin, so a deletion from ZiraHive can be undone on the PC too."""
     try:
         from send2trash import send2trash
 

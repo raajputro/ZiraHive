@@ -14,7 +14,7 @@ from conftest import make_rich_video, make_video
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "sync-client"))
 
-from gharbox_sync.dlna import DlnaServer, media_base  # noqa: E402
+from zirahive_sync.dlna import DlnaServer, media_base  # noqa: E402
 
 DIDL_NS = {"d": "urn:schemas-upnp-org:metadata-1-0/DIDL-Lite/", "dc": "http://purl.org/dc/elements/1.1/",
            "upnp": "urn:schemas-upnp-org:metadata-1-0/upnp/"}
@@ -80,9 +80,9 @@ def _soap_browse(port: int, object_id: str, flag: str = "BrowseDirectChildren") 
     return ET.fromstring(result)
 
 
-async def test_tv_finds_and_browses_gharbox(client, admin, tmp_path, monkeypatch):
+async def test_tv_finds_and_browses_zirahive(client, admin, tmp_path, monkeypatch):
     await _library(client, tmp_path)
-    monkeypatch.setenv("GHARBOX_LAN_URL", "http://192.168.1.20:8080")
+    monkeypatch.setenv("ZIRAHIVE_LAN_URL", "http://192.168.1.20:8080")
     from app.config import get_settings
     get_settings.cache_clear()
     loop = asyncio.get_running_loop()
@@ -92,7 +92,7 @@ async def test_tv_finds_and_browses_gharbox(client, admin, tmp_path, monkeypatch
         r.raise_for_status()
         return r.json()
 
-    tv = DlnaServer("GharBox (test)", "1234-abcd", "http://localhost:8080", fetch, http_port=0, ssdp_port=0,
+    tv = DlnaServer("ZiraHive (test)", "1234-abcd", "http://localhost:8080", fetch, http_port=0, ssdp_port=0,
                     ip="127.0.0.1")
     tv.start()
     try:
@@ -105,7 +105,7 @@ async def test_tv_finds_and_browses_gharbox(client, admin, tmp_path, monkeypatch
         s.close()
         assert reply.startswith("HTTP/1.1 200 OK") and f"LOCATION: {tv.location}" in reply
         desc = (await asyncio.to_thread(httpx.get, tv.location)).text
-        assert "<friendlyName>GharBox (test)</friendlyName>" in desc and "ContentDirectory" in desc
+        assert "<friendlyName>ZiraHive (test)</friendlyName>" in desc and "ContentDirectory" in desc
 
         root = await asyncio.to_thread(_soap_browse, tv.http_port, "0")
         folders = {c.find("dc:title", DIDL_NS).text: c.get("id") for c in root.findall("d:container", DIDL_NS)}

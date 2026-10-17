@@ -10,9 +10,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     """All settings come from environment variables (or a .env file)."""
 
-    model_config = SettingsConfigDict(env_file=".env", env_prefix="GHARBOX_", extra="ignore")
+    model_config = SettingsConfigDict(env_file=".env", env_prefix="ZIRAHIVE_", extra="ignore")
 
-    # Where GharBox keeps everything it owns: backups, thumbnails, upload scratch, secrets.
+    # Where ZiraHive keeps everything it owns: backups, thumbnails, upload scratch, secrets.
     data_dir: Path = Path("./data")
     database_url: str = ""  # empty -> SQLite file inside data_dir
     redis_url: str = ""  # empty -> background jobs run in-process
@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     media_root: str = ""
     media_host_path: str = ""
     ice_servers: str = ""
-    server_name: str = ""  # how linked GharBox servers see this one, e.g. "Mahbub's GharBox"  # voice chat: extra STUN servers, comma separated  # the media folder as Windows sees it (G:/Media), for showing paths
+    server_name: str = ""  # how linked ZiraHive servers see this one, e.g. "Mahbub's ZiraHive"  # voice chat: extra STUN servers, comma separated  # the media folder as Windows sees it (G:/Media), for showing paths
     # Extra libraries outside media_root: "Name:/path[:kind],Name2:/path2"
     media_libraries: str = ""
     # Your drives, mounted read-only by Docker as /drives/c, /drives/d, ... (DRIVE_D=D:/ in .env).
@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     tmdb_api_key: str = ""
 
     # The public address of the share-link gateway, used when making share links, e.g.
-    # https://gharbox.tail1234.ts.net:8443  (empty: links use whatever address you're on)
+    # https://zirahive.tail1234.ts.net:8443  (empty: links use whatever address you're on)
     public_url: str = ""
     # Secure cookies: "auto" = when the request came over HTTPS; "true" / "false" to force
     secure_cookies: str = "auto"
@@ -53,7 +53,7 @@ class Settings(BaseSettings):
     #   documents = PDFs, Word and text files, scans and screenshots;  all = every photo too;  off
     ocr: str = "documents"
     ocr_languages: str = "ben+eng"
-    lan_url: str = ""  # e.g. http://192.168.0.105:8080: how TVs and Chromecasts reach GharBox
+    lan_url: str = ""  # e.g. http://192.168.0.105:8080: how TVs and Chromecasts reach ZiraHive
 
     ffmpeg_bin: str = "ffmpeg"
     ffprobe_bin: str = "ffprobe"
@@ -74,17 +74,20 @@ class Settings(BaseSettings):
     def db_url(self) -> str:
         if self.database_url:
             return self.database_url
-        return f"sqlite+aiosqlite:///{(self.data_dir / 'gharbox.db').resolve()}"
+        db = self.data_dir / "zirahive.db"
+        if not db.exists() and (self.data_dir / "gharbox.db").exists():
+            db = self.data_dir / "gharbox.db"  # made before the rename
+        return f"sqlite+aiosqlite:///{db.resolve()}"
 
     def ensure_dirs(self) -> None:
         for d in (self.data_dir, self.storage_dir, self.cache_dir / "thumbs",
                   self.cache_dir / "posters", self.upload_dir):
             d.mkdir(parents=True, exist_ok=True)
-        # Marks this folder as GharBox's own (people's files, the vault, the database), so it is
-        # never offered or scanned as media, even when the drive it's on is shared with GharBox.
-        mark = self.data_dir / ".gharbox-data"
+        # Marks this folder as ZiraHive's own (people's files, the vault, the database), so it is
+        # never offered or scanned as media, even when the drive it's on is shared with ZiraHive.
+        mark = self.data_dir / ".zirahive-data"
         if not mark.exists():
-            mark.write_text("GharBox's own data. Never shown as media.\n")
+            mark.write_text("ZiraHive's own data. Never shown as media.\n")
 
     def resolved_secret(self) -> str:
         if self.secret_key:
@@ -110,6 +113,17 @@ class Settings(BaseSettings):
         return out
 
 
+def _adopt_old_names() -> None:
+    """ZiraHive was called GharBox: settings still written the old way (GHARBOX_DATA_DIR=...)
+    keep working, unless the new name is set too."""
+    import os
+
+    for key, value in list(os.environ.items()):
+        if key.startswith("GHARBOX_"):
+            os.environ.setdefault("ZIRAHIVE_" + key[len("GHARBOX_"):], value)
+
+
 @lru_cache
 def get_settings() -> Settings:
+    _adopt_old_names()
     return Settings()

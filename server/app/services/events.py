@@ -27,7 +27,7 @@ async def audit(session: AsyncSession, action: str, user: User | None = None,
 
 
 async def _push(url: str, title: str, body: str | None, link: str | None) -> None:
-    headers = {"Title": title.encode("utf-8").decode("latin-1", "ignore") or "GharBox",
+    headers = {"Title": title.encode("utf-8").decode("latin-1", "ignore") or "ZiraHive",
                "Tags": "house"}
     if link:
         headers["Click"] = link

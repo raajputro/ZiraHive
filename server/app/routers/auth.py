@@ -16,7 +16,7 @@ from ..models import Asset, AssetVersion, RecoveryCode, User, utcnow
 from ..schemas import (CodeIn, LoginIn, MeOut, MySettingsIn, PasswordChangeIn, PasswordIn,
                        RecoveryCodesOut, SetupIn, TokenOut, TwoFactorSetupOut, UserAdminOut,
                        UserCreateIn, UserOut, UserUpdateIn)
-from ..security import (COOKIE_NAME, admin_user, client_ip, create_token, current_user,
+from ..security import (COOKIE_NAME, OLD_COOKIE_NAME, admin_user, client_ip, create_token, current_user,
                         hash_password, login_ip_throttle, login_throttle, use_secure_cookie,
                         verify_password)
 from ..services.events import audit, notify
@@ -113,6 +113,7 @@ async def login(body: LoginIn, request: Request, response: Response,
 @router.post("/auth/logout", status_code=204)
 async def logout(response: Response):
     response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(OLD_COOKIE_NAME, path="/")
 
 
 @router.post("/auth/logout-all", status_code=204)
@@ -123,6 +124,7 @@ async def logout_everywhere(request: Request, response: Response, user: User = D
     await audit(session, "logout_all", user, request=request)
     await session.commit()
     response.delete_cookie(COOKIE_NAME, path="/")
+    response.delete_cookie(OLD_COOKIE_NAME, path="/")
 
 
 @router.get("/auth/me", response_model=MeOut)
@@ -156,7 +158,7 @@ async def device_token(request: Request, user: User = Depends(current_user),
 @router.post("/auth/me/test-notification", status_code=204)
 async def test_notification(user: User = Depends(current_user),
                             session: AsyncSession = Depends(get_session)):
-    await notify(session, user, "test", "Notifications work", "This is a test from GharBox.")
+    await notify(session, user, "test", "Notifications work", "This is a test from ZiraHive.")
     await session.commit()
 
 
@@ -184,7 +186,7 @@ async def two_factor_setup(user: User = Depends(current_user), session: AsyncSes
         raise HTTPException(409, "Two-factor sign-in is already on")
     user.totp_secret = pyotp.random_base32()
     await session.commit()
-    uri = pyotp.TOTP(user.totp_secret).provisioning_uri(name=user.username, issuer_name="GharBox")
+    uri = pyotp.TOTP(user.totp_secret).provisioning_uri(name=user.username, issuer_name="ZiraHive")
     buf = io.BytesIO()
     segno.make(uri, error="m").save(buf, kind="svg", scale=5, border=2, xmldecl=False,
                                      svgns=True, dark="#1F2A44", light="#FFFFFF")

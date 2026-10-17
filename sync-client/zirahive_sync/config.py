@@ -1,4 +1,4 @@
-"""Settings in %APPDATA%\\GharBox Sync\\config.json; the sign-in token in Windows Credential Manager."""
+"""Settings in %APPDATA%\\ZiraHive Sync\\config.json; the sign-in token in Windows Credential Manager."""
 from __future__ import annotations
 
 import hashlib
@@ -7,19 +7,26 @@ import os
 from dataclasses import asdict, dataclass, field
 from pathlib import Path
 
-APP = "GharBox Sync"
+APP = "ZiraHive Sync"
+OLD_APP = "GharBox Sync"  # the app's name before the rename
 
 
 def app_dir() -> Path:
-    base = os.environ.get("GHARBOX_SYNC_HOME") or os.environ.get("APPDATA") or str(Path.home() / ".config")
+    base = (os.environ.get("ZIRAHIVE_SYNC_HOME") or os.environ.get("GHARBOX_SYNC_HOME") or os.environ.get("APPDATA")
+            or str(Path.home() / ".config"))
     d = Path(base) / APP
+    old = Path(base) / OLD_APP
+    if not d.exists() and old.is_dir():
+        import shutil
+
+        shutil.copytree(old, d)  # settings, sync state and logs carry over; the old folder stays as it was
     d.mkdir(parents=True, exist_ok=True)
     return d
 
 
 @dataclass
 class Pair:
-    local: str    # C:\Users\me\Documents\GharBox
+    local: str    # C:\Users\me\Documents\ZiraHive
     remote: str   # /PC Sync
 
     @property
@@ -34,7 +41,7 @@ class Config:
     language: str = "en"
     interval: int = 60          # seconds between checks
     paused: bool = False
-    tv_sharing: bool = False    # show GharBox on smart TVs at home (DLNA)
+    tv_sharing: bool = False    # show ZiraHive on smart TVs at home (DLNA)
     device_id: str = ""         # this PC's DLNA identity, made once
     pairs: list[Pair] = field(default_factory=list)
 
@@ -75,6 +82,10 @@ def load_token(cfg: Config) -> str | None:
         import keyring
 
         token = keyring.get_password(APP, _account(cfg))
+        if not token:  # signed in before the rename
+            token = keyring.get_password(OLD_APP, _account(cfg))
+            if token:
+                keyring.set_password(APP, _account(cfg), token)
         if token:
             return token
     except Exception:

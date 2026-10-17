@@ -22,10 +22,10 @@ RUN pip install -r requirements.txt
 
 COPY app ./app
 
-RUN useradd --create-home --uid 1000 gharbox && mkdir -p /data && chown gharbox /data
-USER gharbox
+RUN useradd --create-home --uid 1000 zirahive && mkdir -p /data && chown zirahive /data
+USER zirahive
 
-ENV GHARBOX_DATA_DIR=/data
+ENV ZIRAHIVE_DATA_DIR=/data
 EXPOSE 8000
 HEALTHCHECK --interval=30s --timeout=5s --start-period=20s \
   CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/health')"

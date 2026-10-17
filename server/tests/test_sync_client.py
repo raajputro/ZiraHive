@@ -1,4 +1,4 @@
-"""The PC sync client against a real GharBox server (in-process)."""
+"""The PC sync client against a real ZiraHive server (in-process)."""
 from __future__ import annotations
 
 import os
@@ -10,14 +10,14 @@ import pytest
 
 sys.path.insert(0, str(Path(__file__).parents[2] / "sync-client"))
 
-from gharbox_sync import engine  # noqa: E402
-from gharbox_sync.api import Api  # noqa: E402
-from gharbox_sync.config import Pair  # noqa: E402
+from zirahive_sync import engine  # noqa: E402
+from zirahive_sync.api import Api  # noqa: E402
+from zirahive_sync.config import Pair  # noqa: E402
 
 
 @pytest.fixture
 async def setup(app, client, admin, tmp_path, monkeypatch):
-    monkeypatch.setenv("GHARBOX_SYNC_HOME", str(tmp_path / "appdata"))
+    monkeypatch.setenv("ZIRAHIVE_SYNC_HOME", str(tmp_path / "appdata"))
     monkeypatch.setenv("HOME", str(tmp_path / "home"))
     monkeypatch.setattr(engine, "SETTLE_SECONDS", 0)
     monkeypatch.setattr(engine, "trash_local", lambda p: p.rename(tmp_path / f"recycled-{p.name}"))
@@ -68,7 +68,7 @@ async def test_two_way_sync(setup):
     r = await engine.sync_pair(api, pair)
     assert r.changes == 0 and not r.conflicts
 
-    # edit on the PC: uploaded, GharBox keeps the old copy as a version
+    # edit on the PC: uploaded, ZiraHive keeps the old copy as a version
     (local / "notes.txt").write_text("from the PC, edited")
     r = await engine.sync_pair(api, pair)
     assert r.uploaded == ["notes.txt"]
@@ -76,19 +76,19 @@ async def test_two_way_sync(setup):
     assert await content(client, note) == b"from the PC, edited"
     assert len((await client.get(f"/api/assets/{note['id']}/versions")).json()) == 1
 
-    # edit in GharBox (e.g. from the phone): downloaded
+    # edit in ZiraHive (e.g. from the phone): downloaded
     await put_remote(client, "phone/photo.jpg", b"\xff\xd8 edited on the phone")
     r = await engine.sync_pair(api, pair)
     assert r.downloaded == ["phone/photo.jpg"]
     assert (local / "phone" / "photo.jpg").read_bytes() == b"\xff\xd8 edited on the phone"
 
-    # delete on the PC: goes to the GharBox trash
+    # delete on the PC: goes to the ZiraHive trash
     (local / "Tax" / "2025" / "return.pdf").unlink()
     r = await engine.sync_pair(api, pair)
     assert r.trashed_remote == ["Tax/2025/return.pdf"]
     assert "return.pdf" in {a["filename"] for a in (await client.get("/api/trash")).json()}
 
-    # delete in GharBox: goes to the Recycle Bin on the PC
+    # delete in ZiraHive: goes to the Recycle Bin on the PC
     await client.delete(f"/api/assets/{(await remote_files(api))['phone/photo.jpg']['id']}")
     r = await engine.sync_pair(api, pair)
     assert r.trashed_local == ["phone/photo.jpg"] and not (local / "phone" / "photo.jpg").exists()
@@ -96,10 +96,10 @@ async def test_two_way_sync(setup):
 
     # changed on both sides: both copies are kept
     (local / "notes.txt").write_text("PC version")
-    await put_remote(client, "notes.txt", b"GharBox version")
+    await put_remote(client, "notes.txt", b"ZiraHive version")
     r = await engine.sync_pair(api, pair)
     assert r.conflicts == ["notes.txt"]
-    assert (local / "notes.txt").read_text() == "GharBox version"
+    assert (local / "notes.txt").read_text() == "ZiraHive version"
     copies = [p for p in local.iterdir() if p.name.startswith("notes (PC copy")]
     assert len(copies) == 1 and copies[0].read_text() == "PC version"
     assert any(k.startswith("notes (PC copy") for k in await remote_files(api))
@@ -130,7 +130,7 @@ async def test_safety_guards(setup):
     r = await engine.sync_pair(api, pair)
     assert len(r.trashed_remote) == 5 and set(await remote_files(api)) == {"file5.txt"}
 
-    # names GharBox can't keep are reported, not lost
+    # names ZiraHive can't keep are reported, not lost
     if os.name != "nt":
         (local / "what?.txt").write_text("x")
         r = await engine.sync_pair(api, pair)
@@ -145,7 +145,7 @@ async def test_device_token_and_signed_out(app, client, admin):
     assert any(e["action"] == "device_linked" for e in log)
     # sign out everywhere ends the device sign-in too
     await client.post("/api/auth/logout-all")
-    from gharbox_sync.api import SignedOut
+    from zirahive_sync.api import SignedOut
     with pytest.raises(SignedOut):
         await api.tree("/")
     await api.close()

@@ -131,7 +131,7 @@ _CASTABLE = {".mp4": "video/mp4", ".m4v": "video/mp4", ".mov": "video/mp4", ".we
 
 
 def device_base_url(request: Request) -> str:
-    """The address TVs and Chromecasts on the home network can reach GharBox at."""
+    """The address TVs and Chromecasts on the home network can reach ZiraHive at."""
     from ..config import get_settings
 
     configured = get_settings().lan_url.strip().rstrip("/")
@@ -141,8 +141,8 @@ def device_base_url(request: Request) -> str:
     if _PRIVATE.match(host):
         return str(request.base_url).rstrip("/")
     raise HTTPException(409, {"code": "lan_url_needed", "message":
-                              "To cast, GharBox needs this PC's home-network address. Set GHARBOX_LAN_URL "
-                              "in .env (setup.ps1 fills it in) and restart GharBox."})
+                              "To cast, ZiraHive needs this PC's home-network address. Set ZIRAHIVE_LAN_URL "
+                              "in .env (setup.ps1 fills it in) and restart ZiraHive."})
 
 
 @router.get("/media/{media_id}/cast", response_model=CastOut)

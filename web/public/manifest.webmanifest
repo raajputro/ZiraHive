@@ -1,6 +1,6 @@
 {
-  "name": "GharBox",
-  "short_name": "GharBox",
+  "name": "ZiraHive",
+  "short_name": "ZiraHive",
   "description": "Your photos, files and movies, at home.",
   "start_url": "/photos",
   "scope": "/",

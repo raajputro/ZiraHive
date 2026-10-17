@@ -63,7 +63,7 @@ def _env(cfg: BackupConfig) -> dict[str, str]:
 async def restic(cfg: BackupConfig, *args: str, timeout: float = 6 * 3600) -> tuple[int, str, str]:
     exe = restic_bin()
     if not exe:
-        raise BackupError("restic is not installed (the GharBox Docker image includes it)")
+        raise BackupError("restic is not installed (the ZiraHive Docker image includes it)")
     proc = await asyncio.create_subprocess_exec(exe, *args, env=_env(cfg), stdout=asyncio.subprocess.PIPE,
                                                 stderr=asyncio.subprocess.PIPE, stdin=asyncio.subprocess.DEVNULL)
     try:
@@ -108,18 +108,18 @@ async def dump_database(staging: Path) -> Path:
     staging.mkdir(parents=True, exist_ok=True)
     url = s.db_url
     if url.startswith("sqlite"):
-        dest = staging / "gharbox.db"
-        await asyncio.to_thread(_sqlite_copy, s.data_dir / "gharbox.db", dest)
+        dest = staging / "zirahive.db"
+        await asyncio.to_thread(_sqlite_copy, s.data_dir / "zirahive.db", dest)
         return dest
     u = urlparse(url.replace("+asyncpg", ""))
     exe = shutil.which("pg_dump")
     if not exe:
-        raise BackupError("pg_dump is not installed (the GharBox Docker image includes it)")
-    dest = staging / "gharbox.pgdump"
+        raise BackupError("pg_dump is not installed (the ZiraHive Docker image includes it)")
+    dest = staging / "zirahive.pgdump"
     env = {"PATH": os.environ.get("PATH", ""), "PGPASSWORD": u.password or ""}
     proc = await asyncio.create_subprocess_exec(
         exe, "--format=custom", "--no-owner", "-h", u.hostname or "localhost", "-p", str(u.port or 5432),
-        "-U", u.username or "postgres", "-f", str(dest), (u.path or "/gharbox").lstrip("/"),
+        "-U", u.username or "postgres", "-f", str(dest), (u.path or "/zirahive").lstrip("/"),
         env=env, stdout=asyncio.subprocess.DEVNULL, stderr=asyncio.subprocess.PIPE)
     _, err = await proc.communicate()
     if proc.returncode != 0:
@@ -140,8 +140,8 @@ async def _paths(session: AsyncSession, cfg: BackupConfig) -> list[str]:
 def _excludes() -> list[str]:
     s = get_settings()
     out = []
-    for p in (s.cache_dir, s.upload_dir, s.data_dir / "gharbox.db", s.data_dir / "gharbox.db-wal",
-              s.data_dir / "gharbox.db-shm", s.data_dir / "restore"):
+    for p in (s.cache_dir, s.upload_dir, s.data_dir / "zirahive.db", s.data_dir / "zirahive.db-wal",
+              s.data_dir / "zirahive.db-shm", s.data_dir / "restore"):
         out += ["--exclude", str(p)]
     return out
 
@@ -160,7 +160,7 @@ async def run_backup(session: AsyncSession) -> BackupRun:
         try:
             await ensure_repository(cfg)
             await dump_database(staging)
-            rc, out, err = await restic(cfg, "backup", "--json", "--host", "gharbox", "--tag", "gharbox",
+            rc, out, err = await restic(cfg, "backup", "--json", "--host", "zirahive", "--tag", "zirahive",
                                         *_excludes(), *(await _paths(session, cfg)))
             if rc not in (0, 3):  # 3 = some files couldn't be read (reported, the rest is saved)
                 raise BackupError(_short(err))
@@ -172,7 +172,7 @@ async def run_backup(session: AsyncSession) -> BackupRun:
             run.total_bytes = summary.get("total_bytes_processed")
             run.message = "Some files couldn't be read and were skipped" if rc == 3 else None
             if datetime.now(timezone.utc).weekday() == 6:
-                await restic(cfg, "forget", "--tag", "gharbox", "--keep-daily", str(cfg.keep_daily),
+                await restic(cfg, "forget", "--tag", "zirahive", "--keep-daily", str(cfg.keep_daily),
                              "--keep-weekly", str(cfg.keep_weekly), "--keep-monthly", str(cfg.keep_monthly), "--prune")
             run.status = "ok"
         except BackupError as exc:
@@ -216,7 +216,7 @@ async def run_check(session: AsyncSession, subset: str = "5%") -> BackupRun:
 
 
 async def snapshots(cfg: BackupConfig) -> list[dict]:
-    rc, out, err = await restic(cfg, "snapshots", "--no-lock", "--json", "--tag", "gharbox", timeout=300)
+    rc, out, err = await restic(cfg, "snapshots", "--no-lock", "--json", "--tag", "zirahive", timeout=300)
     if rc != 0:
         raise BackupError(_short(err))
     return json.loads(out or "[]")

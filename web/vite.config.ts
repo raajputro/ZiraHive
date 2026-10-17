@@ -9,7 +9,7 @@ const csp = readFileSync(new URL("./Caddyfile", import.meta.url), "utf8").match(
 
 // In dev, the API runs on :8000 and Vite proxies /api to it (same-origin, so cookies work).
 // ws: true carries the watch-party WebSocket through the proxy too.
-const proxy = { "/api": { target: process.env.GHARBOX_API ?? "http://localhost:8000", ws: true } };
+const proxy = { "/api": { target: process.env.ZIRAHIVE_API ?? "http://localhost:8000", ws: true } };
 
 export default defineConfig({
   plugins: [react()],

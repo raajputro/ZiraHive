@@ -5,7 +5,7 @@ from app.services import jobs
 from conftest import make_video
 from test_api import upload
 
-GATEWAY = {"X-GharBox-Gateway": "public"}
+GATEWAY = {"X-ZiraHive-Gateway": "public"}
 
 
 async def test_public_gateway_only_reaches_share_links(client, admin):
@@ -51,7 +51,7 @@ async def test_cookie_secure_over_https(client):
     r = await client.post("/api/setup", json={"username": "mahbub", "password": "supersecret"})
     assert "secure" not in r.headers["set-cookie"].lower()  # plain http on the home network
     r = await client.post("/api/auth/login", json={"username": "mahbub", "password": "supersecret"},
-                          headers={"Host": "gharbox.tail1234.ts.net"})
+                          headers={"Host": "zirahive.tail1234.ts.net"})
     assert "secure" in r.headers["set-cookie"].lower()
 
 

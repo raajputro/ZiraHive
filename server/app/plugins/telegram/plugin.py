@@ -1,10 +1,10 @@
-"""Short Telegram messages about what happens in GharBox."""
+"""Short Telegram messages about what happens in ZiraHive."""
 
 
 def message(event, s) -> str | None:
     d = event.data
     if event.name == "plugin.test":
-        return "GharBox can send you messages here. 👋"
+        return "ZiraHive can send you messages here. 👋"
     if event.name == "media.added" and s.get("new_media"):
         titles = ", ".join(d.get("titles", [])[:5])
         more = d["count"] - min(5, len(d.get("titles", [])))
@@ -15,7 +15,7 @@ def message(event, s) -> str | None:
         when = f" at {d['scheduled_at']}" if d.get("scheduled_at") else " now"
         return f"🍿 {d['host']} is watching {d['title']}{when}"
     if event.name == "user.created" and s.get("people"):
-        return f"👤 {d['by']} added {d['username']} to GharBox"
+        return f"👤 {d['by']} added {d['username']} to ZiraHive"
     if event.name == "file.uploaded" and s.get("uploads"):
         return f"⬆️ {d['owner']} uploaded {d['filename']}"
     return None

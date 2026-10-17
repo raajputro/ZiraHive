@@ -80,7 +80,7 @@ function bookItems(b: BookDetail): QueueItem[] {
   }));
 }
 
-const RATE_KEY = "gharbox.audiobookRate";
+const RATE_KEY = "zirahive.audiobookRate";
 const read = (k: string) => { try { return localStorage.getItem(k); } catch { return null; } };
 const write = (k: string, v: string) => { try { localStorage.setItem(k, v); } catch { /* private mode */ } };
 

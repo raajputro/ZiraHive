@@ -56,7 +56,7 @@ def _dir_size(path: Path) -> int:
 
 @router.get("/admin/activity", response_model=ActivityOut)
 async def activity_now(_: User = Depends(admin_user), session: AsyncSession = Depends(get_session)):
-    """Live view for the admin dashboard: streams, job queue and every disk GharBox uses."""
+    """Live view for the admin dashboard: streams, job queue and every disk ZiraHive uses."""
     settings = get_settings()
     disks, seen = [], set()
     places = [("Backups and app data", str(settings.data_dir))]
@@ -92,22 +92,22 @@ async def security_check(request: Request, _: User = Depends(admin_user),
     # home network and Tailscale addresses are already private/encrypted
     local = host in ("localhost", "127.0.0.1") or host.startswith(("192.168.", "10.", "172.", "100."))
     add(is_https(request) or local, "You're connected over HTTPS",
-        "Open GharBox through its Tailscale address (https://gharbox.<your-tailnet>.ts.net) "
+        "Open ZiraHive through its Tailscale address (https://zirahive.<your-tailnet>.ts.net) "
         "instead of plain http when you're away from home.")
     admins = (await session.scalars(select(User).where(User.is_admin.is_(True)))).all()
     weak = [a.username for a in admins if not a.totp_enabled]
     add(not weak, "Every admin uses two-factor sign-in",
         "Turn on two-factor for: {} (Settings > Your account).".format(", ".join(weak)))
     add(len(settings.resolved_secret()) >= 32, "Sign-in tokens use a strong secret key",
-        "Set GHARBOX_SECRET_KEY in .env to a long random value (or leave it empty to auto-generate).")
+        "Set ZIRAHIVE_SECRET_KEY in .env to a long random value (or leave it empty to auto-generate).")
     add(not settings.api_docs, "The developer API page is off",
-        "Set GHARBOX_API_DOCS=false in .env unless you are developing.", "medium")
+        "Set ZIRAHIVE_API_DOCS=false in .env unless you are developing.", "medium")
     if settings.public_url:
         add(settings.public_url.startswith("https://"), "Share links use HTTPS",
-            "GHARBOX_PUBLIC_URL should start with https://")
+            "ZIRAHIVE_PUBLIC_URL should start with https://")
     else:
         add(False, "Share links can be opened outside your home",
-            "Set up the public share address (docs/REMOTE_ACCESS.md) and put it in GHARBOX_PUBLIC_URL. "
+            "Set up the public share address (docs/REMOTE_ACCESS.md) and put it in ZIRAHIVE_PUBLIC_URL. "
             "Until then, links only work on your home network and Tailscale.", "info")
     others = await session.scalar(select(func.count()).select_from(User).where(
         User.is_admin.is_(False), User.totp_enabled.is_(False))) or 0
@@ -175,7 +175,7 @@ async def phone_backup_finished(body: BackupReportIn, user: User = Depends(curre
     device = f" from {body.device}" if body.device else ""
     if body.failed:
         title = f"Upload needs attention: {body.failed} {'file' if body.failed == 1 else 'files'} failed{device}"
-        text = f"{body.uploaded} uploaded, {body.skipped} already saved. Open GharBox and upload the failed ones again."
+        text = f"{body.uploaded} uploaded, {body.skipped} already saved. Open ZiraHive and upload the failed ones again."
     else:
         title = f"Backed up {body.uploaded} photos and videos{device}"
         text = f"{body.skipped} were already safe."

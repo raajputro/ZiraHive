@@ -16,14 +16,14 @@ from .services import jobs, transcode
 from .services.libraries import discover
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
-log = logging.getLogger("gharbox")
+log = logging.getLogger("zirahive")
 
 VERSION = "0.1.0"
 
 
 async def bootstrap_libraries() -> None:
     """Add a category for every folder in the media folder, plus any listed in
-    GHARBOX_MEDIA_LIBRARIES, and scan the new ones."""
+    ZIRAHIVE_MEDIA_LIBRARIES, and scan the new ones."""
     async with db.sessionmaker()() as session:
         for lib in await discover(session):
             await jobs.enqueue("scan_library", lib.id)
@@ -46,7 +46,7 @@ async def lifespan(_: FastAPI):
     await jobs.init_queue()
     await bootstrap_libraries()
     transcode.manager.start_janitor()
-    log.info("GharBox %s ready (data: %s)", VERSION, settings.data_dir.resolve())
+    log.info("ZiraHive %s ready (data: %s)", VERSION, settings.data_dir.resolve())
     yield
     await transcode.manager.shutdown()
     await jobs.close_queue()
@@ -56,15 +56,15 @@ async def lifespan(_: FastAPI):
 def create_app() -> FastAPI:
     settings = get_settings()
     docs = {} if settings.api_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
-    app = FastAPI(title="GharBox", version=VERSION, lifespan=lifespan,
+    app = FastAPI(title="ZiraHive", version=VERSION, lifespan=lifespan,
                   description="Self-hosted backup and media server", **docs)
 
     @app.middleware("http")
     async def public_gateway_guard(request: Request, call_next):
         """Requests from the public share-link site may only reach share endpoints.
         Caddy already limits that site to /api/s/*; this is the second lock."""
-        # (and to /api/fed/*, which only answers linked GharBox servers' tokens)
-        if request.headers.get("x-gharbox-gateway") == "public" and not request.url.path.startswith(("/api/s/", "/api/fed/")):
+        # (and to /api/fed/*, which only answers linked ZiraHive servers' tokens)
+        if request.headers.get("x-zirahive-gateway") == "public" and not request.url.path.startswith(("/api/s/", "/api/fed/")):
             return JSONResponse({"detail": "Not found"}, status_code=404)
         return await call_next(request)
     origins = [o.strip() for o in get_settings().cors_origins.split(",") if o.strip()]

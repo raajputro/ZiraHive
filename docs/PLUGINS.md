@@ -1,6 +1,6 @@
 # Plugins
 
-Plugins are small Python add-ons that react to what happens in GharBox (new movies, uploads,
+Plugins are small Python add-ons that react to what happens in ZiraHive (new movies, uploads,
 backups, watch parties) or add their own pages to the API. Turn them on and set them up in
 **Settings > Server > Plugins**.
 
@@ -33,15 +33,15 @@ and these headers:
 
 | Header | Value |
 |---|---|
-| `X-GharBox-Event` | the event name |
-| `X-GharBox-Signature` | `sha256=` + HMAC-SHA256 of the raw body with your signing secret |
+| `X-ZiraHive-Event` | the event name |
+| `X-ZiraHive-Signature` | `sha256=` + HMAC-SHA256 of the raw body with your signing secret |
 
 Check the signature before trusting the request. In Python:
 
 ```python
 import hashlib, hmac
 expected = "sha256=" + hmac.new(SECRET.encode(), body, hashlib.sha256).hexdigest()
-ok = hmac.compare_digest(expected, request.headers["X-GharBox-Signature"])
+ok = hmac.compare_digest(expected, request.headers["X-ZiraHive-Signature"])
 ```
 
 ## Events
@@ -59,8 +59,8 @@ Events never contain passwords or file contents.
 
 ## Writing your own
 
-A plugin is a folder in `plugins` inside GharBox's data folder (`GHARBOX_DATA_PATH`, for example
-`D:\GharBoxData\plugins\new-movie-sms`), with two files.
+A plugin is a folder in `plugins` inside ZiraHive's data folder (`ZIRAHIVE_DATA_PATH`, for example
+`D:\ZiraHiveData\plugins\new-movie-sms`), with two files.
 
 **plugin.json** says what it is:
 
@@ -108,16 +108,16 @@ async def handle(request, ctx):
 ```
 
 `ctx` also has `ctx.log` (a logger; messages go to `docker compose logs api`),
-`ctx.notify_admins(title, body)` for a GharBox notification, `ctx.plugin_id` and `ctx.public_url`.
+`ctx.notify_admins(title, body)` for a ZiraHive notification, `ctx.plugin_id` and `ctx.public_url`.
 
 Then open **Settings > Server > Plugins**: the plugin appears (reload the page), fill in its
 settings, turn it on and press **Send a test**.
 
 ### Good to know
 
-- **A plugin runs with GharBox's own rights**, so only add code you trust. Nothing in a plugin
-  folder runs until an admin turns it on, and GharBox asks again for plugins that aren't built in.
-- **Plugins can't break GharBox.** Events are handed over in the background; a plugin that fails,
+- **A plugin runs with ZiraHive's own rights**, so only add code you trust. Nothing in a plugin
+  folder runs until an admin turns it on, and ZiraHive asks again for plugins that aren't built in.
+- **Plugins can't break ZiraHive.** Events are handed over in the background; a plugin that fails,
   or takes more than 15 seconds, is stopped and its error is shown on its card in Settings.
 - **Changes to `plugin.py` load by themselves** on the next event. After changing `plugin.json`,
   reload the Settings page.

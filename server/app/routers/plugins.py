@@ -142,7 +142,7 @@ async def test_plugin(pid: str, admin: User = Depends(admin_user), session: Asyn
     st = await session.get(PluginState, pid)
     if st is None or not st.enabled:
         raise HTTPException(409, "Turn the plugin on first")
-    event = plugins.Event("plugin.test", {"by": admin.username, "message": "A test from GharBox"})
+    event = plugins.Event("plugin.test", {"by": admin.username, "message": "A test from ZiraHive"})
     error = await plugins.deliver(m, json.loads(st.settings_json or "{}"), event)
     return TestOut(ok=error is None, error=error)
 

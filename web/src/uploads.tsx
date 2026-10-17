@@ -104,7 +104,7 @@ export function UploadProvider({ children }: { children: ReactNode }) {
             {!active && <button className="icon" aria-label={tr("Close")} onClick={() => setItems([])}><X size={16} /></button>}
           </header>
           <div className="tray-bar"><span style={{ width: `${total ? (sent / total) * 100 : 0}%` }} /></div>
-          {active > 0 && <p className="tray-hint">{tr("You can lock your phone: uploading pauses and carries on when you open GharBox again. You'll get a notification when it's done.")}</p>}
+          {active > 0 && <p className="tray-hint">{tr("You can lock your phone: uploading pauses and carries on when you open ZiraHive again. You'll get a notification when it's done.")}</p>}
           <ul>
             {items.slice(-50).reverse().map((i) => (
               <li key={i.key} className={i.state}>

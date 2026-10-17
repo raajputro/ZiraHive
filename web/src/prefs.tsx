@@ -5,7 +5,7 @@ interface Prefs { lowData: boolean; setLowData: (v: boolean) => void }
 const PrefsContext = createContext<Prefs>({ lowData: false, setLowData: () => undefined });
 export const usePrefs = () => useContext(PrefsContext);
 
-const KEY = "gharbox:lowData";
+const KEY = "zirahive:lowData";
 function read(): boolean {
   try { return localStorage.getItem(KEY) === "1"; } catch { return false; }
 }

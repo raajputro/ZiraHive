@@ -1,9 +1,9 @@
 """What smart TVs see over DLNA.
 
 TVs find media servers on the home network with UPnP (SSDP multicast), which Docker Desktop
-can't do, so the DLNA part runs in the GharBox app on the PC (gharbox_sync/dlna.py). It asks
+can't do, so the DLNA part runs in the ZiraHive app on the PC (zirahive_sync/dlna.py). It asks
 this endpoint for one folder at a time, as the account it is signed in with, and hands the TV
-links that play one title each (12 hours), straight from GharBox.
+links that play one title each (12 hours), straight from ZiraHive.
 
 Folder ids: "0" (top), "lib:<id>", "series:<id>", "season:<series id>:<n>", "music:<library id>",
 "album:<id>", "continue".
@@ -45,7 +45,7 @@ class DlnaItem(BaseModel):
     mime: str
     size: int | None = None
     duration: float | None = None
-    path: str  # on GharBox, with a token that plays only this
+    path: str  # on ZiraHive, with a token that plays only this
     art: str | None = None
     year: int | None = None
     artist: str | None = None
@@ -59,7 +59,7 @@ class DlnaOut(BaseModel):
     title: str
     folders: list[DlnaFolder] = []
     items: list[DlnaItem] = []
-    lan_url: str | None = None  # GharBox's home-network address, when set
+    lan_url: str | None = None  # ZiraHive's home-network address, when set
 
 
 def _video(user: User, m: MediaItem, title: str | None = None) -> DlnaItem:
@@ -93,7 +93,7 @@ async def browse(id: str = "0", user: User = Depends(current_user), session: Asy
                 folders.append(DlnaFolder(id=f"music:{lib.id}", title=lib.name))
             elif lib.kind not in SHELF_KINDS:
                 folders.append(DlnaFolder(id=f"lib:{lib.id}", title=lib.name))
-        return DlnaOut(id="0", parent=None, title="GharBox", folders=folders, lan_url=lan)
+        return DlnaOut(id="0", parent=None, title="ZiraHive", folders=folders, lan_url=lan)
 
     if kind == "continue":
         rows = (await session.execute(

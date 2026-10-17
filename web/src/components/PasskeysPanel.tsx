@@ -59,7 +59,7 @@ export default function PasskeysPanel() {
         </ul>
       )}
       {problem === "insecure" ? (
-        <p className="notice">{tr("Passkeys need a secure address. Open GharBox at your https:// address (or http://localhost on the server PC) to add one.")}</p>
+        <p className="notice">{tr("Passkeys need a secure address. Open ZiraHive at your https:// address (or http://localhost on the server PC) to add one.")}</p>
       ) : problem === "unsupported" ? (
         <p className="notice">{tr("This browser can't use passkeys. Try a recent Chrome, Edge, Safari or Firefox.")}</p>
       ) : (

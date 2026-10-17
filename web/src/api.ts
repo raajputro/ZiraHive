@@ -1,5 +1,5 @@
 import { digits, t as tr, tx } from "./i18n";
-// Typed client for the GharBox API. Auth uses the httpOnly cookie set at login.
+// Typed client for the ZiraHive API. Auth uses the httpOnly cookie set at login.
 
 export interface User { id: string; username: string; is_admin: boolean; quota_bytes: number | null; created_at: string; totp_enabled: boolean; max_age: number | null; language?: string | null }
 export interface Me extends User { ntfy_url: string | null; used_bytes: number; language: string | null }
@@ -93,7 +93,7 @@ export interface Media {
   series_id: string | null; series_title: string | null; season: number | null; episode: number | null;
   episode_title: string | null; next_id: string | null;
   intro_start: number | null; intro_end: number | null; credits_start: number | null; age: number | null;
-  base?: string; link_id?: string;  // a title on a linked GharBox, fetched through this server
+  base?: string; link_id?: string;  // a title on a linked ZiraHive, fetched through this server
 }
 export type Quality = "original" | "1080p" | "720p" | "480p" | "360p";
 export interface Tracks {
@@ -127,7 +127,7 @@ export interface UploadResult { id: string | null; offset: number; size: number;
 export interface SecurityItem { ok: boolean; title: string; fix: string | null; level: "high" | "medium" | "info" }
 
 let publicBase = "";
-/** Loads the public share-link address once (GHARBOX_PUBLIC_URL on the server). */
+/** Loads the public share-link address once (ZIRAHIVE_PUBLIC_URL on the server). */
 export async function loadConfig() {
   try {
     const r = await fetch("/api/config");
@@ -158,7 +158,7 @@ async function request<T>(method: string, path: string, body?: unknown, init: Re
     } catch { /* not JSON */ }
     message = tx(message);  // server messages in the interface language
     if (res.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/passkeys/login") && !path.startsWith("/api/s/"))
-      window.dispatchEvent(new Event("gharbox:signed-out"));
+      window.dispatchEvent(new Event("zirahive:signed-out"));
     throw new ApiError(res.status, message, code);
   }
   if (res.status === 204) return undefined as T;

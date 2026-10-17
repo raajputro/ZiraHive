@@ -93,7 +93,7 @@ export default function ScanPage() {
           {pages.length === 0 && !busy && (
             <div className="empty">
               <h2>{tr("Turn paper into a PDF you can search")}</h2>
-              <p>{tr("Put the page on a dark table, take a photo from above, and GharBox straightens and cleans it. Add as many pages as you like. The words are read in Bangla and English, so you can find the document later by searching for anything written on it.")}</p>
+              <p>{tr("Put the page on a dark table, take a photo from above, and ZiraHive straightens and cleans it. Add as many pages as you like. The words are read in Bangla and English, so you can find the document later by searching for anything written on it.")}</p>
             </div>
           )}
           {pages.length > 0 && (

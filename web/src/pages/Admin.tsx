@@ -158,7 +158,7 @@ function Libraries() {
               <button className="icon" title={tr("Scan now")} aria-label={tr("Scan {name}", { name: l.name })}
                 onClick={() => void run(() => api.scanLibrary(l.id), tr("Scanning {name}. New titles appear in a minute.", { name: l.name }))}><RefreshCw size={16} /></button>
               <button className="icon" title={tr("Remove (files are not deleted)")} aria-label={tr("Remove {name}", { name: l.name })}
-                onClick={() => confirm(tr("Remove \"{name}\" from GharBox? Your files stay where they are.", { name: l.name })) && void run(() => api.removeLibrary(l.id))}><Trash2 size={16} /></button>
+                onClick={() => confirm(tr("Remove \"{name}\" from ZiraHive? Your files stay where they are.", { name: l.name })) && void run(() => api.removeLibrary(l.id))}><Trash2 size={16} /></button>
             </li>
           ))}
         </ul>
@@ -195,7 +195,7 @@ function AccountPanel() {
     if (!confirm(tr("Sign out on every phone and browser, including this one?"))) return;
     await api.logoutAll();
     setMsg(tr("Signed out everywhere."));
-    window.dispatchEvent(new Event("gharbox:signed-out"));
+    window.dispatchEvent(new Event("zirahive:signed-out"));
   };
   const quota = me?.quota_bytes;
   return (
@@ -299,7 +299,7 @@ function NotificationsPanel() {
   return (
     <section className="panel">
       <h2><Bell size={18} aria-hidden />{" "}{tr("Phone notifications")}</h2>
-      <p className="muted small">{tr("GharBox shows notifications in the bell. To also get them on your phone, install the free ntfy app, subscribe to a topic with a long random name, and paste its address here, for example https://ntfy.sh/gharbox-k2v9x7q.")}</p>
+      <p className="muted small">{tr("ZiraHive shows notifications in the bell. To also get them on your phone, install the free ntfy app, subscribe to a topic with a long random name, and paste its address here, for example https://ntfy.sh/zirahive-k2v9x7q.")}</p>
       <form className="inline-form" onSubmit={save}>
         <label>{tr("ntfy topic address")}<input value={ntfy} onChange={(e) => setNtfy(e.target.value)} placeholder="https://ntfy.sh/your-topic" /></label>
         <button>{tr("Save")}</button>
@@ -386,9 +386,9 @@ function AuditPanel() {
   const label: Record<string, string> = {
     login: tr("Signed in"), login_failed: tr("Wrong password"), login_failed_2fa: tr("Wrong 2FA code"), login_failed_passkey: tr("Passkey didn't match"),
     passkey_added: tr("Added a passkey"), passkey_removed: tr("Removed a passkey"),
-    link_invite_created: tr("Shared with another GharBox"), link_invite_removed: tr("Stopped sharing with another GharBox"),
-    link_added: tr("Linked another GharBox"), link_removed: tr("Removed a linked GharBox"),
-    plugin_enabled: tr("Turned on a plugin"), plugin_disabled: tr("Turned off a plugin"), plugin_settings: tr("Changed a plugin's settings"), setup: tr("Set up GharBox"),
+    link_invite_created: tr("Shared with another ZiraHive"), link_invite_removed: tr("Stopped sharing with another ZiraHive"),
+    link_added: tr("Linked another ZiraHive"), link_removed: tr("Removed a linked ZiraHive"),
+    plugin_enabled: tr("Turned on a plugin"), plugin_disabled: tr("Turned off a plugin"), plugin_settings: tr("Changed a plugin's settings"), setup: tr("Set up ZiraHive"),
     logout_all: tr("Signed out everywhere"), password_changed: tr("Changed password"), "2fa_enabled": tr("Turned on 2FA"),
     "2fa_disabled": tr("Turned off 2FA"), user_created: tr("Added a person"), user_updated: tr("Changed a person"),
     user_deleted: tr("Removed a person"), share_created: tr("Made a share link"), share_deleted: tr("Deleted a share link"),

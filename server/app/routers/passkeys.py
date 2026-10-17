@@ -64,7 +64,7 @@ def _site(request: Request) -> tuple[str, str]:
     host = urlsplit(origin).hostname
     served = urlsplit(f"//{request.headers.get('x-forwarded-host') or request.headers.get('host', '')}").hostname
     if not host or host != served:
-        raise HTTPException(400, "Passkeys need the page and GharBox on the same address")
+        raise HTTPException(400, "Passkeys need the page and ZiraHive on the same address")
     if urlsplit(origin).scheme != "https" and host != "localhost":
         raise HTTPException(400, {"code": "passkey_insecure", "message":
                                   "Passkeys work on your https:// address, or on http://localhost on the server PC."})
@@ -108,7 +108,7 @@ async def register_options(request: Request, user: User = Depends(current_user),
     existing = (await session.scalars(select(Passkey).where(Passkey.user_id == user.id,
                                                             Passkey.rp_id == rp_id))).all()
     opts = generate_registration_options(
-        rp_id=rp_id, rp_name="GharBox", user_id=user.id.encode(), user_name=user.username,
+        rp_id=rp_id, rp_name="ZiraHive", user_id=user.id.encode(), user_name=user.username,
         user_display_name=user.username,
         authenticator_selection=AuthenticatorSelectionCriteria(
             resident_key=ResidentKeyRequirement.REQUIRED, user_verification=UserVerificationRequirement.REQUIRED),

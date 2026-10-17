@@ -1,10 +1,10 @@
-"""Load test for GharBox with Locust (free, pip install locust).
+"""Load test for ZiraHive with Locust (free, pip install locust).
 
     locust -f loadtest/locustfile.py --host http://localhost:8080
     # then open http://localhost:8089, or headless:
     locust -f loadtest/locustfile.py --host http://localhost:8080 -u 20 -r 2 -t 3m --headless
 
-Set GHARBOX_USER / GHARBOX_PASSWORD. Each simulated person browses photos, opens
+Set ZIRAHIVE_USER / ZIRAHIVE_PASSWORD. Each simulated person browses photos, opens
 thumbnails and watches a movie the way a browser does: 2 MB range requests, with seeks.
 """
 import os
@@ -12,8 +12,8 @@ import random
 
 from locust import HttpUser, between, task
 
-USER = os.environ.get("GHARBOX_USER", "mahbub")
-PASSWORD = os.environ.get("GHARBOX_PASSWORD", "supersecret")
+USER = os.environ.get("ZIRAHIVE_USER", "mahbub")
+PASSWORD = os.environ.get("ZIRAHIVE_PASSWORD", "supersecret")
 CHUNK = 2 * 1024 * 1024
 
 

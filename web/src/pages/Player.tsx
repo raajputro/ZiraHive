@@ -83,7 +83,7 @@ function Player({ id }: { id: string }) {
     setCastHelp("");
     const problem = castProblem();
     if (problem === "insecure") {
-      setCastHelp(tr("Casting needs a secure page. Open GharBox with https (your online address), or as http://localhost:8080 on the server PC, then try again. On an iPhone or Mac, use AirPlay in the video's own controls."));
+      setCastHelp(tr("Casting needs a secure page. Open ZiraHive with https (your online address), or as http://localhost:8080 on the server PC, then try again. On an iPhone or Mac, use AirPlay in the video's own controls."));
       return;
     }
     if (problem === "browser") {
@@ -104,7 +104,7 @@ function Player({ id }: { id: string }) {
       setCast(ctl);
     } catch (e) {
       if (e instanceof Error && e.message !== "cancelled" && !/cancel/i.test(e.message)) {
-        setCastHelp(e instanceof ApiError ? e.message : tr("Couldn't start playing on the TV. Check that it's on the same Wi-Fi as GharBox."));
+        setCastHelp(e instanceof ApiError ? e.message : tr("Couldn't start playing on the TV. Check that it's on the same Wi-Fi as ZiraHive."));
       }
     } finally { setCastBusy(false); }
   };
@@ -258,7 +258,7 @@ function OfflinePanel({ media, qualities }: { media: Media; qualities: string[] 
   return (
     <section className="offline">
       <h2><Download size={17} aria-hidden />{" "}{tr("Watch without internet")}</h2>
-      <p className="muted small">{tr("GharBox makes a smaller copy you can save on your phone or laptop. You'll get a notification when it's ready.")}</p>
+      <p className="muted small">{tr("ZiraHive makes a smaller copy you can save on your phone or laptop. You'll get a notification when it's ready.")}</p>
       {copies.map((c) => (
         <div key={c.id} className="offline-row">
           <strong>{c.quality}</strong>

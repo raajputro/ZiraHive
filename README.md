@@ -1,4 +1,4 @@
-# GharBox
+# ZiraHive
 
 **Your own Google Drive and Jellyfin, on your own PC.** Back up phones, keep your files, and watch
 your movies, series, music and books on any screen in the house, or anywhere with your family.
@@ -35,12 +35,12 @@ store.
 | **Search and scan** | Find documents by the words inside them, in Bangla and English, even in scanned papers. Turn paper into a searchable PDF with the phone's camera. |
 | **Watch** | Movies and series from your own folders, with posters, seasons, "next episode" and skip intro. Every format plays: what the browser can't play is converted while you watch. |
 | **Watch parties** | Watch together from different places, in step, with chat, reactions and voice chat. |
-| **Linked servers** | Share some categories with family who have their own GharBox, and watch theirs. |
-| **On the TV** | Cast to a Chromecast, or browse GharBox from any smart TV's media menu (DLNA). |
+| **Linked servers** | Share some categories with family who have their own ZiraHive, and watch theirs. |
+| **On the TV** | Cast to a Chromecast, or browse ZiraHive from any smart TV's media menu (DLNA). |
 | **Listen** | Music by album and artist, playlists, and audiobooks that remember where you stopped. |
 | **Read** | EPUB and PDF books and comics, with your page saved on every device. |
 | **Vault** | A locked space for ID scans and private papers, encrypted on your device. Not even the admin can open it. |
-| **PC sync** | The GharBox Sync app keeps a folder on your Windows PC and in GharBox the same, both ways. |
+| **PC sync** | The ZiraHive Sync app keeps a folder on your Windows PC and in ZiraHive the same, both ways. |
 | **Family** | An account for each person, storage limits, and age limits for children. |
 | **Passkeys** | Sign in with your phone's or laptop's fingerprint, face or screen lock. |
 | **Plugins** | Add-ons for Telegram messages, webhooks to Home Assistant or n8n, or your own. |
@@ -54,20 +54,20 @@ it once.
 1. **Run the setup.** In this folder, right-click **setup.ps1** and choose **Run with PowerShell**.
    It asks one question, where your media folder is, for example `G:\Media`, and then:
    - creates `.env` with a random database password,
-   - puts GharBox's own data (backed-up photos, files, the database) on the drive with the most
+   - puts ZiraHive's own data (backed-up photos, files, the database) on the drive with the most
      free space,
    - shows which categories your media folders will become,
    - fills in this PC's home-network address for TVs,
-   - builds and starts everything (10 to 20 minutes the first time) and opens GharBox.
+   - builds and starts everything (10 to 20 minutes the first time) and opens ZiraHive.
 
 2. **Create the admin account** at **http://localhost:8080**.
 
 3. **Open it on other devices at home.** Use the address setup printed, for example
-   `http://192.168.0.105:8080`. If it doesn't load, allow GharBox through Windows Firewall, in
+   `http://192.168.0.105:8080`. If it doesn't load, allow ZiraHive through Windows Firewall, in
    PowerShell as administrator:
 
    ```powershell
-   New-NetFirewallRule -DisplayName "GharBox" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow
+   New-NetFirewallRule -DisplayName "ZiraHive" -Direction Inbound -Protocol TCP -LocalPort 8080 -Action Allow
    ```
 
    Give the PC a fixed address in your router (often called "DHCP reservation") so it never changes.
@@ -76,13 +76,13 @@ it once.
    **Settings > Your account**.
 
 Prefer doing it by hand? `copy .env.example .env`, fill in `POSTGRES_PASSWORD`,
-`GHARBOX_DATA_PATH` and `MEDIA_PATH`, then run `docker compose up -d --build`.
+`ZIRAHIVE_DATA_PATH` and `MEDIA_PATH`, then run `docker compose up -d --build`.
 
 ## Your media
 
 ### The media folder
 
-GharBox reads your media **where it already is**. Nothing is copied, moved or changed, and it
+ZiraHive reads your media **where it already is**. Nothing is copied, moved or changed, and it
 can't see any other folder or drive.
 
 Every folder inside your media folder becomes a category by itself, named and typed from the
@@ -133,7 +133,7 @@ whose drive is unplugged is hidden until it's back.
   `cover.jpg` or `folder.jpg` becomes the cover.
 - **Subtitles:** inside the file, or a file next to it with the same name: `Movie.srt`,
   `Movie.en.srt`, `Movie.bn.srt`.
-- **Posters and plot summaries:** add a free key from themoviedb.org as `GHARBOX_TMDB_API_KEY` in
+- **Posters and plot summaries:** add a free key from themoviedb.org as `ZIRAHIVE_TMDB_API_KEY` in
   `.env`. Without it, a frame from the video becomes the poster.
 
 ## Watching
@@ -142,7 +142,7 @@ whose drive is unplugged is hidden until it's back.
 
 - **Files the browser can play** (MP4 with H.264, WebM) play as they are.
 - **Everything else** (MKV with AC-3 or DTS sound, HEVC, AVI, ...) is converted while you watch.
-  You can still jump anywhere in the film; GharBox converts from that point.
+  You can still jump anywhere in the film; ZiraHive converts from that point.
 - **Quality:** Original, 1080p, 720p, 480p or 360p. **Low-data mode** (Settings > Your account)
   starts videos at 480p.
 - **Audio and subtitles:** every audio track is listed by language, handy for dual-audio releases.
@@ -167,35 +167,35 @@ glowing mic next to whoever is talking, and the film turns down while people tal
 each other directly and encrypted (WebRTC); it needs a secure page (your `https://` Tailscale
 address, or `http://localhost` on the PC) and the browser's microphone permission.
 
-### Linked GharBox servers
+### Linked ZiraHive servers
 
-Your brother has his own GharBox? Share some categories with each other.
+Your brother has his own ZiraHive? Share some categories with each other.
 
-1. On yours, **Settings > Server > Linked GharBox servers > Share with another GharBox**: name it,
+1. On yours, **Settings > Server > Linked ZiraHive servers > Share with another ZiraHive**: name it,
    tick the categories, choose an age limit, and enter your address as his server can reach it
    (your public share address `https://…ts.net:8443`, or your Tailscale address if his server is
    on your Tailscale). Press **Make a link code** and send him the code privately.
-2. On his, paste the code under **Watch another GharBox**.
+2. On his, paste the code under **Watch another ZiraHive**.
 
 His family then sees your categories on their Watch page, marked "from ...", and plays them like
 their own. His server fetches the films for them: nobody gets an account on yours, and his
 server can reach only the categories you ticked. Where each person stopped is kept on his side.
-Remove the link on your side and it stops at once. Set `GHARBOX_SERVER_NAME` in `.env` for the
+Remove the link on your side and it stops at once. Set `ZIRAHIVE_SERVER_NAME` in `.env` for the
 name his side sees.
 
 ### On the TV
 
 - **Chromecast**, and TVs with Chromecast built in (most Android and Google TVs): press **Cast to
-  TV** under the player in Chrome or Edge. The TV fetches the film from GharBox by itself, and the
-  page becomes the remote. Casting needs a secure page, as Google requires: open GharBox at
+  TV** under the player in Chrome or Edge. The TV fetches the film from ZiraHive by itself, and the
+  page becomes the remote. Casting needs a secure page, as Google requires: open ZiraHive at
   `http://localhost:8080` on the PC itself, or at your Tailscale `https://` address on a phone.
-- **Other smart TVs** (Samsung, LG, Sony, ...) use **DLNA**. In the GharBox Sync app on the PC,
-  tick **Show on TVs at home**. The TV's media or source menu then lists *GharBox (your PC)* with
+- **Other smart TVs** (Samsung, LG, Sony, ...) use **DLNA**. In the ZiraHive Sync app on the PC,
+  tick **Show on TVs at home**. The TV's media or source menu then lists *ZiraHive (your PC)* with
   your categories, series by season and music albums. Anyone on your Wi-Fi can browse what the
   signed-in account can see, so sign the app in with a family account rather than the admin.
 - **iPhone, iPad, Mac:** AirPlay from the video's own controls.
 
-Both need this PC's home-network address as `GHARBOX_LAN_URL` in `.env`; `setup.ps1` fills it in.
+Both need this PC's home-network address as `ZIRAHIVE_LAN_URL` in `.env`; `setup.ps1` fills it in.
 Links given to a TV play only that one title, for 12 hours.
 
 ### Age limits for children
@@ -231,37 +231,37 @@ Links given to a TV play only that one title, for 12 hours.
   like `IMG_0001.JPG`.
 - **Search:** the search box in Files finds documents by the words inside them: PDFs, Word,
   PowerPoint, OpenDocument and text files, and the text in scanned PDFs and photos of pages, in
-  Bangla and English. `GHARBOX_OCR=all` in `.env` also reads every photo (slower); `off` turns it
+  Bangla and English. `ZIRAHIVE_OCR=all` in `.env` also reads every photo (slower); `off` turns it
   off.
-- **Scan:** **Scan** in Files turns paper into a searchable PDF with the phone's camera. GharBox
+- **Scan:** **Scan** in Files turns paper into a searchable PDF with the phone's camera. ZiraHive
   finds the page, straightens it and cleans it up; add as many pages as you like.
 - **Vault:** for papers no one else should see. Files are encrypted on your device with your own
   passphrase before upload. Keep the recovery key you're shown somewhere safe: without the
   passphrase or the key, nobody can open the vault, including you.
-- **PC sync:** the GharBox Sync app for Windows keeps a folder on your PC and one in GharBox the
+- **PC sync:** the ZiraHive Sync app for Windows keeps a folder on your PC and one in ZiraHive the
   same, both ways. See [sync-client/README.md](sync-client/README.md).
 
-Backed-up files are stored under readable names in `GHARBOX_DATA_PATH\storage\<username>\...`, so
-you can browse them in Explorer even when GharBox isn't running.
+Backed-up files are stored under readable names in `ZIRAHIVE_DATA_PATH\storage\<username>\...`, so
+you can browse them in Explorer even when ZiraHive isn't running.
 
 ## On your phone
 
-Open your GharBox address and choose **Add to Home Screen** (Safari: the Share button; Chrome: the
+Open your ZiraHive address and choose **Add to Home Screen** (Safari: the Share button; Chrome: the
 menu). It then opens full screen with its own icon, like an app.
 
 **Back up the camera roll:** **Photos > Upload photos**, then pick everything. Photos already
 saved are skipped, and uploads continue where they stopped. You can lock the phone: the upload
-pauses and carries on when you open GharBox again, and you're notified when it finishes or a file
+pauses and carries on when you open ZiraHive again, and you're notified when it finishes or a file
 fails. On iPhone, Safari may hand over JPEG copies of HEIC photos and only the still part of Live
 Photos; to keep the originals, copy them to a PC first and upload from there.
 
 **Notifications:** install the free **ntfy** app, subscribe to a topic with a long random name
-(for example `gharbox-k2v9x7q`), paste `https://ntfy.sh/gharbox-k2v9x7q` into **Settings > Your
+(for example `zirahive-k2v9x7q`), paste `https://ntfy.sh/zirahive-k2v9x7q` into **Settings > Your
 account > Phone notifications**, and press **Send test**.
 
 ## Away from home
 
-GharBox is reached from outside through **Tailscale**: free, encrypted, no router changes, and it
+ZiraHive is reached from outside through **Tailscale**: free, encrypted, no router changes, and it
 works behind the CGNAT most Bangladeshi internet providers use. The app itself is never on the
 public internet; only your devices and your family's can reach the sign-in page.
 
@@ -269,9 +269,9 @@ public internet; only your devices and your family's can reach the sign-in page.
    **MagicDNS** on and press **Enable HTTPS**.
 2. Under **Settings > Keys**, generate an auth key and put it in `.env` as `TS_AUTHKEY=...`.
 3. Run `docker compose --profile remote up -d --build`. The PC appears as something like
-   `gharbox.tail1234.ts.net`.
+   `zirahive.tail1234.ts.net`.
 4. On each phone and laptop, install the Tailscale app, sign in, and open
-   `https://gharbox.tail1234.ts.net`.
+   `https://zirahive.tail1234.ts.net`.
 5. Invite family under **Users** in the Tailscale console (the free plan covers 6 people).
 
 Share links can get their own public address that serves share links and nothing else.
@@ -288,7 +288,7 @@ options.
 - **Offsite backup:** a daily encrypted copy of photos, files, the vault and the database to a USB
   disk, another computer or a cloud bucket, with regular checks. Set it up in **Settings > Server >
   Offsite backup**; restoring is in [docs/BACKUP.md](docs/BACKUP.md).
-- **Your media is read-only** to GharBox: it can never change or delete it.
+- **Your media is read-only** to ZiraHive: it can never change or delete it.
 
 ## Plugins
 
@@ -305,7 +305,7 @@ You can write your own in a few lines of Python; see [docs/PLUGINS.md](docs/PLUG
 docker compose ps                     # what's running
 docker compose logs -f api worker     # watch the logs
 docker compose up -d --build          # after updating the code
-docker compose down                   # stop (your data stays in GHARBOX_DATA_PATH)
+docker compose down                   # stop (your data stays in ZIRAHIVE_DATA_PATH)
 ```
 
 The admin dashboard in **Settings > Server** shows who is watching what, background jobs, and free
@@ -340,7 +340,7 @@ npm install
 npm run dev                                 # http://localhost:5173, proxies /api to :8000
 ```
 
-Without `GHARBOX_DATABASE_URL` and `GHARBOX_REDIS_URL`, the server uses SQLite in `server/data` and
+Without `ZIRAHIVE_DATABASE_URL` and `ZIRAHIVE_REDIS_URL`, the server uses SQLite in `server/data` and
 runs background jobs inside the API process. Video features need `ffmpeg` on your PATH
 (`winget install ffmpeg`). API docs are at http://localhost:8000/docs while the server runs.
 
@@ -355,7 +355,7 @@ Every text in the interface needs a Bangla translation in `web/src/locales/bn.ts
 | End-to-end tests in a real browser (Playwright) | `e2e/tests` | see below |
 | Load test (Locust) | `loadtest/locustfile.py` | see the file's header |
 
-End-to-end tests run against a running GharBox. On a fresh install they create the admin account
+End-to-end tests run against a running ZiraHive. On a fresh install they create the admin account
 themselves; on yours, pass your admin sign-in:
 
 ```powershell
@@ -374,7 +374,22 @@ GitHub Actions (`.github/workflows/ci.yml`) runs the API tests, builds the web a
 images and the Windows sync app, then starts the full stack with sample media
 (`scripts/make-sample-media.sh`) and runs the Playwright suite on every push.
 
+## Upgrading from GharBox
+
+ZiraHive used to be called GharBox. To upgrade an existing install, get the new code and run
+`setup.ps1` again. It renames the `GHARBOX_` settings in `.env` to `ZIRAHIVE_`, keeps your database
+and Tailscale sign-in, stops the old containers and starts ZiraHive. Your files, photos, accounts
+and watch history stay as they were, and people stay signed in at home. Two things to know:
+
+- Your Tailscale address becomes `https://zirahive.<your-tailnet>.ts.net` (setup updates
+  `ZIRAHIVE_PUBLIC_URL`). Everyone signs in once more there, and share links made with the old
+  `gharbox` address need sharing again.
+- The PC app is now **ZiraHiveSync.exe**; it picks up the old app's folders and sign-in by itself.
+  Remove GharBoxSync.exe from Windows start-up and run `ZiraHiveSync.exe startup on`.
+
+Your data folder can keep its old name (`GharBoxData`); it's just the path in `.env`.
+
 ## License
 
-AGPL-3.0, so GharBox stays free: anyone who runs a modified version as a service must share their
+AGPL-3.0, so ZiraHive stays free: anyone who runs a modified version as a service must share their
 changes.

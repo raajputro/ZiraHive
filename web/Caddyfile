@@ -22,7 +22,7 @@
 }
 
 (api_proxy) {
-	reverse_proxy {$GHARBOX_API_UPSTREAM:api:8000} {
+	reverse_proxy {$ZIRAHIVE_API_UPSTREAM:api:8000} {
 		# stream video and large downloads without buffering
 		flush_interval -1
 		transport http {
@@ -36,17 +36,17 @@
 # Private site: the whole app. Reach it on your home network, or from anywhere
 # through Tailscale. Never expose this one to the open internet.
 # ---------------------------------------------------------------------------
-{$GHARBOX_SITE_ADDRESS::80} {
+{$ZIRAHIVE_SITE_ADDRESS::80} {
 	import security_headers
 	encode zstd gzip
 	# nobody gets to pretend they came through the public gateway
-	request_header -X-GharBox-Gateway
+	request_header -X-ZiraHive-Gateway
 
 	handle /api/* {
 		import api_proxy
 	}
 	handle {
-		root * {$GHARBOX_WEB_ROOT:/srv}
+		root * {$ZIRAHIVE_WEB_ROOT:/srv}
 		try_files {path} /index.html
 		file_server
 	}
@@ -54,27 +54,27 @@
 }
 
 # ---------------------------------------------------------------------------
-# Public site: share links ONLY (/s/<token>), plus the API for linked GharBox servers.
+# Public site: share links ONLY (/s/<token>), plus the API for linked ZiraHive servers.
 # Tailscale Funnel publishes this one.
 # Sign-in, files, photos and movies are not reachable here at all; the server
-# double-checks this using the X-GharBox-Gateway header set below.
+# double-checks this using the X-ZiraHive-Gateway header set below.
 # ---------------------------------------------------------------------------
-:{$GHARBOX_PUBLIC_PORT:8081} {
+:{$ZIRAHIVE_PUBLIC_PORT:8081} {
 	import security_headers
 	encode zstd gzip
 
 	handle /api/s/* {
-		request_header X-GharBox-Gateway public
+		request_header X-ZiraHive-Gateway public
 		import api_proxy
 	}
-	# Linked GharBox servers (Settings > Server > Linked servers); answers only their tokens
+	# Linked ZiraHive servers (Settings > Server > Linked servers); answers only their tokens
 	handle /api/fed/* {
-		request_header X-GharBox-Gateway public
+		request_header X-ZiraHive-Gateway public
 		import api_proxy
 	}
 	@app path /s/* /assets/* /favicon.svg /manifest.webmanifest /*.png
 	handle @app {
-		root * {$GHARBOX_WEB_ROOT:/srv}
+		root * {$ZIRAHIVE_WEB_ROOT:/srv}
 		try_files {path} /index.html
 		file_server
 	}

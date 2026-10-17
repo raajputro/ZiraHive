@@ -1,4 +1,4 @@
-"""The few GharBox API calls the sync client needs."""
+"""The few ZiraHive API calls the sync client needs."""
 from __future__ import annotations
 
 import os
@@ -7,7 +7,7 @@ from typing import Callable
 
 import httpx
 
-USER_AGENT = "GharBox Sync"
+USER_AGENT = "ZiraHive Sync"
 
 
 class ApiError(Exception):
@@ -102,7 +102,7 @@ class Api:
         return up["asset"]
 
     async def download(self, asset_id: str, dest: Path) -> None:
-        tmp = dest.with_name(f".gharbox-sync-{os.getpid()}-{dest.name}.tmp")
+        tmp = dest.with_name(f".zirahive-sync-{os.getpid()}-{dest.name}.tmp")
         try:
             async with self.http.stream("GET", f"/api/assets/{asset_id}/file", params={"download": "true"}) as r:
                 if not r.is_success:

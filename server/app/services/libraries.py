@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..models import Library
+from .browse import marked
 
 log = logging.getLogger(__name__)
 
@@ -70,7 +71,7 @@ async def discover(session: AsyncSession) -> list[Library]:
     order = (await session.scalar(select(func.max(Library.sort_order)))) or 0
     created = []
     for child in sorted(root.iterdir(), key=lambda p: p.name.lower()):
-        if not child.is_dir() or child.name.startswith((".", "$")) or str(child) in known or (child / ".gharbox-data").exists():
+        if not child.is_dir() or child.name.startswith((".", "$")) or str(child) in known or marked(child):
             continue
         order += 1
         name = pretty_name(child.name)

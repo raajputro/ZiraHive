@@ -7,11 +7,11 @@ import bn from "./locales/bn";
 
 export type Lang = "en" | "bn";
 const DICTS: Record<Lang, Record<string, string>> = { en: {}, bn };
-const KEY = "gharbox.lang";
+const KEY = "zirahive.lang";
 
 function initial(): Lang {
   try {
-    const saved = localStorage.getItem(KEY);
+    const saved = localStorage.getItem(KEY) ?? localStorage.getItem("gharbox.lang");  // the old name
     if (saved === "en" || saved === "bn") return saved;
   } catch { /* private mode */ }
   return navigator.languages?.some((l) => l.toLowerCase().startsWith("bn")) ? "bn" : "en";

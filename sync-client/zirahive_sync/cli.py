@@ -1,12 +1,12 @@
-"""gharbox-sync: command line, and the tray app when started with no arguments.
+"""zirahive-sync: command line, and the tray app when started with no arguments.
 
-  gharbox-sync                       tray icon (first time: a small set-up window)
-  gharbox-sync login --server URL --user NAME
-  gharbox-sync add LOCAL_FOLDER /Folder/In/GharBox
-  gharbox-sync once [--allow-deletions]
-  gharbox-sync run                   keep syncing in this window
-  gharbox-sync startup on|off        start with Windows
-  gharbox-sync status
+  zirahive-sync                       tray icon (first time: a small set-up window)
+  zirahive-sync login --server URL --user NAME
+  zirahive-sync add LOCAL_FOLDER /Folder/In/ZiraHive
+  zirahive-sync once [--allow-deletions]
+  zirahive-sync run                   keep syncing in this window
+  zirahive-sync startup on|off        start with Windows
+  zirahive-sync status
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ from .engine import Report, sync_pair
 
 def describe(pair: Pair, r: Report) -> str:
     parts = [f"{pair.local} <-> {pair.remote}:"]
-    for label, items in (("uploaded", r.uploaded), ("downloaded", r.downloaded), ("moved to GharBox trash", r.trashed_remote),
+    for label, items in (("uploaded", r.uploaded), ("downloaded", r.downloaded), ("moved to ZiraHive trash", r.trashed_remote),
                          ("moved to Recycle Bin", r.trashed_local), ("kept both copies", r.conflicts),
                          ("skipped", r.skipped), ("errors", r.errors)):
         if items:
@@ -64,14 +64,14 @@ async def login(cfg: Config, password: str, code: str | None = None) -> None:
 def startup(on: bool) -> Path:
     """A small launcher in the Startup folder (Windows) so syncing starts after sign-in."""
     folder = Path(os.environ.get("APPDATA", str(Path.home()))) / "Microsoft" / "Windows" / "Start Menu" / "Programs" / "Startup"
-    launcher = folder / "GharBox Sync.cmd"
+    launcher = folder / "ZiraHive Sync.cmd"
     if on:
         folder.mkdir(parents=True, exist_ok=True)
-        if getattr(sys, "frozen", False):  # the GharBoxSync.exe build
+        if getattr(sys, "frozen", False):  # the ZiraHiveSync.exe build
             command = f'"{sys.executable}" tray'
         else:
             pythonw = Path(sys.executable).with_name("pythonw.exe")
-            command = f'"{pythonw if pythonw.exists() else sys.executable}" -m gharbox_sync tray'
+            command = f'"{pythonw if pythonw.exists() else sys.executable}" -m zirahive_sync tray'
         launcher.write_text(f'@echo off\r\nstart "" {command}\r\n', "utf-8")
     else:
         launcher.unlink(missing_ok=True)
@@ -79,7 +79,7 @@ def startup(on: bool) -> Path:
 
 
 def tv_server(cfg: Config):
-    """The DLNA server that shows GharBox on TVs, as the signed-in account (not started)."""
+    """The DLNA server that shows ZiraHive on TVs, as the signed-in account (not started)."""
     import socket
     import uuid
 
@@ -88,7 +88,7 @@ def tv_server(cfg: Config):
     if not cfg.device_id:
         cfg.device_id = str(uuid.uuid4())
         cfg.save()
-    name = f"GharBox ({socket.gethostname()})"
+    name = f"ZiraHive ({socket.gethostname()})"
     return DlnaServer(name, cfg.device_id, cfg.server, dlna_fetcher(cfg.server, load_token(cfg) or ""))
 
 
@@ -98,7 +98,7 @@ def main(argv: list[str] | None = None) -> None:
         sys.stdout, sys.stderr = sys.stdout or out, sys.stderr or out
     logging.basicConfig(level=logging.INFO, format="%(asctime)s %(message)s",
                         handlers=[logging.FileHandler(app_dir() / "sync.log", encoding="utf-8"), logging.StreamHandler()])
-    ap = argparse.ArgumentParser(prog="gharbox-sync", description="Keep a PC folder and a GharBox folder the same.")
+    ap = argparse.ArgumentParser(prog="zirahive-sync", description="Keep a PC folder and a ZiraHive folder the same.")
     ap.add_argument("--version", action="version", version=__version__)
     sub = ap.add_subparsers(dest="cmd")
     p = sub.add_parser("login")
@@ -114,7 +114,7 @@ def main(argv: list[str] | None = None) -> None:
     sub.add_parser("run")
     sub.add_parser("status")
     sub.add_parser("tray")
-    sub.add_parser("tv", help="show GharBox on smart TVs at home (DLNA) until stopped")
+    sub.add_parser("tv", help="show ZiraHive on smart TVs at home (DLNA) until stopped")
     p = sub.add_parser("startup")
     p.add_argument("state", choices=["on", "off"])
     args = ap.parse_args(argv)
@@ -151,13 +151,13 @@ def main(argv: list[str] | None = None) -> None:
             print(f"  {p.local} <-> {p.remote}")
     elif args.cmd in ("once", "run"):
         if not cfg.server or not load_token(cfg):
-            sys.exit("Sign in first: gharbox-sync login --server https://... --user NAME")
+            sys.exit("Sign in first: zirahive-sync login --server https://... --user NAME")
         while True:
             try:
                 for pair, report in asyncio.run(sync_all(cfg, getattr(args, "allow_deletions", False))):
                     print(describe(pair, report))
             except SignedOut:
-                sys.exit("GharBox signed this PC out. Run gharbox-sync login again.")
+                sys.exit("ZiraHive signed this PC out. Run zirahive-sync login again.")
             except Exception as exc:  # network down, server restarting: try again later
                 logging.warning("sync failed: %s", exc)
             if args.cmd == "once":
@@ -165,7 +165,7 @@ def main(argv: list[str] | None = None) -> None:
             time.sleep(cfg.interval)
     elif args.cmd == "tv":
         if not cfg.server or not load_token(cfg):
-            sys.exit("Sign in first: gharbox-sync login --server https://... --user NAME")
+            sys.exit("Sign in first: zirahive-sync login --server https://... --user NAME")
         server = tv_server(cfg)
         server.start()
         print(f"TVs at home can now find \"{server.name}\" (as {cfg.username}). Ctrl+C stops it.")

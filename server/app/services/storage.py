@@ -78,7 +78,7 @@ def unique_target(username: str, folder: str, filename: str) -> tuple[Path, str]
     """Pick a readable, non-clashing path: storage/<user>/<folder>/<name> (n).ext
 
     Files are stored under readable names so you can still browse your backups in
-    Explorer even if GharBox is not running.
+    Explorer even if ZiraHive is not running.
     """
     base_dir = user_root(username).joinpath(*[p for p in folder.split("/") if p])
     base_dir.mkdir(parents=True, exist_ok=True)

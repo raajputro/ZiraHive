@@ -1,4 +1,4 @@
-"""Sample music, audiobooks, ebooks and comics for trying GharBox (and for its tests).
+"""Sample music, audiobooks, ebooks and comics for trying ZiraHive (and for its tests).
 
     python3 scripts/sample_shelf.py ./sample-media
 
@@ -78,7 +78,7 @@ def music(root: Path) -> None:
     for n, title in enumerate(["Opening", "Closing Song"], 1):
         tone(folder / f"{n:02d} {title}.flac", 2, 500 + n * 50)
     picture("Live at Home", (40, 90, 160)).save(folder / "cover.jpg", "JPEG")
-    # Browsers can't play WMA: GharBox converts it once
+    # Browsers can't play WMA: ZiraHive converts it once
     tone(root / "Singles" / "Old Radio.wma", 2, 700, {"title": "Old Radio", "artist": "Radio Days"})
 
 
@@ -117,7 +117,7 @@ def epub(path: Path, title: str, author: str, chapters: int = 3, series: tuple[s
     opf = f"""<?xml version="1.0" encoding="utf-8"?>
 <package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
   <metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
-    <dc:identifier id="id">urn:gharbox:{title.replace(' ', '-').lower()}</dc:identifier>
+    <dc:identifier id="id">urn:zirahive:{title.replace(' ', '-').lower()}</dc:identifier>
     <dc:title>{title}</dc:title><dc:creator>{author}</dc:creator><dc:language>en</dc:language>
     <dc:date>2020-01-01</dc:date><dc:description>&lt;p&gt;A short sample book about {title.lower()}.&lt;/p&gt;</dc:description>
     <meta name="cover" content="cover-img"/>{series_meta}

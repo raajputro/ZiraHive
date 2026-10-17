@@ -2,6 +2,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { Download, Folder, FileText, Film, Image, File, Play, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { api, ApiError, formatBytes, formatDuration, url, type PublicAsset, type PublicListing, type PublicShare } from "../api";
 
+import HiveMark from "../components/HiveMark";
 import { locale, t as tr } from "../i18n";
 const icons = { photo: Image, video: Film, document: FileText, other: File };
 
@@ -9,7 +10,7 @@ const icons = { photo: Image, video: Film, document: FileText, other: File };
 export default function PublicSharePage({ token }: { token: string }) {
   const [info, setInfo] = useState<PublicShare | null>(null);
   const [key, setKey] = useState<string | undefined>(() => {
-    try { return sessionStorage.getItem(`gharbox:share:${token}`) ?? undefined; } catch { return undefined; }
+    try { return sessionStorage.getItem(`zirahive:share:${token}`) ?? undefined; } catch { return undefined; }
   });
   const [listing, setListing] = useState<PublicListing | null>(null);
   const [path, setPath] = useState("/");
@@ -32,7 +33,7 @@ export default function PublicSharePage({ token }: { token: string }) {
     setError("");
     try {
       const r = await api.unlockShare(token, password);
-      try { sessionStorage.setItem(`gharbox:share:${token}`, r.key); } catch { /* private mode */ }
+      try { sessionStorage.setItem(`zirahive:share:${token}`, r.key); } catch { /* private mode */ }
       setKey(r.key);
     } catch (err) { setError(err instanceof ApiError ? err.message : tr("Couldn't open the link")); }
   };
@@ -46,7 +47,7 @@ export default function PublicSharePage({ token }: { token: string }) {
     return (
       <div className="signin">
         <form onSubmit={unlock}>
-          <div className="signin-mark" lang="bn" aria-hidden>ঘর</div>
+          <div className="signin-mark"><HiveMark size={56} /></div>
           <h1>{info.title}</h1>
           <p>{info.owner}{" "}{tr("shared this with a password.")}</p>
           <label>{tr("Password")}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)} required autoFocus /></label>
@@ -64,7 +65,7 @@ export default function PublicSharePage({ token }: { token: string }) {
   return (
     <div className="public">
       <header className="public-head">
-        <span className="brand-inline"><span lang="bn">ঘর</span>{" "}{tr("GharBox")}</span>
+        <span className="brand-inline"><HiveMark size={22} />{" "}{tr("ZiraHive")}</span>
         <div>
           <h1>{info.title}</h1>
           <p className="muted">{tr("Shared by")}{" "}{info.owner}{info.expires_at ? tr(", until {date}", { date: new Date(info.expires_at).toLocaleDateString(locale()) }) : ""}</p>

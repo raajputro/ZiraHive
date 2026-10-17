@@ -10,7 +10,7 @@ const THEMES = {
   dark: { body: { color: "#dfe3ea !important", background: "#14171d !important" }, a: { color: "#9db4ea !important" } },
 };
 const FONTS = { publisher: "", serif: "Georgia, 'Noto Serif Bengali', serif", sans: "'Hind Siliguri', system-ui, sans-serif" };
-const locKey = (id: string) => `gharbox.epubloc.${id}`;
+const locKey = (id: string) => `zirahive.epubloc.${id}`;
 
 function flatten(items: NavItem[], depth = 0, out: TocEntry[] = []): TocEntry[] {
   for (const it of items) {

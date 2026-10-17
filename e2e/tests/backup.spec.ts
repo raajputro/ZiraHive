@@ -3,7 +3,7 @@ import { expect, test } from "@playwright/test";
 test("turn on offsite backup, back up now and check it", async ({ page }) => {
   const info = await (await page.request.get("/api/admin/backup")).json();
   test.skip(!info.restic, "restic isn't installed on this server");
-  const folder = `/tmp/gharbox-e2e-backup-${Date.now().toString(36)}`;
+  const folder = `/tmp/zirahive-e2e-backup-${Date.now().toString(36)}`;
 
   await page.goto("/settings#server");
   const panel = page.locator("section", { has: page.getByRole("heading", { name: "Offsite backup" }) });

@@ -10,8 +10,8 @@ import cbor2
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
-ORIGIN = "https://gharbox.example.ts.net"
-HOST = {"Origin": ORIGIN, "Host": "gharbox.example.ts.net"}
+ORIGIN = "https://zirahive.example.ts.net"
+HOST = {"Origin": ORIGIN, "Host": "zirahive.example.ts.net"}
 
 
 def b64u(b: bytes) -> str:
@@ -25,7 +25,7 @@ def unb64u(s: str) -> bytes:
 class SoftKey:
     """A passkey the way a phone keeps it: an EC key pair, a credential id, a counter."""
 
-    def __init__(self, rp_id: str = "gharbox.example.ts.net"):
+    def __init__(self, rp_id: str = "zirahive.example.ts.net"):
         self.key = ec.generate_private_key(ec.SECP256R1())
         self.cred_id = os.urandom(16)
         self.rp_id, self.count, self.user_handle = rp_id, 0, None
@@ -55,7 +55,7 @@ class SoftKey:
 
 async def add_passkey(client, key: SoftKey, name="Pixel 7") -> dict:
     o = (await client.post("/api/auth/passkeys/register/options", headers=HOST)).json()
-    assert o["options"]["rp"]["id"] == "gharbox.example.ts.net"
+    assert o["options"]["rp"]["id"] == "zirahive.example.ts.net"
     assert o["options"]["authenticatorSelection"]["residentKey"] == "required"
     r = await client.post("/api/auth/passkeys/register", headers=HOST,
                           json={"state": o["state"], "credential": key.create(o["options"]), "name": name})
@@ -73,7 +73,7 @@ async def passkey_login(client, key: SoftKey, origin=ORIGIN):
 async def test_passkey_sign_in(client, admin):
     key = SoftKey()
     pk = await add_passkey(client, key)
-    assert pk["name"] == "Pixel 7" and pk["rp_id"] == "gharbox.example.ts.net"
+    assert pk["name"] == "Pixel 7" and pk["rp_id"] == "zirahive.example.ts.net"
     assert [p["name"] for p in (await client.get("/api/auth/passkeys")).json()] == ["Pixel 7"]
     notes = (await client.get("/api/notifications")).json()["items"]
     assert any("passkey" in n["title"] for n in notes)
@@ -96,7 +96,7 @@ async def test_passkey_sign_in(client, admin):
     stranger = SoftKey()
     stranger.user_handle = key.user_handle
     assert (await passkey_login(client, stranger)).status_code == 401
-    phished = await passkey_login(client, key, origin="https://gharbox-login.example.com")
+    phished = await passkey_login(client, key, origin="https://zirahive-login.example.com")
     assert phished.status_code == 401
 
 
@@ -108,7 +108,7 @@ async def test_passkeys_need_a_secure_address_and_can_be_removed(client, admin):
                               headers={"Origin": "http://localhost:8080", "Host": "localhost:8080"})
     assert local.status_code == 200
     other = await client.post("/api/auth/passkeys/register/options",
-                              headers={"Origin": "https://evil.example", "Host": "gharbox.example.ts.net"})
+                              headers={"Origin": "https://evil.example", "Host": "zirahive.example.ts.net"})
     assert other.status_code == 400
 
     key = SoftKey()
@@ -219,16 +219,16 @@ async def test_webhook_plugin_signs_what_it_sends(client, admin, monkeypatch):
 
     monkeypatch.setattr(plugins.Context, "http", lambda self, **kw: httpx.AsyncClient(transport=httpx.MockTransport(answer)))
     await client.put("/api/admin/plugins/webhook", json={"enabled": True, "settings": {
-        "url": "http://ha.local/api/webhook/gharbox", "secret": "k3y", "events": "file.uploaded"}})
+        "url": "http://ha.local/api/webhook/zirahive", "secret": "k3y", "events": "file.uploaded"}})
     r = await client.post("/api/admin/plugins/webhook/test")
     assert r.json() == {"ok": True, "error": None}
     await upload(client, "note.txt", b"hello", folder="/Docs")
     await client.post("/api/users", json={"username": "rina", "password": "password12"})  # not chosen
     await plugins.drain()
-    assert [req.headers["x-gharbox-event"] for req in sent] == ["plugin.test", "file.uploaded"]
+    assert [req.headers["x-zirahive-event"] for req in sent] == ["plugin.test", "file.uploaded"]
     req = sent[1]
     expected = "sha256=" + hmac.new(b"k3y", req.content, hashlib.sha256).hexdigest()
-    assert req.headers["x-gharbox-signature"] == expected
+    assert req.headers["x-zirahive-signature"] == expected
     assert json.loads(req.content)["data"]["filename"] == "note.txt"
 
     # a receiver that fails is reported by the test button
@@ -258,11 +258,11 @@ from conftest import make_video  # noqa: E402
 
 
 async def test_linked_servers(app, client, admin, tmp_path, monkeypatch):
-    """This server shares a category with 'another' GharBox, which here is itself: the whole
+    """This server shares a category with 'another' ZiraHive, which here is itself: the whole
     protocol (code, token, proxying, limits) runs in one process."""
     def in_process(link):
         return httpx.AsyncClient(transport=httpx.ASGITransport(app=app), base_url=link.url,
-                                 headers={"Authorization": f"GharBox-Link {link.token}"})
+                                 headers={"Authorization": f"ZiraHive-Link {link.token}"})
     monkeypatch.setattr(links_router, "client_for", in_process)
 
     make_video(tmp_path / "shared" / "Monpura (2009).mp4", seconds=3)
@@ -286,7 +286,7 @@ async def test_linked_servers(app, client, admin, tmp_path, monkeypatch):
                                                          "max_age": 13, "url": "http://test"})
     assert r.status_code == 201, r.text
     code = r.json()["code"]
-    assert code.startswith("ghx1.")
+    assert code.startswith("zh1.")
     assert "code" not in (await client.get("/api/admin/link-guests")).json()[0] or \
         (await client.get("/api/admin/link-guests")).json()[0]["code"] is None
     bad = await client.post("/api/admin/link-guests", json={"name": "x", "library_ids": ["nope"], "url": "http://test"})
@@ -297,7 +297,7 @@ async def test_linked_servers(app, client, admin, tmp_path, monkeypatch):
     r = await client.post("/api/admin/links", json={"code": code})
     assert r.status_code == 201, r.text
     link = r.json()
-    assert link["name"] == "GharBox" and [lib["name"] for lib in link["libraries"]] == ["Shared"]
+    assert link["name"] == "ZiraHive" and [lib["name"] for lib in link["libraries"]] == ["Shared"]
     lid = link["id"]
 
     # only the shared category, and only what suits 13+ (Late Night is 18+)
@@ -343,7 +343,7 @@ async def test_linked_servers(app, client, admin, tmp_path, monkeypatch):
 
     # the fed API answers only link tokens, and not the normal sign-in
     assert (await client.get("/api/fed/info")).status_code == 401
-    assert (await client.get("/api/fed/info", headers={"Authorization": "GharBox-Link nope"})).status_code == 401
+    assert (await client.get("/api/fed/info", headers={"Authorization": "ZiraHive-Link nope"})).status_code == 401
 
     # removing the invite on the host ends it
     guest_id = (await client.get("/api/admin/link-guests")).json()[0]["id"]
@@ -354,7 +354,7 @@ async def test_linked_servers(app, client, admin, tmp_path, monkeypatch):
 
 
 async def test_public_gateway_reaches_only_share_links_and_fed(client, admin):
-    pub = {"X-GharBox-Gateway": "public"}
+    pub = {"X-ZiraHive-Gateway": "public"}
     assert (await client.get("/api/auth/me", headers=pub)).status_code == 404
     assert (await client.get("/api/fed/info", headers=pub)).status_code == 401  # reached, but needs a link token
 
@@ -362,3 +362,40 @@ async def test_public_gateway_reaches_only_share_links_and_fed(client, admin):
 async def jobs_drain():
     from app.services import jobs
     await jobs.drain_local()
+
+
+# ------------------------------------------------------------ renamed from GharBox
+
+def test_old_setting_names_still_work(monkeypatch, tmp_path):
+    from app.config import get_settings
+
+    monkeypatch.delenv("ZIRAHIVE_LAN_URL", raising=False)
+    monkeypatch.setenv("GHARBOX_LAN_URL", "http://192.168.0.9:8080")
+    get_settings.cache_clear()
+    try:
+        assert get_settings().lan_url == "http://192.168.0.9:8080"
+    finally:
+        monkeypatch.delenv("ZIRAHIVE_LAN_URL", raising=False)
+        get_settings.cache_clear()
+
+
+async def test_old_sign_in_cookie_and_data_marker(client, admin, tmp_path):
+    from app.services.browse import marked
+
+    client.headers.pop("Authorization")
+    client.cookies.clear()
+    client.cookies.set("gharbox_token", admin)
+    assert (await client.get("/api/auth/me")).status_code == 200
+    (tmp_path / "old").mkdir()
+    (tmp_path / "old" / ".gharbox-data").write_text("")
+    assert marked(tmp_path / "old") and not marked(tmp_path)
+
+
+async def test_a_removed_link_doesnt_block_the_others(client, admin, tmp_path):
+    lib = (await client.post("/api/libraries", json={"name": "Films", "path": str(tmp_path), "kind": "movies"})).json()
+    good = (await client.post("/api/admin/link-guests", json={"name": "a", "library_ids": [lib["id"]], "url": "http://test"})).json()
+    from app.routers.federation import read_code
+    _, token = read_code(good["code"])
+    for _ in range(40):  # a server keeps asking with a removed link's token
+        assert (await client.get("/api/fed/info", headers={"Authorization": "ZiraHive-Link removed-token-xxxxxxxxxx"})).status_code in (401, 429)
+    assert (await client.get("/api/fed/info", headers={"Authorization": f"ZiraHive-Link {token}"})).status_code == 200

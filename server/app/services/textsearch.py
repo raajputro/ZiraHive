@@ -30,7 +30,7 @@ def tesseract() -> str | None:
 
 
 def wanted(filename: str, folder: str, kind: str) -> bool:
-    """Which files get their words read, depending on GHARBOX_OCR."""
+    """Which files get their words read, depending on ZIRAHIVE_OCR."""
     mode = get_settings().ocr
     ext = PurePosixPath(filename).suffix.lower()
     if mode == "off":

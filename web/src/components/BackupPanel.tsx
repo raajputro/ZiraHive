@@ -43,7 +43,7 @@ export default function BackupPanel() {
     <section className="panel wide-panel backup-panel">
       <h2><CloudUpload size={20} aria-hidden /> {tr("Offsite backup")}</h2>
       <p className="muted">{tr("A copy of everything that can't be replaced (photos, files, the vault and the database) on another disk or in the cloud, encrypted on this PC first, so whoever keeps it can't look inside. If this PC breaks or is stolen, you can bring it all back.")}</p>
-      {!info.restic && <p className="error">{tr("restic isn't installed here. The GharBox Docker image includes it.")}</p>}
+      {!info.restic && <p className="error">{tr("restic isn't installed here. The ZiraHive Docker image includes it.")}</p>}
 
       {shown && (
         <div className="notice backup-password" role="alert">
@@ -107,12 +107,12 @@ export default function BackupPanel() {
 function BackupForm({ info, onSaved, onCancel }: { info: BackupInfo; onSaved: (r: BackupInfo) => void; onCancel?: () => void }) {
   const [where, setWhere] = useState<Where>(guessWhere(info.repository));
   const repo = info.repository ?? "";
-  const [disk, setDisk] = useState(where === "disk" && repo ? repo : "/backup-disk/gharbox");
+  const [disk, setDisk] = useState(where === "disk" && repo ? repo : "/backup-disk/zirahive");
   const [endpoint, setEndpoint] = useState(where === "s3" ? repo.slice(3) : "");
   const [keyId, setKeyId] = useState("");
   const [secret, setSecret] = useState("");
   const [sftp, setSftp] = useState(where === "sftp" ? repo.slice(5) : "");
-  const [remote, setRemote] = useState(where === "rclone" ? repo.slice(7) : "gdrive:GharBox");
+  const [remote, setRemote] = useState(where === "rclone" ? repo.slice(7) : "gdrive:ZiraHive");
   const [other, setOther] = useState(where === "other" ? repo : "");
   const [hour, setHour] = useState(info.configured ? toLocal(info.hour) : 2);
   const [media, setMedia] = useState(info.include_media);
@@ -154,7 +154,7 @@ function BackupForm({ info, onSaved, onCancel }: { info: BackupInfo; onSaved: (r
       </>}
       {where === "s3" && <>
         <label>{tr("Endpoint and bucket")}<input value={endpoint} onChange={(e) => setEndpoint(e.target.value)} required
-          placeholder="https://s3.us-west-004.backblazeb2.com/my-gharbox-backup" /></label>
+          placeholder="https://s3.us-west-004.backblazeb2.com/my-zirahive-backup" /></label>
         <label>{tr("Access key ID")}<input value={keyId} onChange={(e) => setKeyId(e.target.value)} autoComplete="off"
           placeholder={info.env_keys.includes("AWS_ACCESS_KEY_ID") ? tr("Saved. Leave empty to keep it") : ""} /></label>
         <label>{tr("Secret access key")}<input type="password" value={secret} onChange={(e) => setSecret(e.target.value)} autoComplete="off"
@@ -162,7 +162,7 @@ function BackupForm({ info, onSaved, onCancel }: { info: BackupInfo; onSaved: (r
         <p className="muted small">{tr("Backblaze B2 and Cloudflare R2 give 10 GB free. Make a private bucket and a key that can only use that bucket.")}</p>
       </>}
       {where === "sftp" && <>
-        <label>{tr("Address")}<input value={sftp} onChange={(e) => setSftp(e.target.value)} required placeholder="mahbub@192.168.0.20:/backups/gharbox" /></label>
+        <label>{tr("Address")}<input value={sftp} onChange={(e) => setSftp(e.target.value)} required placeholder="mahbub@192.168.0.20:/backups/zirahive" /></label>
         <p className="muted small">{tr("Signs in with an SSH key: put it in the data folder as .ssh/id_ed25519. See docs/BACKUP.md.")}</p>
       </>}
       {where === "rclone" && <>

@@ -7,6 +7,7 @@ import { UploadProvider } from "./uploads";
 import { PrefsProvider } from "./prefs";
 import { AudioProvider } from "./audio";
 import NowPlaying from "./components/NowPlaying";
+import HiveMark from "./components/HiveMark";
 import NotificationBell from "./components/Notifications";
 import PhotosPage from "./pages/Photos";
 import AlbumsPage, { AlbumPage } from "./pages/Albums";
@@ -49,8 +50,8 @@ function SignedInApp() {
       setUser(null);
     });
     const onSignedOut = () => setUser(null);
-    window.addEventListener("gharbox:signed-out", onSignedOut);
-    return () => window.removeEventListener("gharbox:signed-out", onSignedOut);
+    window.addEventListener("zirahive:signed-out", onSignedOut);
+    return () => window.removeEventListener("zirahive:signed-out", onSignedOut);
   }, []);
 
   if (user === undefined) return <div className="boot" aria-busy="true" />;
@@ -125,7 +126,7 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <nav className="rail" aria-label={tr("Main")}>
-        <div className="brand"><span lang="bn">ঘর</span>{" "}{tr("GharBox")}</div>
+        <div className="brand"><HiveMark size={26} />{" "}{tr("ZiraHive")}</div>
         {links.map(({ to, label, icon: Icon, desktop }) => (
           <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}><Icon size={19} aria-hidden /> <span>{label}</span></NavLink>
         ))}
@@ -136,7 +137,7 @@ function Shell({ children }: { children: ReactNode }) {
         </div>
       </nav>
       <div className="mobile-top">
-        <span className="brand-inline"><span lang="bn">ঘর</span>{" "}{tr("GharBox")}</span>
+        <span className="brand-inline"><HiveMark size={22} />{" "}{tr("ZiraHive")}</span>
         <NavLink to="/trash" className="icon" aria-label={tr("Trash")}><Trash2 size={19} /></NavLink>
         <NavLink to="/settings" className="icon" aria-label={tr("Settings")}><Settings size={19} /></NavLink>
         <NotificationBell />
@@ -165,7 +166,7 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
       onSignedIn(res.user);
     } catch (err) {
       if (err instanceof ApiError && err.code === "2fa_required") { setNeedCode(true); return; }
-      setError(err instanceof ApiError ? err.message : tr("Can't reach the server. Check that GharBox is running."));
+      setError(err instanceof ApiError ? err.message : tr("Can't reach the server. Check that ZiraHive is running."));
     } finally { setBusy(false); }
   };
 
@@ -184,8 +185,8 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
   return (
     <div className="signin">
       <form onSubmit={submit}>
-        <div className="signin-mark" lang="bn" aria-hidden>ঘর</div>
-        <h1>{firstRun ? tr("Set up your GharBox") : tr("Welcome home")}</h1>
+        <div className="signin-mark"><HiveMark size={56} /></div>
+        <h1>{firstRun ? tr("Set up your ZiraHive") : tr("Welcome home")}</h1>
         <p>{firstRun ? tr("Create the admin account. You can add family members afterwards.") : tr("Sign in to your photos, files and movies.")}</p>
         <label>{tr("Username")}<input value={username} onChange={(e) => setUsername(e.target.value)} autoComplete="username" required autoFocus /></label>
         <label>{tr("Password")}<input type="password" value={password} onChange={(e) => setPassword(e.target.value)}

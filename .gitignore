@@ -1,6 +1,6 @@
 # secrets and local data
 .env
-gharbox-data/
+zirahive-data/
 movies/
 server/data/
 
@@ -28,6 +28,6 @@ _to_delete/
 sync-client/build/
 sync-client/dist/
 sync-client/*.spec
-sync-client/gharbox-sync.ico
+sync-client/zirahive-sync.ico
 sync-client/*.egg-info/
 backup-disk/

@@ -4,7 +4,7 @@ import { api, ApiError, type FolderBrowse } from "../api";
 import { t as tr, tx } from "../i18n";
 import Dialog from "./Dialog";
 
-/** Pick a folder on the PC's drives (as GharBox sees them). */
+/** Pick a folder on the PC's drives (as ZiraHive sees them). */
 export default function FolderPicker({ onPick, onClose }: { onPick: (f: { path: string; label: string; name: string; guess: string | null }) => void; onClose: () => void }) {
   const [at, setAt] = useState<FolderBrowse | null>(null);
   const [error, setError] = useState("");
@@ -18,7 +18,7 @@ export default function FolderPicker({ onPick, onClose }: { onPick: (f: { path: 
       </div>
       {error && <p className="error">{error}</p>}
       {at && at.folders.length === 0 && (
-        <p className="muted">{at.path ? tr("No folders in here.") : tr("No drives are shared with GharBox yet. Run setup.ps1 again, or add DRIVE_D=D:/ (and so on) to .env, then restart GharBox.")}</p>
+        <p className="muted">{at.path ? tr("No folders in here.") : tr("No drives are shared with ZiraHive yet. Run setup.ps1 again, or add DRIVE_D=D:/ (and so on) to .env, then restart ZiraHive.")}</p>
       )}
       <ul className="picker-list">
         {at?.folders.map((f) => (

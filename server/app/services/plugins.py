@@ -1,4 +1,4 @@
-"""Plugins: small Python add-ons that react to what happens in GharBox, or add their own pages.
+"""Plugins: small Python add-ons that react to what happens in ZiraHive, or add their own pages.
 
 A plugin is a folder with two files:
 
@@ -7,7 +7,7 @@ A plugin is a folder with two files:
 
 Built-in plugins live in app/plugins/; your own go in <data folder>/plugins/<id>/. A plugin's code
 is only loaded once an admin turns it on (Settings > Server > Plugins), because it then runs with
-GharBox's own rights. See docs/PLUGINS.md.
+ZiraHive's own rights. See docs/PLUGINS.md.
 """
 from __future__ import annotations
 
@@ -27,7 +27,7 @@ import httpx
 
 from ..config import get_settings
 
-log = logging.getLogger("gharbox.plugins")
+log = logging.getLogger("zirahive.plugins")
 
 BUILTIN_DIR = Path(__file__).resolve().parent.parent / "plugins"
 ID = re.compile(r"^[a-z0-9][a-z0-9-]{1,39}$")
@@ -82,12 +82,12 @@ class Context:
     def __init__(self, manifest: Manifest, settings: dict):
         self.plugin_id = manifest.id
         self.settings = settings
-        self.log = logging.getLogger(f"gharbox.plugin.{manifest.id}")
+        self.log = logging.getLogger(f"zirahive.plugin.{manifest.id}")
         self.public_url = get_settings().public_url
 
     def http(self, **kw) -> httpx.AsyncClient:
         kw.setdefault("timeout", 10)
-        kw.setdefault("headers", {"User-Agent": "GharBox plugin"})
+        kw.setdefault("headers", {"User-Agent": "ZiraHive plugin"})
         return httpx.AsyncClient(**kw)
 
     async def notify_admins(self, title: str, body: str | None = None) -> None:
@@ -156,7 +156,7 @@ def load(m: Manifest) -> ModuleType:
     cached = _modules.get(m.id)
     if cached and cached[0] == mtime:
         return cached[1]
-    name = f"gharbox_plugin_{m.id.replace('-', '_')}"
+    name = f"zirahive_plugin_{m.id.replace('-', '_')}"
     spec = importlib.util.spec_from_file_location(name, path)
     if spec is None or spec.loader is None:
         raise ImportError(f"can't load {path}")
@@ -203,7 +203,7 @@ async def deliver(m: Manifest, saved: dict, event: Event) -> str | None:
         error = None
     except asyncio.TimeoutError:
         error = f"{event.name}: took longer than {EVENT_TIMEOUT} seconds"
-    except Exception as exc:  # a plugin's mistake must never break GharBox
+    except Exception as exc:  # a plugin's mistake must never break ZiraHive
         error = f"{event.name}: {type(exc).__name__}: {exc}"
         log.warning("plugin %s failed on %s: %s", m.id, event.name, exc)
     await _record(m.id, error)

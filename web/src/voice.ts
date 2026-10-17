@@ -1,5 +1,5 @@
 // Voice chat in a watch party: every device in the voice chat talks to every other one directly
-// (WebRTC, encrypted), with GharBox only passing the set-up messages along the party socket.
+// (WebRTC, encrypted), with ZiraHive only passing the set-up messages along the party socket.
 // At home and over Tailscale devices reach each other directly; no outside server is used.
 
 export interface VoicePeer { conn: string; username: string; muted: boolean }

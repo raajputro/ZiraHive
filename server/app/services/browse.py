@@ -1,5 +1,5 @@
 """Folders the admin may pick as categories: the media folder and the drives Docker mounted
-(read-only) under /drives. Nothing outside them can become a category, so GharBox's own data
+(read-only) under /drives. Nothing outside them can become a category, so ZiraHive's own data
 and the server's system files can never be shown to family members as "media"."""
 from __future__ import annotations
 
@@ -10,15 +10,21 @@ from pathlib import Path, PurePosixPath
 
 from ..config import get_settings
 
-NO_DRIVE_MARK = ".gharbox-no-drive"  # inside the placeholder folder used for drives not in .env
-DATA_MARK = ".gharbox-data"          # inside GharBox's own data folder (see Settings.ensure_dirs)
+NO_DRIVE_MARK = ".zirahive-no-drive"  # inside the placeholder folder used for drives not in .env
+DATA_MARK = ".zirahive-data"          # inside ZiraHive's own data folder (see Settings.ensure_dirs)
+_OLD_MARKS = {DATA_MARK: ".gharbox-data", NO_DRIVE_MARK: ".gharbox-no-drive"}  # from before the rename
+
+
+def marked(folder: Path, mark: str = DATA_MARK) -> bool:
+    """True when the folder carries the mark (under the new or the old name)."""
+    return (folder / mark).exists() or (folder / _OLD_MARKS[mark]).exists()
 
 
 def is_private(path: Path) -> bool:
-    """True inside GharBox's data folder (also when reached through a drive mount)."""
+    """True inside ZiraHive's data folder (also when reached through a drive mount)."""
     for d in (path, *path.parents):
         try:
-            if (d / DATA_MARK).exists():
+            if marked(d):
                 return True
         except OSError:
             return False
@@ -26,9 +32,9 @@ def is_private(path: Path) -> bool:
 
 
 def walk_filter(dirpath: str, dirnames: list[str]) -> list[str]:
-    """For os.walk: leave out hidden folders and GharBox's own data folder."""
+    """For os.walk: leave out hidden folders and ZiraHive's own data folder."""
     base = Path(dirpath)
-    return [d for d in dirnames if not d.startswith(".") and not (base / d / DATA_MARK).exists()]
+    return [d for d in dirnames if not d.startswith(".") and not marked(base / d)]
 _SKIP = re.compile(r"^(\$recycle\.bin|system volume information|\$windows\..*|windows|program files.*|programdata|"
                    r"recovery|config\.msi|msocache|appdata|node_modules|\..*)$", re.I)
 
@@ -42,13 +48,13 @@ def roots() -> list[tuple[Path, str]]:
     drives = Path(s.drives_dir)
     if drives.is_dir():
         for d in sorted(drives.iterdir()):
-            if d.is_dir() and len(d.name) == 1 and not (d / NO_DRIVE_MARK).exists():
+            if d.is_dir() and len(d.name) == 1 and not marked(d, NO_DRIVE_MARK):
                 try:
                     next(d.iterdir(), None)
                 except OSError:
                     continue
                 out.append((d, f"{d.name.upper()}:"))
-    if os.name == "nt":  # GharBox running straight on Windows, without Docker
+    if os.name == "nt":  # ZiraHive running straight on Windows, without Docker
         for letter in string.ascii_uppercase:
             p = Path(f"{letter}:\\")
             if p.exists():
@@ -101,7 +107,7 @@ def display(path: str | Path) -> str:
 
 def list_folder(path: Path) -> list[Path]:
     try:
-        children = [c for c in path.iterdir() if not _SKIP.match(c.name) and not (c / DATA_MARK).exists()]
+        children = [c for c in path.iterdir() if not _SKIP.match(c.name) and not marked(c)]
     except OSError:
         return []
     out = []

@@ -2,7 +2,7 @@
 
 The client compares it with the PC folder and with what both looked like at the last sync,
 then uploads, downloads, trashes or keeps both copies. It uses the normal upload API (with
-`replace`) and file download; deletions go to the GharBox trash, never straight away.
+`replace`) and file download; deletions go to the ZiraHive trash, never straight away.
 """
 from __future__ import annotations
 

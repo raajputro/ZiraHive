@@ -1,12 +1,12 @@
-"""Shows GharBox on smart TVs at home (DLNA / UPnP media server).
+"""Shows ZiraHive on smart TVs at home (DLNA / UPnP media server).
 
 TVs look for media servers with SSDP (multicast on the home network), then browse folders over
-HTTP + SOAP. This module does both, and answers each browse by asking GharBox
-(GET /api/dlna/browse). The videos and songs themselves go straight from GharBox to the TV,
+HTTP + SOAP. This module does both, and answers each browse by asking ZiraHive
+(GET /api/dlna/browse). The videos and songs themselves go straight from ZiraHive to the TV,
 with links that each play one title for 12 hours.
 
-It runs inside the GharBox app on a Windows PC (Docker Desktop can't use multicast), or with
-`gharbox-sync tv` on any computer at home.
+It runs inside the ZiraHive app on a Windows PC (Docker Desktop can't use multicast), or with
+`zirahive-sync tv` on any computer at home.
 """
 from __future__ import annotations
 
@@ -23,14 +23,14 @@ from urllib.parse import urlsplit, urlunsplit
 from xml.etree import ElementTree as ET
 from xml.sax.saxutils import escape
 
-log = logging.getLogger("gharbox_sync.dlna")
+log = logging.getLogger("zirahive_sync.dlna")
 
 SSDP_ADDR, SSDP_PORT = "239.255.255.250", 1900
 MAX_AGE = 1800
 DEVICE = "urn:schemas-upnp-org:device:MediaServer:1"
 CDS = "urn:schemas-upnp-org:service:ContentDirectory:1"
 CMS = "urn:schemas-upnp-org:service:ConnectionManager:1"
-SERVER = "Windows/10 UPnP/1.0 GharBox/1.0"
+SERVER = "Windows/10 UPnP/1.0 ZiraHive/1.0"
 DLNA_FLAGS = "DLNA.ORG_OP=01;DLNA.ORG_CI=0;DLNA.ORG_FLAGS=01700000000000000000000000000000"
 
 Fetch = Callable[[str], dict]  # folder id -> the /api/dlna/browse answer
@@ -49,7 +49,7 @@ def local_ip() -> str:
 
 
 def media_base(server: str, lan_url: str | None, ip: str) -> str:
-    """Where the TV fetches videos: GharBox's home address if it has one set, else the address
+    """Where the TV fetches videos: ZiraHive's home address if it has one set, else the address
     this app uses, with localhost swapped for this PC's address (the TV isn't this PC)."""
     if lan_url:
         return lan_url.rstrip("/")
@@ -192,7 +192,7 @@ class DlnaServer:
         self.ssdp = self._ssdp_socket()
         threading.Thread(target=self._ssdp_loop, name="dlna-ssdp", daemon=True).start()
         threading.Thread(target=self._announce_loop, name="dlna-notify", daemon=True).start()
-        log.info("Showing GharBox to TVs at %s", self.location)
+        log.info("Showing ZiraHive to TVs at %s", self.location)
 
     def stop(self) -> None:
         self.stopping.set()
@@ -277,8 +277,8 @@ class DlnaServer:
         return ('<?xml version="1.0"?><root xmlns="urn:schemas-upnp-org:device-1-0" '
                 'xmlns:dlna="urn:schemas-dlna-org:device-1-0"><specVersion><major>1</major><minor>0</minor></specVersion>'
                 f"<device><deviceType>{DEVICE}</deviceType><dlna:X_DLNADOC>DMS-1.50</dlna:X_DLNADOC>"
-                f"<friendlyName>{escape(self.name)}</friendlyName><manufacturer>GharBox</manufacturer>"
-                "<manufacturerURL>https://github.com/</manufacturerURL><modelName>GharBox</modelName>"
+                f"<friendlyName>{escape(self.name)}</friendlyName><manufacturer>ZiraHive</manufacturer>"
+                "<manufacturerURL>https://github.com/</manufacturerURL><modelName>ZiraHive</modelName>"
                 f"<modelNumber>1</modelNumber><UDN>uuid:{self.udn}</UDN>"
                 "<iconList><icon><mimetype>image/png</mimetype><width>120</width><height>120</height><depth>24</depth>"
                 "<url>/icon.png</url></icon></iconList><serviceList>"
@@ -355,7 +355,7 @@ class DlnaServer:
                                            int(args.get("StartingIndex") or 0), int(args.get("RequestedCount") or 0))
         except KeyError:
             return 500, _soap_fault(701, "No such object")
-        except Exception as exc:  # GharBox unreachable or signed out
+        except Exception as exc:  # ZiraHive unreachable or signed out
             log.warning("browse %s failed: %s", args.get("ObjectID"), exc)
             return 500, _soap_fault(720, "Cannot process the request")
         return 200, _soap("Browse", CDS, f"<Result>{escape(result)}</Result><NumberReturned>{n}</NumberReturned>"
@@ -422,19 +422,34 @@ _ICON: bytes | None = None
 
 
 def _icon() -> bytes:
-    """The GharBox mark, drawn once (Pillow is already needed for the tray icon)."""
+    """The ZiraHive mark, drawn once (Pillow is already needed for the tray icon)."""
     global _ICON
     if _ICON is None:
         import io
 
-        from PIL import Image, ImageDraw
+        from PIL import Image
 
-        im = Image.new("RGB", (120, 120), (32, 42, 68))
-        d = ImageDraw.Draw(im)
-        d.polygon([(20, 60), (60, 22), (100, 60)], fill=(222, 170, 92))
-        d.rectangle([32, 58, 88, 98], fill=(222, 170, 92))
-        d.rectangle([52, 72, 68, 98], fill=(32, 42, 68))
+        im = Image.new("RGB", (480, 480), (32, 42, 68))
+        hive(im, (201, 166, 107), (32, 42, 68), radius=160)
+        im = im.resize((120, 120), Image.LANCZOS)
         buf = io.BytesIO()
         im.save(buf, "PNG")
         _ICON = buf.getvalue()
     return _ICON
+
+
+def hive(im, fg, bg, radius: float) -> None:
+    """Draws the ZiraHive mark (a honeycomb cell holding a smaller one) in the middle of `im`."""
+    import math
+
+    from PIL import ImageDraw
+
+    d = ImageDraw.Draw(im)
+    cx, cy = im.width / 2, im.height / 2
+
+    def cell(r):
+        return [(cx + r * math.cos(math.radians(90 + 60 * i)), cy + r * math.sin(math.radians(90 + 60 * i)))
+                for i in range(6)]
+    d.polygon(cell(radius), fill=fg)
+    d.polygon(cell(radius * 0.78), fill=bg)
+    d.polygon(cell(radius * 0.36), fill=fg)

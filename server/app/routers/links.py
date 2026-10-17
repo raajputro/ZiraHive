@@ -1,6 +1,6 @@
-"""Linking two GharBox servers: people here watch what another GharBox shares with us.
+"""Linking two ZiraHive servers: people here watch what another ZiraHive shares with us.
 
-Everything goes through this server: it asks the other GharBox (with the link's token) and passes
+Everything goes through this server: it asks the other ZiraHive (with the link's token) and passes
 the answer on, so people's browsers never need to reach the other server, and the token never
 leaves here. Age limits of people here are applied on top of the other server's own limit.
 """
@@ -33,7 +33,7 @@ _PASS_HEADERS = ("content-type", "content-length", "content-range", "accept-rang
 def client_for(link: FedLink) -> httpx.AsyncClient:
     """Replaced in tests, to reach the other server in-process."""
     return httpx.AsyncClient(base_url=link.url, timeout=httpx.Timeout(60, connect=10), follow_redirects=False,
-                             headers={"Authorization": f"{SCHEME} {link.token}", "User-Agent": "GharBox link"})
+                             headers={"Authorization": f"{SCHEME} {link.token}", "User-Agent": "ZiraHive link"})
 
 
 async def _get_json(link: FedLink, path: str, session: AsyncSession, **params) -> dict | list:
@@ -45,7 +45,7 @@ async def _get_json(link: FedLink, path: str, session: AsyncSession, **params) -
         await session.commit()
         raise HTTPException(502, f"{link.name} can't be reached right now") from None
     if r.status_code == 401:
-        link.last_error = "The other GharBox removed this link"
+        link.last_error = "The other ZiraHive removed this link"
         await session.commit()
         raise HTTPException(502, f"{link.name} removed this link")
     if r.status_code == 404:
@@ -139,14 +139,14 @@ async def add_link(body: LinkIn, request: Request, admin: User = Depends(admin_u
     try:
         url, token = read_code(body.code)
     except (ValueError, KeyError, TypeError):
-        raise HTTPException(400, "That isn't a GharBox link code. Copy the whole code, starting with ghx1.") from None
+        raise HTTPException(400, "That isn't a ZiraHive link code. Copy the whole code, starting with zh1.") from None
     if await session.scalar(select(FedLink.id).where(FedLink.url == url, FedLink.token == token)):
         raise HTTPException(409, "This code is already added")
-    link = FedLink(name=(body.name or "").strip() or "Linked GharBox", url=url.rstrip("/"), token=token)
+    link = FedLink(name=(body.name or "").strip() or "Linked ZiraHive", url=url.rstrip("/"), token=token)
     try:
         info = await _get_json(link, "/api/fed/info", session)
     except HTTPException as exc:
-        raise HTTPException(400, f"The other GharBox didn't accept the code ({exc.detail}). Check that its "
+        raise HTTPException(400, f"The other ZiraHive didn't accept the code ({exc.detail}). Check that its "
                                  f"address {url} can be reached from this server.") from None
     if not body.name:
         link.name = str(info.get("name") or link.name)[:100]

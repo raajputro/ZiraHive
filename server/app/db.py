@@ -59,7 +59,7 @@ async def create_all() -> None:
 
 def add_missing_columns(conn) -> None:
     """Upgrade an existing database in place: add columns and indexes that newer versions
-    of GharBox define but the database doesn't have yet. New tables are already handled by
+    of ZiraHive define but the database doesn't have yet. New tables are already handled by
     create_all. (Renames and type changes will need proper migrations; see ROADMAP.)"""
     insp = inspect(conn)
     for table in Base.metadata.sorted_tables:

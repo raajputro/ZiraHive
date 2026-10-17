@@ -525,7 +525,7 @@ class BackupConfig(Base):
 
     id: Mapped[str] = mapped_column(String(16), primary_key=True, default="main")
     enabled: Mapped[bool] = mapped_column(Boolean, default=True)
-    repository: Mapped[str] = mapped_column(Text)       # /backup-disk/gharbox, s3:..., sftp:..., rclone:...
+    repository: Mapped[str] = mapped_column(Text)       # /backup-disk/zirahive, s3:..., sftp:..., rclone:...
     password: Mapped[str] = mapped_column(Text)         # restic repository password
     env_json: Mapped[str] = mapped_column(Text, default="{}")  # e.g. AWS_ACCESS_KEY_ID for S3
     hour: Mapped[int] = mapped_column(Integer, default=2)       # local hour of the daily run
@@ -600,7 +600,7 @@ class PluginState(Base):
 
 
 class FedGuest(Base):
-    """Another GharBox this server shares some categories with (this server is the host)."""
+    """Another ZiraHive this server shares some categories with (this server is the host)."""
 
     __tablename__ = "fed_guests"
 
@@ -616,7 +616,7 @@ class FedGuest(Base):
 
 
 class FedLink(Base):
-    """Another GharBox whose shared categories people here can watch (this server is the guest)."""
+    """Another ZiraHive whose shared categories people here can watch (this server is the guest)."""
 
     __tablename__ = "fed_links"
 
@@ -630,7 +630,7 @@ class FedLink(Base):
 
 
 class RemoteProgress(Base):
-    """Where someone here stopped in a title on a linked GharBox."""
+    """Where someone here stopped in a title on a linked ZiraHive."""
 
     __tablename__ = "remote_progress"
     __table_args__ = (UniqueConstraint("user_id", "link_id", "media_id"),)

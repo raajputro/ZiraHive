@@ -220,7 +220,7 @@ function PartyRoom({ id }: { id: string }) {
     const problem = voiceProblem();
     if (problem) {
       setVoiceMsg(problem === "insecure"
-        ? tr("Voice chat needs a secure page: open GharBox at your https:// address, or http://localhost on the server PC.")
+        ? tr("Voice chat needs a secure page: open ZiraHive at your https:// address, or http://localhost on the server PC.")
         : tr("This browser can't do voice chat. Try a recent Chrome, Edge, Firefox or Safari."));
       return;
     }

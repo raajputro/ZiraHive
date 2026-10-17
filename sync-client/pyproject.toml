@@ -1,7 +1,7 @@
 [project]
-name = "gharbox-sync"
+name = "zirahive-sync"
 version = "0.1.0"
-description = "Keeps a folder on your PC and a folder in GharBox the same, both ways."
+description = "Keeps a folder on your PC and a folder in ZiraHive the same, both ways."
 readme = "README.md"
 license = { text = "AGPL-3.0-or-later" }
 requires-python = ">=3.10"
@@ -14,11 +14,11 @@ dependencies = [
 ]
 
 [project.scripts]
-gharbox-sync = "gharbox_sync.cli:main"
+zirahive-sync = "zirahive_sync.cli:main"
 
 [build-system]
 requires = ["setuptools>=69"]
 build-backend = "setuptools.build_meta"
 
 [tool.setuptools]
-packages = ["gharbox_sync"]
+packages = ["zirahive_sync"]

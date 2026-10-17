@@ -36,7 +36,7 @@ def test_kinds_and_names():
 def media_root(tmp_path, monkeypatch):
     root = tmp_path / "media"
     sample.make_all(root)
-    monkeypatch.setenv("GHARBOX_MEDIA_ROOT", str(root))
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_ROOT", str(root))
     return root
 
 

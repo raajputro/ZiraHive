@@ -63,8 +63,8 @@
   security-check status, restore guide
 - Bangla interface: every screen, server messages and notifications, Bangla digits and dates,
   per-account language; CI fails if a text has no Bangla
-- GharBox Sync for Windows: two-way folder sync with a three-way comparison, keep-both on conflicts,
-  Recycle Bin and GharBox trash for deletions, unplugged-drive and mass-delete guards, tray app,
+- ZiraHive Sync for Windows: two-way folder sync with a three-way comparison, keep-both on conflicts,
+  Recycle Bin and ZiraHive trash for deletions, unplugged-drive and mass-delete guards, tray app,
   device sign-in, single .exe built in CI
 - React Router 7 (security fix)
 
@@ -78,9 +78,9 @@
 - Chromecast: Cast to TV from the player with the Cast SDK loaded only on demand, direct play or
   converted HLS, subtitles, remote controls, progress saved; one-title links (12 h) accepted only on
   that title's media URLs; CORS only for those
-- DLNA/UPnP media server in GharBox Sync (SSDP discovery, ContentDirectory, ConnectionManager):
+- DLNA/UPnP media server in ZiraHive Sync (SSDP discovery, ContentDirectory, ConnectionManager):
   categories, series by season, Continue watching, music albums; TVs stream the original files
-  with byte-range seeking; `gharbox-sync tv` for other computers
+  with byte-range seeking; `zirahive-sync tv` for other computers
 - setup.ps1 for first-time Windows setup (drives, data folder, home-network address)
 
 ## Later for playback
@@ -95,7 +95,7 @@
   talking lights, the film turned down while people talk
 - Plugins: plugin.json + plugin.py, loaded only when turned on; events, settings, pages; built-in
   signed webhook and Telegram messages; docs/PLUGINS.md
-- Linked GharBox servers: invite codes for chosen categories with an age limit, server-to-server
+- Linked ZiraHive servers: invite codes for chosen categories with an age limit, server-to-server
   tokens, browsing and streaming proxied through the guest's server, progress kept there, revocable
 - setup.ps1 asks for one media folder; README rewritten
 

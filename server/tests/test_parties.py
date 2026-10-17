@@ -14,14 +14,14 @@ from conftest import make_video
 @pytest.fixture
 def tc(tmp_path, monkeypatch):
     """A synchronous client, because WebSockets are tested with Starlette's TestClient."""
-    monkeypatch.setenv("GHARBOX_DATA_DIR", str(tmp_path / "data"))
-    monkeypatch.setenv("GHARBOX_REDIS_URL", "")
-    monkeypatch.setenv("GHARBOX_DATABASE_URL", "")
-    monkeypatch.setenv("GHARBOX_MEDIA_LIBRARIES", "")
-    monkeypatch.setenv("GHARBOX_MEDIA_ROOT", "")
+    monkeypatch.setenv("ZIRAHIVE_DATA_DIR", str(tmp_path / "data"))
+    monkeypatch.setenv("ZIRAHIVE_REDIS_URL", "")
+    monkeypatch.setenv("ZIRAHIVE_DATABASE_URL", "")
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_LIBRARIES", "")
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_ROOT", "")
     (tmp_path / "drives").mkdir()
     (tmp_path / "drives" / "t").symlink_to(tmp_path)  # a pretend drive, so categories can be added
-    monkeypatch.setenv("GHARBOX_DRIVES_DIR", str(tmp_path / "drives"))
+    monkeypatch.setenv("ZIRAHIVE_DRIVES_DIR", str(tmp_path / "drives"))
     from app.config import get_settings
     get_settings.cache_clear()
     from app.main import create_app
@@ -195,7 +195,7 @@ def test_socket_security(tc, family):
     tc.cookies.clear()  # only the headers below decide who's asking
     for headers, code in ((family["nabil"], 4404), ({}, 4401),
                           ({**family["rina"], "Origin": "https://evil.example"}, 4403),
-                          ({**family["rina"], "X-GharBox-Gateway": "public"}, 4403)):
+                          ({**family["rina"], "X-ZiraHive-Gateway": "public"}, 4403)):
         with pytest.raises(WebSocketDisconnect) as exc:
             with tc.websocket_connect(url, headers=headers) as ws:
                 ws.receive_json()

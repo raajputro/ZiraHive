@@ -38,7 +38,7 @@ export default function ShareDialog({ type, id, label, onClose }:
 
   return (
     <Dialog title={tr("Share {label}", { label: label })} onClose={onClose}>
-      <p className="muted small">{tr("Anyone with the link can open it, even without a GharBox account.")}</p>
+      <p className="muted small">{tr("Anyone with the link can open it, even without a ZiraHive account.")}</p>
       {!hasPublicBase() && (
         <p className="notice small">{tr("These links only open on your home network and on Tailscale, because no public share address is set up yet. See docs/REMOTE_ACCESS.md.")}</p>
       )}

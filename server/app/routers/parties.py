@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..db import get_session, sessionmaker
 from ..models import MediaItem, PartyMember, PartyMessage, Series, User, WatchParty, utcnow
 from ..schemas import ChatOut, InviteIn, PartyIn, PartyMemberOut, PartyOut, PartyUpdateIn, RsvpIn
-from ..security import COOKIE_NAME, current_user, decode_token
+from ..security import current_user, decode_token, session_cookie
 from ..services.events import audit, notify
 from ..services.party_rooms import MAX_CHAT, rooms
 from .media import gate_for
@@ -22,7 +22,7 @@ MAX_SIGNAL = 64_000  # one SDP offer is a few KB
 
 def ice_servers() -> list[dict]:
     """STUN/TURN servers for voice chat. At home and over Tailscale none are needed: devices reach
-    each other directly. GHARBOX_ICE_SERVERS adds some, e.g. stun:stun.l.google.com:19302."""
+    each other directly. ZIRAHIVE_ICE_SERVERS adds some, e.g. stun:stun.l.google.com:19302."""
     from ..config import get_settings
 
     urls = [u.strip() for u in get_settings().ice_servers.split(",") if u.strip()]
@@ -256,7 +256,7 @@ async def send_reminders(session: AsyncSession) -> int:
 
 async def _ws_user(ws: WebSocket) -> User | None:
     auth = ws.headers.get("authorization", "")
-    token = auth[7:].strip() if auth.lower().startswith("bearer ") else ws.cookies.get(COOKIE_NAME)
+    token = auth[7:].strip() if auth.lower().startswith("bearer ") else session_cookie(ws.cookies)
     payload = decode_token(token) if token else None
     if not payload or "sub" not in payload:
         return None
@@ -276,7 +276,7 @@ def _same_origin(ws: WebSocket) -> bool:
 
 @router.websocket("/{party_id}/ws")
 async def party_socket(ws: WebSocket, party_id: str):
-    if ws.headers.get("x-gharbox-gateway") == "public" or not _same_origin(ws):
+    if ws.headers.get("x-zirahive-gateway") == "public" or not _same_origin(ws):
         await ws.close(code=4403)
         return
     user = await _ws_user(ws)

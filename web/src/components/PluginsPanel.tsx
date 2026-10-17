@@ -14,7 +14,7 @@ export default function PluginsPanel() {
   return (
     <section className="panel plugins">
       <h2><Puzzle size={18} aria-hidden />{" "}{tr("Plugins")}</h2>
-      <p className="muted">{tr("Add-ons that react to what happens in GharBox: new movies, uploads, backups, watch parties. Put your own in the plugins folder inside GharBox's data folder; see docs/PLUGINS.md.")}</p>
+      <p className="muted">{tr("Add-ons that react to what happens in ZiraHive: new movies, uploads, backups, watch parties. Put your own in the plugins folder inside ZiraHive's data folder; see docs/PLUGINS.md.")}</p>
       {list === null ? <p aria-busy="true" className="muted">{tr("Loading…")}</p>
         : list.map((p) => <PluginCard key={p.id} plugin={p} onChange={replace} />)}
     </section>
@@ -31,7 +31,7 @@ function PluginCard({ plugin: p, onChange }: { plugin: Plugin; onChange: (p: Plu
     try { await fn(); } catch (e) { setMsg(e instanceof ApiError ? e.message : tr("That didn't work")); } finally { setBusy(false); }
   };
   const toggle = () => act(async () => {
-    if (!p.enabled && !p.builtin && !confirm(tr("Turn on {name}? A plugin runs with GharBox's own rights and can see everyone's files. Only turn on plugins you trust.", { name: tx(p.name) }))) return;
+    if (!p.enabled && !p.builtin && !confirm(tr("Turn on {name}? A plugin runs with ZiraHive's own rights and can see everyone's files. Only turn on plugins you trust.", { name: tx(p.name) }))) return;
     onChange(await api.updatePlugin(p.id, { enabled: !p.enabled }));
   });
   const save = () => act(async () => {

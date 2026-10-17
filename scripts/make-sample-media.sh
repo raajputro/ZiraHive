@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Makes a small media folder with every kind of category, for trying GharBox or for tests.
+# Makes a small media folder with every kind of category, for trying ZiraHive or for tests.
 #   scripts/make-sample-media.sh ./sample-media
 set -euo pipefail
 OUT="${1:-./sample-media}"
@@ -16,7 +16,7 @@ for e in 1 2 3; do clip "$OUT/Web Series/Mirzapur/Season 1/Mirzapur.S01E0$e.mp4"
 clip "$OUT/Web Series/Mirzapur/Season 2/Mirzapur.S02E01.mp4"
 clip "$OUT/Animation/Kung Fu Panda (2008).mp4"
 
-# A film like a real download: MKV, AC-3 sound (browsers can't play it, so GharBox converts),
+# A film like a real download: MKV, AC-3 sound (browsers can't play it, so ZiraHive converts),
 # Bangla + English audio, built-in Bangla subtitles, Intro chapter, and an English .srt beside it.
 RICH="$OUT/Bangla Movies/Dhaka Nights (2024)"
 mkdir -p "$RICH"
