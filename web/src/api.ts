@@ -201,6 +201,7 @@ export interface Plugin {
   last_error: string | null; last_error_at: string | null; last_ok_at: string | null; has_pages: boolean;
 }
 
+export interface HealthItem { id: string; title: string; status: "ok" | "warn" | "fail" | "info"; detail: string; fix: string | null }
 export interface AiStatus { ai: boolean; ollama: boolean; models: Record<string, string>; photos: number; photos_indexed: number; people: number; documents_ready: number; llm_model: string; embed_model: string }
 export interface PersonSummary { id: string; name: string | null; photos: number; cover_face: string | null; hidden: boolean }
 export interface Cleanup { duplicates: { keep: string; photos: Asset[] }[]; blurry: Asset[]; measured: number; waiting: number }
@@ -288,6 +289,7 @@ export const api = {
   testNotification: () => request<void>("POST", "/api/auth/me/test-notification"),
   changePassword: (current_password: string, new_password: string) =>
     request<{ user: User }>("POST", "/api/auth/password", { current_password, new_password }),
+  health: () => request<HealthItem[]>("GET", "/api/admin/health"),
   aiStatus: () => request<AiStatus>("GET", "/api/ai/status"),
   aiCatchUp: () => request<void>("POST", "/api/admin/ai/catch-up"),
   searchPhotos: (text: string) => request<{ query: string; searched_for: string; hits: { asset: Asset; score: number }[] }>(

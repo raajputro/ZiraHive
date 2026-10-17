@@ -145,7 +145,8 @@ async def test_offsite_backup_to_a_disk(client, admin, tmp_path):
         assert rc == 0, err
     restored = list(target.rglob("will.txt"))
     assert restored and restored[0].read_bytes() == b"my will: ok"
-    assert list(target.rglob("backup-staging/zirahive.db"))
+    # the database copy: SQLite's file, or a pg_dump when running on PostgreSQL
+    assert list(target.rglob("backup-staging/zirahive.db")) or list(target.rglob("backup-staging/zirahive.pgdump"))
     assert not list(target.rglob("cache/thumbs"))  # caches are left out
 
     assert (await client.post("/api/admin/backup/check")).status_code == 202

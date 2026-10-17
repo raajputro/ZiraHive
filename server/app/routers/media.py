@@ -9,7 +9,7 @@ from sqlalchemy import and_, case, delete, func, select, update
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_session
+from ..db import get_session, one_row
 from ..models import Book, Library, MediaItem, MusicAlbum, Series, Track, User, WatchProgress, utcnow
 from ..schemas import (FolderBrowseOut, FolderPick, LibraryIn, LibraryOrderIn, LibraryOut, LibraryUpdateIn, MediaOut,
                        ProgressIn, SeasonOut, SeriesOut, TitleOut)
@@ -494,11 +494,7 @@ async def save_progress(media_id: str, body: ProgressIn, user: User = Depends(cu
                         session: AsyncSession = Depends(get_session)):
     item = await _get_media(media_id, session, user)
     duration = body.duration or item.duration
-    prog = await session.scalar(select(WatchProgress).where(
-        WatchProgress.user_id == user.id, WatchProgress.media_id == media_id))
-    if prog is None:
-        prog = WatchProgress(user_id=user.id, media_id=media_id)
-        session.add(prog)
+    prog = await one_row(session, WatchProgress, user_id=user.id, media_id=media_id)
     prog.position, prog.duration = body.position, duration
     prog.finished = bool(duration and body.position >= duration * 0.92)
     prog.updated_at = utcnow()

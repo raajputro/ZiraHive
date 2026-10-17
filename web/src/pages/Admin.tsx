@@ -13,6 +13,7 @@ import PasskeysPanel from "../components/PasskeysPanel";
 import PluginsPanel from "../components/PluginsPanel";
 import LinksPanel from "../components/LinksPanel";
 import AiPanel from "../components/AiPanel";
+import HealthPanel from "../components/HealthPanel";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(locale()) : tr("never"));
 
 type Tab = "account" | "server" | "people" | "log";
@@ -37,7 +38,7 @@ export default function AdminPage() {
         ))}
       </nav>
       {tab === "account" && <><AccountPanel /><PasskeysPanel /><TwoFactorPanel /><NotificationsPanel /><Password /></>}
-      {tab === "server" && user.is_admin && <><SecurityPanel /><BackupPanel /><StatsPanel /><ActivityPanel /><Libraries /><AiPanel /><LinksPanel /><PluginsPanel /></>}
+      {tab === "server" && user.is_admin && <><HealthPanel /><SecurityPanel /><BackupPanel /><StatsPanel /><ActivityPanel /><Libraries /><AiPanel /><LinksPanel /><PluginsPanel /></>}
       {tab === "people" && user.is_admin && <Users />}
       {tab === "log" && user.is_admin && <AuditPanel />}
     </div>

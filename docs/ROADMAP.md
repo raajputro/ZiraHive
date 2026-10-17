@@ -117,7 +117,21 @@
 - Security headers and CSP, secure cookies, URL tokens limited to video links, per-address throttle
 - Security check panel for the admin
 
-## Platform
-- Alembic database migrations (needed before the first schema change after release)
-- Passkeys
-- Admin dashboard: active streams and job queue
+## Batch 9: ready for real use (done)
+- Alembic migrations: a fixed baseline for new installs; older databases are caught up once and
+  marked; a test fails when models change without a migration; checked on SQLite and PostgreSQL
+  (also in CI)
+- The full browser suite passes on PostgreSQL, the database Docker installs use
+- Health check: Settings > Server > Health, and `python -m app.doctor` for when the page won't open
+- setup.ps1: starts Docker Desktop, checks the port and free space, asks about the local AI
+  (COMPOSE_PROFILES), waits until ZiraHive answers, firewall rule as administrator, desktop
+  shortcut; writes .env without a byte-order mark; update.ps1; docs/FIRST_RUN.md
+- Version 1.0.0
+
+## Next
+- **Windows without Docker.** A native installer (Python, ffmpeg, Tesseract, restic and PostgreSQL
+  bundled as a Windows service) would save the Docker Desktop install, but it is a large job that
+  needs testing on real Windows PCs. It waits until the Docker install has run in daily use.
+- Remux instead of re-encode when only the audio needs converting; burned-in picture subtitles
+- Converted streams for DLNA TVs that can't play a file
+- Better Bangla photo search with a multilingual picture model, once a small one runs well on CPUs

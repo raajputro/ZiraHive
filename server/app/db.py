@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from pathlib import Path
 
 import logging
 
@@ -42,7 +43,11 @@ def sessionmaker() -> async_sessionmaker[AsyncSession]:
     return _sessionmaker
 
 
+MIGRATIONS = Path(__file__).resolve().parent.parent / "migrations"
+
+
 async def create_all() -> None:
+    """Brings the database up to date at start-up (Alembic migrations in server/migrations)."""
     from . import models  # noqa: F401  (register tables)
 
     assert _engine is not None
@@ -50,17 +55,46 @@ async def create_all() -> None:
         if conn.dialect.name == "postgresql":
             # api and worker start at the same time; let only one create/upgrade tables.
             await conn.exec_driver_sql("SELECT pg_advisory_xact_lock(424242)")
-        # Runs first, while no table references assets yet (album_items etc. are created
-        # below), so rebuilding the table on SQLite can't break anyone's foreign keys.
-        await conn.run_sync(drop_asset_hash_unique)
-        await conn.run_sync(Base.metadata.create_all)
-        await conn.run_sync(add_missing_columns)
+        await conn.run_sync(migrate)
+
+
+def _alembic(conn):
+    from alembic.config import Config
+
+    cfg = Config()
+    cfg.set_main_option("script_location", str(MIGRATIONS))
+    cfg.attributes["connection"] = conn
+    return cfg
+
+
+def schema_version(conn) -> str | None:
+    from alembic.runtime.migration import MigrationContext
+
+    return MigrationContext.configure(conn).get_current_revision()
+
+
+def migrate(conn) -> None:
+    from alembic import command
+
+    for name in ("alembic", "alembic.runtime.migration", "alembic.runtime.plugins"):
+        logging.getLogger(name).setLevel(logging.WARNING)  # only real news in the log
+    cfg = _alembic(conn)
+    insp = inspect(conn)
+    if schema_version(conn) is None and any(insp.has_table(t) for t in Base.metadata.tables):
+        # Made before ZiraHive used migrations: catch it up the old way once (new tables, new
+        # columns), then mark it as current. From here on only migrations change it.
+        # (drop_asset_hash_unique runs first, while no table references assets yet.)
+        drop_asset_hash_unique(conn)
+        Base.metadata.create_all(conn)
+        add_missing_columns(conn)
+        command.stamp(cfg, "head")
+        log.info("database: now upgraded by migrations")
+    command.upgrade(cfg, "head")
 
 
 def add_missing_columns(conn) -> None:
-    """Upgrade an existing database in place: add columns and indexes that newer versions
-    of ZiraHive define but the database doesn't have yet. New tables are already handled by
-    create_all. (Renames and type changes will need proper migrations; see ROADMAP.)"""
+    """Catches up a database made before migrations existed: adds columns and indexes newer
+    versions define but the database doesn't have yet. Used once per such database."""
     insp = inspect(conn)
     for table in Base.metadata.sorted_tables:
         if not insp.has_table(table.name):
@@ -120,3 +154,20 @@ def drop_asset_hash_unique(conn) -> None:
         conn.exec_driver_sql("DROP TABLE assets_v1")
         conn.exec_driver_sql("PRAGMA legacy_alter_table=OFF")
     log.info("database upgraded: files may now have copies in several folders")
+
+
+async def one_row(session: AsyncSession, model, **keys):
+    """The row with these key values, made first if it doesn't exist. Safe when two requests
+    arrive at once (saving a position twice a second, say): the database settles who makes it."""
+    from sqlalchemy import select
+
+    row = await session.scalar(select(model).filter_by(**keys))
+    if row is not None:
+        return row
+    conn = await session.connection()
+    if conn.dialect.name == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    else:
+        from sqlalchemy.dialects.sqlite import insert
+    await session.execute(insert(model).values(**keys).on_conflict_do_nothing(index_elements=list(keys)))
+    return await session.scalar(select(model).filter_by(**keys).execution_options(populate_existing=True))

@@ -17,7 +17,7 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.background import BackgroundTask
 
-from ..db import get_session
+from ..db import get_session, one_row
 from ..models import FedLink, RemoteProgress, User, utcnow
 from ..security import admin_user, current_user
 from ..services.events import audit
@@ -286,11 +286,7 @@ class RemoteProgressIn(BaseModel):
 async def link_progress(link_id: str, media_id: str, body: RemoteProgressIn, user: User = Depends(current_user),
                         session: AsyncSession = Depends(get_session)):
     link = await _link(session, link_id)
-    row = await session.scalar(select(RemoteProgress).where(
-        RemoteProgress.user_id == user.id, RemoteProgress.link_id == link.id, RemoteProgress.media_id == media_id))
-    if row is None:
-        row = RemoteProgress(user_id=user.id, link_id=link.id, media_id=media_id)
-        session.add(row)
+    row = await one_row(session, RemoteProgress, user_id=user.id, link_id=link.id, media_id=media_id)
     row.position, row.duration = body.position, body.duration
     row.title = body.title or row.title
     row.finished = bool(body.duration and body.position >= body.duration * 0.92)

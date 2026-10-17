@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import io
+import os
 import subprocess
 from pathlib import Path
 
@@ -9,11 +10,26 @@ import pytest
 from PIL import Image
 
 
+async def _empty_postgres(url: str) -> None:
+    from sqlalchemy.ext.asyncio import create_async_engine
+
+    engine = create_async_engine(url)
+    async with engine.begin() as conn:
+        await conn.exec_driver_sql("DROP SCHEMA public CASCADE")
+        await conn.exec_driver_sql("CREATE SCHEMA public")
+    await engine.dispose()
+
+
 @pytest.fixture
 async def app(tmp_path, monkeypatch):
     monkeypatch.setenv("ZIRAHIVE_DATA_DIR", str(tmp_path / "data"))
     monkeypatch.setenv("ZIRAHIVE_REDIS_URL", "")
-    monkeypatch.setenv("ZIRAHIVE_DATABASE_URL", "")
+    # TEST_DATABASE_URL=postgresql+asyncpg://... runs every test on PostgreSQL (an empty database
+    # each time; everything in it is deleted)
+    pg = os.environ.get("TEST_DATABASE_URL", "")
+    monkeypatch.setenv("ZIRAHIVE_DATABASE_URL", pg)
+    if pg:
+        await _empty_postgres(pg)
     monkeypatch.setenv("ZIRAHIVE_MEDIA_LIBRARIES", "")
     monkeypatch.setenv("ZIRAHIVE_MAX_CHUNK_MB", "1")
     # a pretend drive "T:" that is the test folder, so tests can add categories anywhere in it

@@ -7,8 +7,8 @@ Free, open source and private: nothing leaves your home unless you share it.
 Everything runs in the web browser on phones, PCs and TVs. There are no apps to install from a
 store.
 
-> **Status:** batches 1 to 8 are done, including the optional local AI. See
-> [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** version 1.0: all nine planned batches are done. Installing it for the first time?
+> Follow [docs/FIRST_RUN.md](docs/FIRST_RUN.md). What's next: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contents
 
@@ -53,18 +53,23 @@ store.
 You need **Docker Desktop** (free for personal use) with the WSL 2 backend. Install it and start
 it once.
 
-1. **Run the setup.** In this folder, right-click **setup.ps1** and choose **Run with PowerShell**.
-   It asks one question, where your media folder is, for example `G:\Media`, and then:
+1. **Run the setup.** In this folder, right-click **setup.ps1** and choose **Run with PowerShell**
+   (run it as administrator once, so it can let phones through Windows Firewall). It asks where
+   your media folder is, for example `G:\Media`, and whether to turn on the local AI. Then it:
    - creates `.env` with a random database password,
    - puts ZiraHive's own data (backed-up photos, files, the database) on the drive with the most
      free space,
    - shows which categories your media folders will become,
    - fills in this PC's home-network address for TVs,
-   - builds and starts everything (10 to 20 minutes the first time) and opens ZiraHive.
+   - starts Docker Desktop if needed, checks the port and the free space,
+   - builds and starts everything (10 to 20 minutes the first time), waits until it answers, and
+     opens it, with a ZiraHive shortcut on the desktop.
 
 2. **Create the admin account** at **http://localhost:8080**.
 
-3. **Open it on other devices at home.** Use the address setup printed, for example
+3. **Check its health** in **Settings > Server > Health**: each item is OK, or says what to do.
+
+4. **Open it on other devices at home.** Use the address setup printed, for example
    `http://192.168.0.105:8080`. If it doesn't load, allow ZiraHive through Windows Firewall, in
    PowerShell as administrator:
 
@@ -74,7 +79,7 @@ it once.
 
    Give the PC a fixed address in your router (often called "DHCP reservation") so it never changes.
 
-4. **Add your family** in **Settings > People**, and turn on two-factor sign-in for yourself in
+5. **Add your family** in **Settings > People**, and turn on two-factor sign-in for yourself in
    **Settings > Your account**.
 
 Prefer doing it by hand? `copy .env.example .env`, fill in `POSTGRES_PASSWORD`,
@@ -320,11 +325,14 @@ You can write your own in a few lines of Python; see [docs/PLUGINS.md](docs/PLUG
 
 ## Running it day to day
 
+**Updating:** right-click **update.ps1 > Run with PowerShell**. Your files, settings and
+accounts stay, and the database is upgraded by itself.
+
 ```powershell
-docker compose ps                     # what's running
-docker compose logs -f api worker     # watch the logs
-docker compose up -d --build          # after updating the code
-docker compose down                   # stop (your data stays in ZIRAHIVE_DATA_PATH)
+docker compose ps                              # what's running
+docker compose exec api python -m app.doctor   # health check, also when the page won't open
+docker compose logs -f api worker              # watch the logs
+docker compose down                            # stop (your data stays in ZIRAHIVE_DATA_PATH)
 ```
 
 The admin dashboard in **Settings > Server** shows who is watching what, background jobs, and free
@@ -361,7 +369,9 @@ npm run dev                                 # http://localhost:5173, proxies /ap
 ```
 
 Without `ZIRAHIVE_DATABASE_URL` and `ZIRAHIVE_REDIS_URL`, the server uses SQLite in `server/data` and
-runs background jobs inside the API process. Video features need `ffmpeg` on your PATH
+runs background jobs inside the API process. The database is upgraded by Alembic migrations when
+the server starts; after changing `app/models.py`, add one with
+`alembic revision --autogenerate -m "what changed"` (a test fails until you do). Video features need `ffmpeg` on your PATH
 (`winget install ffmpeg`). API docs are at http://localhost:8000/docs while the server runs.
 
 Every text in the interface needs a Bangla translation in `web/src/locales/bn.ts`;
@@ -371,7 +381,8 @@ Every text in the interface needs a Bangla translation in `web/src/locales/bn.ts
 
 | What | Where | Run |
 |---|---|---|
-| API tests (pytest) | `server/tests` | `cd server; pytest` |
+| API tests (pytest; set `TEST_POSTGRES_URL` to also check the migrations on PostgreSQL) | `server/tests` | `cd server; pytest` |
+| Local AI helper, with the real face models | `ai/tests` | `pytest ai/tests` |
 | End-to-end tests in a real browser (Playwright) | `e2e/tests` | see below |
 | Load test (Locust) | `loadtest/locustfile.py` | see the file's header |
 

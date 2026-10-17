@@ -7,6 +7,14 @@ on:
 jobs:
   server-tests:
     runs-on: ubuntu-latest
+    services:
+      postgres:   # the migrations are also checked against the database Docker installs use
+        image: pgvector/pgvector:pg16
+        env: { POSTGRES_USER: zirahive, POSTGRES_PASSWORD: zirahive, POSTGRES_DB: zirahive }
+        ports: ["5432:5432"]
+        options: --health-cmd "pg_isready -U zirahive" --health-interval 5s --health-retries 20
+    env:
+      TEST_POSTGRES_URL: postgresql+asyncpg://zirahive:zirahive@localhost:5432/zirahive
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

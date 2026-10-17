@@ -10,7 +10,7 @@ from fastapi.responses import FileResponse, Response
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_session
+from ..db import get_session, one_row
 from ..models import Book, BookProgress, Library, User, utcnow
 from ..schemas import (AudioPartOut, AudioReadyOut, BookDetailOut, BookOut, BookProgressIn, BookProgressOut,
                        ChapterOut)
@@ -249,11 +249,7 @@ async def stream_part(book_id: str, index: int, request: Request, converted: boo
 async def save_progress(book_id: str, body: BookProgressIn, user: User = Depends(current_user),
                         session: AsyncSession = Depends(get_session)):
     b, _ = await _book(session, user, book_id)
-    p = await session.scalar(select(BookProgress).where(BookProgress.user_id == user.id,
-                                                        BookProgress.book_id == b.id))
-    if p is None:
-        p = BookProgress(user_id=user.id, book_id=b.id)
-        session.add(p)
+    p = await one_row(session, BookProgress, user_id=user.id, book_id=b.id)
     p.position, p.fraction = body.position, body.fraction
     if body.locator is not None:
         p.locator = body.locator

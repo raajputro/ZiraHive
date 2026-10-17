@@ -932,3 +932,14 @@ body.has-player .tray { bottom: 88px; }
 .plain-list { list-style: none; padding: 0; margin: 8px 0 12px; display: grid; gap: 4px; }
 .ok-text { color: var(--ok, #2e7d32); font-weight: 600; }
 .ai-subs { display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+
+/* Health */
+.health-list { list-style: none; padding: 0; margin: 10px 0; display: grid; gap: 8px; }
+.health-list li { display: grid; grid-template-columns: 20px 1fr; gap: 8px; align-items: start; }
+.health-list li > svg { margin-top: 3px; }
+.health-list p { margin: 2px 0 0; }
+.health-ok > svg { color: var(--ok, #2e7d32); }
+.health-warn > svg { color: var(--jute-deep, #9a7a3f); }
+.health-fail > svg { color: var(--danger, #b3261e); }
+.health-info > svg { color: var(--muted); }
+.health-list .muted { overflow-wrap: anywhere; }

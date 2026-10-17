@@ -21,6 +21,8 @@ COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY app ./app
+COPY migrations ./migrations
+COPY alembic.ini .
 
 RUN useradd --create-home --uid 1000 zirahive && mkdir -p /data && chown zirahive /data
 USER zirahive

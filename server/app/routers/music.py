@@ -8,7 +8,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from ..db import get_session
+from ..db import get_session, one_row
 from ..models import Library, MusicAlbum, Playlist, PlaylistTrack, Track, TrackStat, User, utcnow
 from ..schemas import (MusicAlbumDetailOut, MusicAlbumOut, ArtistDetailOut, ArtistOut, AudioReadyOut, FavoriteIn,
                        MusicHomeOut, PlaylistAddIn, PlaylistDetailOut, PlaylistIn, PlaylistOut,
@@ -242,11 +242,7 @@ async def stream_track(track_id: str, request: Request, converted: bool = False,
 
 
 async def _stat(session: AsyncSession, user: User, track_id: str) -> TrackStat:
-    s = await session.scalar(select(TrackStat).where(TrackStat.user_id == user.id, TrackStat.track_id == track_id))
-    if s is None:
-        s = TrackStat(user_id=user.id, track_id=track_id, plays=0, favorite=False)
-        session.add(s)
-    return s
+    return await one_row(session, TrackStat, user_id=user.id, track_id=track_id)
 
 
 @router.post("/tracks/{track_id}/played", status_code=204)

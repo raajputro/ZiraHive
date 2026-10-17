@@ -375,7 +375,8 @@ def test_old_setting_names_still_work(monkeypatch, tmp_path):
     try:
         assert get_settings().lan_url == "http://192.168.0.9:8080"
     finally:
-        monkeypatch.delenv("ZIRAHIVE_LAN_URL", raising=False)
+        import os
+        os.environ.pop("ZIRAHIVE_LAN_URL", None)  # copied there by the old-name support, not by monkeypatch
         get_settings.cache_clear()
 
 

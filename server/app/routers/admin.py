@@ -136,6 +136,14 @@ async def security_check(request: Request, _: User = Depends(admin_user),
     return checks
 
 
+@router.get("/admin/health")
+async def health_check(_: User = Depends(admin_user), session: AsyncSession = Depends(get_session)) -> list[dict]:
+    """Is everything ZiraHive needs here and working? Each item says what to do if not."""
+    from ..services.health import as_dicts, run_checks
+
+    return as_dicts(await run_checks(session))
+
+
 @router.get("/admin/audit", response_model=list[AuditOut])
 async def audit_log(limit: int = Query(100, ge=1, le=1000), before: datetime | None = None,
                     action: str | None = None, _: User = Depends(admin_user),

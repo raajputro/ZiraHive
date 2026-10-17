@@ -18,7 +18,7 @@ from .services.libraries import discover
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("zirahive")
 
-VERSION = "0.1.0"
+VERSION = "1.0.0"
 
 
 async def bootstrap_libraries() -> None:
