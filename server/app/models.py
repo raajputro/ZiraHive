@@ -3,7 +3,7 @@ from __future__ import annotations
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import (BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, String,
+from sqlalchemy import (BigInteger, Boolean, DateTime, Float, ForeignKey, Integer, LargeBinary, String,
                         Text, UniqueConstraint, Index, false, true)
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -566,3 +566,21 @@ class AssetText(Base):
     pages: Mapped[int | None] = mapped_column(Integer, nullable=True)
     sha256: Mapped[str] = mapped_column(String(64))  # of the file it was read from
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class Passkey(Base):
+    """A passkey (WebAuthn): sign in with the phone's or laptop's fingerprint, face or PIN.
+    It works only on the address it was made on (rp_id), as browsers require."""
+
+    __tablename__ = "passkeys"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    credential_id: Mapped[str] = mapped_column(String(512), unique=True, index=True)  # base64url
+    public_key: Mapped[bytes] = mapped_column(LargeBinary)
+    sign_count: Mapped[int] = mapped_column(BigInteger, default=0)
+    name: Mapped[str] = mapped_column(String(100))
+    rp_id: Mapped[str] = mapped_column(String(255))
+    transports: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    last_used_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

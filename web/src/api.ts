@@ -155,7 +155,7 @@ async function request<T>(method: string, path: string, body?: unknown, init: Re
       else if (data.detail && typeof data.detail === "object") { message = data.detail.message; code = data.detail.code; }
     } catch { /* not JSON */ }
     message = tx(message);  // server messages in the interface language
-    if (res.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/s/"))
+    if (res.status === 401 && !path.startsWith("/api/auth/login") && !path.startsWith("/api/auth/passkeys/login") && !path.startsWith("/api/s/"))
       window.dispatchEvent(new Event("gharbox:signed-out"));
     throw new ApiError(res.status, message, code);
   }
@@ -191,6 +191,10 @@ export interface FolderBrowse {
   folders: { path: string; label: string; name: string; guess: string | null }[];
 }
 export interface SearchHit { asset: Asset; snippet: string | null; in_text: boolean }
+
+export interface Passkey { id: string; name: string; rp_id: string; created_at: string; last_used_at: string | null }
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface PasskeyChallenge { options: any; state: string }
 
 export interface CastInfo {
   url: string; content_type: string; title: string; subtitle: string | null; poster: string | null;
@@ -267,6 +271,14 @@ export const api = {
   testNotification: () => request<void>("POST", "/api/auth/me/test-notification"),
   changePassword: (current_password: string, new_password: string) =>
     request<{ user: User }>("POST", "/api/auth/password", { current_password, new_password }),
+  passkeys: () => request<Passkey[]>("GET", "/api/auth/passkeys"),
+  passkeyRegisterOptions: () => request<PasskeyChallenge>("POST", "/api/auth/passkeys/register/options"),
+  passkeyRegister: (state: string, credential: unknown, name: string) =>
+    request<Passkey>("POST", "/api/auth/passkeys/register", { state, credential, name }),
+  removePasskey: (id: string) => request<void>("DELETE", `/api/auth/passkeys/${id}`),
+  passkeyLoginOptions: () => request<PasskeyChallenge>("POST", "/api/auth/passkeys/login/options"),
+  passkeyLogin: (state: string, credential: unknown) =>
+    request<{ user: User }>("POST", "/api/auth/passkeys/login", { state, credential }),
   twoFactorSetup: () => request<{ secret: string; uri: string; qr_svg: string }>("POST", "/api/auth/2fa/setup"),
   twoFactorEnable: (code: string) => request<{ recovery_codes: string[] }>("POST", "/api/auth/2fa/enable", { code }),
   twoFactorDisable: (password: string) => request<void>("POST", "/api/auth/2fa/disable", { password }),

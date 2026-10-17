@@ -33,6 +33,9 @@ class Viewer:
     position: float = 0.0
     joined: float = field(default_factory=now)
     reactions: list[float] = field(default_factory=list)
+    voice: bool = False      # in the voice chat
+    muted: bool = False
+    signals: list[float] = field(default_factory=list)  # recent voice set-up messages (rate limit)
 
 
 @dataclass
@@ -71,7 +74,21 @@ class Room:
                                             "host": v.user_id == self.host_id})
             p["devices"] += 1
             p["buffering"] = p["buffering"] or v.buffering
+            p["voice"] = p.get("voice", False) or v.voice
         return {"type": "people", "people": sorted(seen.values(), key=lambda p: (not p["host"], p["username"]))}
+
+    def voice_roster(self) -> dict:
+        """Who is in the voice chat, per device (each device is its own audio connection)."""
+        return {"type": "voice", "peers": [{"conn": v.conn_id, "username": v.username, "muted": v.muted}
+                                           for v in self.viewers.values() if v.voice]}
+
+    def allow_signal(self, viewer: Viewer) -> bool:
+        t = now()
+        viewer.signals = [x for x in viewer.signals if t - x < 10]
+        if len(viewer.signals) >= 200:  # set-up takes a few dozen messages; more is abuse
+            return False
+        viewer.signals.append(t)
+        return True
 
     def may_control(self, user_id: str) -> bool:
         return self.control == "everyone" or user_id == self.host_id

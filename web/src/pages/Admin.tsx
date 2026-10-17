@@ -9,6 +9,7 @@ import Dialog from "../components/Dialog";
 import { locale, t as tr, lang, setLang, type Lang, tx } from "../i18n";
 import BackupPanel from "../components/BackupPanel";
 import FolderPicker from "../components/FolderPicker";
+import PasskeysPanel from "../components/PasskeysPanel";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(locale()) : tr("never"));
 
 type Tab = "account" | "server" | "people" | "log";
@@ -32,7 +33,7 @@ export default function AdminPage() {
           <button key={t} className={tab === t ? "active" : ""} aria-current={tab === t ? "page" : undefined} onClick={() => go(t)}>{label}</button>
         ))}
       </nav>
-      {tab === "account" && <><AccountPanel /><TwoFactorPanel /><NotificationsPanel /><Password /></>}
+      {tab === "account" && <><AccountPanel /><PasskeysPanel /><TwoFactorPanel /><NotificationsPanel /><Password /></>}
       {tab === "server" && user.is_admin && <><SecurityPanel /><BackupPanel /><StatsPanel /><ActivityPanel /><Libraries /></>}
       {tab === "people" && user.is_admin && <Users />}
       {tab === "log" && user.is_admin && <AuditPanel />}
@@ -381,7 +382,8 @@ function AuditPanel() {
   }, []);
   useEffect(() => { void load(); }, [load]);
   const label: Record<string, string> = {
-    login: tr("Signed in"), login_failed: tr("Wrong password"), login_failed_2fa: tr("Wrong 2FA code"), setup: tr("Set up GharBox"),
+    login: tr("Signed in"), login_failed: tr("Wrong password"), login_failed_2fa: tr("Wrong 2FA code"), login_failed_passkey: tr("Passkey didn't match"),
+    passkey_added: tr("Added a passkey"), passkey_removed: tr("Removed a passkey"), setup: tr("Set up GharBox"),
     logout_all: tr("Signed out everywhere"), password_changed: tr("Changed password"), "2fa_enabled": tr("Turned on 2FA"),
     "2fa_disabled": tr("Turned off 2FA"), user_created: tr("Added a person"), user_updated: tr("Changed a person"),
     user_deleted: tr("Removed a person"), share_created: tr("Made a share link"), share_deleted: tr("Deleted a share link"),

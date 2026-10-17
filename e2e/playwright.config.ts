@@ -19,12 +19,14 @@ export default defineConfig({
     screenshot: "only-on-failure",
   },
   projects: [
-    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /(mobile|player|party)\.spec\.ts/ },
+    { name: "desktop", use: { ...devices["Desktop Chrome"] }, testIgnore: /(mobile|player|party[\w-]*)\.spec\.ts/ },
     // Two people in one watch party. Uses the WebM sample, which open-source Chromium can play.
     {
       name: "party",
-      testMatch: /party\.spec\.ts/,
-      use: { ...devices["Desktop Chrome"], launchOptions: { args: ["--autoplay-policy=no-user-gesture-required"] } },
+      testMatch: /party[\w-]*\.spec\.ts/,
+      // a pretend microphone and no permission prompt, for the voice chat test
+      use: { ...devices["Desktop Chrome"], launchOptions: { args: ["--autoplay-policy=no-user-gesture-required",
+        "--use-fake-ui-for-media-stream", "--use-fake-device-for-media-stream"] } },
     },
     // Video needs real Chrome: the open-source Chromium build can't decode H.264.
     // npx playwright install chrome

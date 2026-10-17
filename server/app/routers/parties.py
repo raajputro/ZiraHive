@@ -17,6 +17,18 @@ from ..services.events import audit, notify
 from ..services.party_rooms import MAX_CHAT, rooms
 from .media import gate_for
 
+MAX_SIGNAL = 64_000  # one SDP offer is a few KB
+
+
+def ice_servers() -> list[dict]:
+    """STUN/TURN servers for voice chat. At home and over Tailscale none are needed: devices reach
+    each other directly. GHARBOX_ICE_SERVERS adds some, e.g. stun:stun.l.google.com:19302."""
+    from ..config import get_settings
+
+    urls = [u.strip() for u in get_settings().ice_servers.split(",") if u.strip()]
+    return [{"urls": urls}] if urls else []
+
+
 router = APIRouter(prefix="/api/parties", tags=["parties"])
 
 
@@ -285,10 +297,12 @@ async def party_socket(ws: WebSocket, party_id: str):
         await ws.send_text(json.dumps(msg, ensure_ascii=False))
 
     viewer = rooms.join(room, user.id, user.username, send)
-    await send({"type": "hello", "you": user.username, "host": room.host_id == user.id,
+    await send({"type": "hello", "you": user.username, "host": room.host_id == user.id, "conn": viewer.conn_id,
+                "ice": ice_servers(),
                 "chat": [{"id": m.id, "username": m.username, "text": m.text,
                           "created_at": _aware(m.created_at).isoformat()} for m in reversed(history)]})
     await send(room.state())
+    await send(room.voice_roster())
     await room.broadcast(room.people())
     await room.broadcast({"type": "notice", "text": f"{user.username} joined"}, skip=viewer.conn_id)
     try:
@@ -307,6 +321,8 @@ async def party_socket(ws: WebSocket, party_id: str):
         if not closed:
             if viewer.buffering:
                 room.set_buffering(viewer, False)
+            if viewer.voice:
+                await room.broadcast(room.voice_roster())
             await room.broadcast(room.people())
             await room.broadcast({"type": "notice", "text": f"{user.username} left"})
             await room.broadcast(room.state())
@@ -379,6 +395,23 @@ async def _handle(room, viewer, user: User, msg: dict, send) -> None:
             await session.commit()
             await room.broadcast({"type": "chat", "id": m.id, "username": user.username, "text": text,
                                   "created_at": _aware(m.created_at).isoformat()})
+        return
+    if kind == "voice":  # join, leave or mute the voice chat
+        viewer.voice = bool(msg.get("join"))
+        viewer.muted = bool(msg.get("muted")) if viewer.voice else False
+        await room.broadcast(room.voice_roster())
+        await room.broadcast(room.people())
+        return
+    if kind == "signal":  # WebRTC set-up between two people in the voice chat, passed along as is
+        target = room.viewers.get(str(msg.get("to", "")))
+        data = msg.get("data")
+        if (target is None or not viewer.voice or not target.voice or not isinstance(data, dict)
+                or len(json.dumps(data)) > MAX_SIGNAL or not room.allow_signal(viewer)):
+            return
+        try:
+            await target.send({"type": "signal", "from": viewer.conn_id, "username": user.username, "data": data})
+        except Exception:  # that device just left
+            pass
         return
     if kind == "react":
         emoji = str(msg.get("emoji", ""))

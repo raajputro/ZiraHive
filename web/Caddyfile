@@ -14,7 +14,7 @@
 		X-Frame-Options DENY
 		Referrer-Policy no-referrer
 		Cross-Origin-Opener-Policy same-origin
-		Permissions-Policy "camera=(), microphone=(), geolocation=(), payment=(), usb=()"
+		Permissions-Policy "camera=(), microphone=(self), geolocation=(), payment=(), usb=()"
 		Content-Security-Policy "default-src 'self'; script-src 'self' https://www.gstatic.com; style-src 'self' 'unsafe-inline' blob:; img-src 'self' data: blob:; media-src 'self' blob:; worker-src 'self' blob:; font-src 'self' data: blob:; connect-src 'self'; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; form-action 'self'"
 		# Only takes effect over HTTPS (browsers ignore it on plain http)
 		Strict-Transport-Security "max-age=31536000"

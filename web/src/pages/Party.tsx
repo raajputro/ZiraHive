@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
 import { Link, useParams } from "react-router-dom";
-import { ArrowLeft, SkipForward, Send, Users, Wifi, WifiOff, Play } from "lucide-react";
+import { ArrowLeft, SkipForward, Send, Users, Wifi, WifiOff, Play, Mic, MicOff, PhoneOff } from "lucide-react";
+import { VoiceChat, voiceProblem, type PeerState, type VoicePeer } from "../voice";
 import { api, ApiError, episodeCode, type Media, type Party, type Quality, type Tracks } from "../api";
 import { useAuth } from "../App";
 import { usePrefs } from "../prefs";
@@ -16,7 +17,7 @@ interface RemoteState {
   media_id: string; playing: boolean; position: number; at: number; server_time: number;
   waiting_for: string[]; control: "host" | "everyone"; wait_for_all: boolean; by: string | null;
 }
-interface Person { user_id: string; username: string; devices: number; buffering: boolean; host: boolean }
+interface Person { user_id: string; username: string; devices: number; buffering: boolean; host: boolean; voice?: boolean }
 type Line = { id: string; kind: "chat"; username: string; text: string } | { id: string; kind: "notice"; text: string };
 interface Floating { id: number; emoji: string; username: string; left: number }
 
@@ -53,6 +54,18 @@ function PartyRoom({ id }: { id: string }) {
   const sentBuffering = useRef(false);
   const lastReport = useRef(0);
   const chatEnd = useRef<HTMLDivElement>(null);
+  // voice chat
+  const voice = useRef<VoiceChat | null>(null);
+  const myConn = useRef("");
+  const iceServers = useRef<RTCIceServer[]>([]);
+  const roster = useRef<VoicePeer[]>([]);
+  const [inVoice, setInVoice] = useState(false);
+  const [muted, setMuted] = useState(false);
+  const [voicePeers, setVoicePeers] = useState<PeerState[]>([]);
+  const [meSpeaking, setMeSpeaking] = useState(false);
+  const [voiceMsg, setVoiceMsg] = useState("");
+  const [voiceBusy, setVoiceBusy] = useState(false);
+  const duck = useRef<{ base: number; quietSince: number } | null>(null);
 
   const serverNow = () => Date.now() / 1000 + offset.current;
   const expected = (s: RemoteState) => (s.playing ? s.position + Math.max(0, serverNow() - s.at) : s.position);
@@ -99,6 +112,8 @@ function PartyRoom({ id }: { id: string }) {
         const msg = JSON.parse(e.data);
         switch (msg.type) {
           case "hello":
+            myConn.current = msg.conn;
+            iceServers.current = msg.ice ?? [];
             setLines(msg.chat.map((c: { id: string; username: string; text: string }) => ({ ...c, kind: "chat" })));
             break;
           case "pong": {
@@ -114,6 +129,8 @@ function PartyRoom({ id }: { id: string }) {
             setRemote(msg);
             break;
           case "people": setPeople(msg.people); break;
+          case "voice": roster.current = msg.peers; voice.current?.setRoster(msg.peers); break;
+          case "signal": void voice.current?.signal(msg.from, msg.data); break;
           case "chat": setLines((l) => [...l.slice(-300), { ...msg, kind: "chat" }]); break;
           case "notice": setLines((l) => [...l.slice(-300), { id: `n${Date.now()}${Math.random()}`, kind: "notice", text: msg.text }]); break;
           case "react": {
@@ -127,6 +144,12 @@ function PartyRoom({ id }: { id: string }) {
       };
       sock.onclose = (e) => {
         window.clearInterval(pinger);
+        if (voice.current) {  // the voice links were set up through this connection
+          voice.current.leave();
+          voice.current = null;
+          setInVoice(false);
+          setVoiceMsg(tr("Voice chat stopped when the connection dropped. Join again when it's back."));
+        }
         if (closed) return;
         if (e.code >= 4400) { setConn("refused"); return; }
         setConn("reconnecting");
@@ -135,7 +158,7 @@ function PartyRoom({ id }: { id: string }) {
       };
     };
     connect();
-    return () => { closed = true; window.clearInterval(pinger); ws.current?.close(); };
+    return () => { closed = true; window.clearInterval(pinger); voice.current?.leave(); voice.current = null; ws.current?.close(); };
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
@@ -192,6 +215,54 @@ function PartyRoom({ id }: { id: string }) {
   };
   const onEnded = () => { if (party?.is_host && media?.next_id) send({ type: "media", media_id: media.next_id }); };
   const tapToJoin = () => { setNeedsTap(false); apply(); };
+  const joinVoice = async () => {
+    setVoiceMsg("");
+    const problem = voiceProblem();
+    if (problem) {
+      setVoiceMsg(problem === "insecure"
+        ? tr("Voice chat needs a secure page: open GharBox at your https:// address, or http://localhost on the server PC.")
+        : tr("This browser can't do voice chat. Try a recent Chrome, Edge, Firefox or Safari."));
+      return;
+    }
+    setVoiceBusy(true);
+    const v = new VoiceChat(send, myConn.current, iceServers.current);
+    v.onChange = (peers, me) => {
+      setVoicePeers((old) => (JSON.stringify(old) === JSON.stringify(peers) ? old : peers));
+      setMeSpeaking(me);
+      // lower the film while someone is talking, back up after a second of quiet
+      const vid = video.current;
+      if (!vid) return;
+      const talking = peers.some((p) => p.speaking);
+      if (talking && !duck.current) { duck.current = { base: vid.volume, quietSince: 0 }; vid.volume = vid.volume * 0.35; }
+      else if (talking && duck.current) duck.current.quietSince = 0;
+      else if (!talking && duck.current) {
+        if (!duck.current.quietSince) duck.current.quietSince = Date.now();
+        else if (Date.now() - duck.current.quietSince > 1000) { vid.volume = duck.current.base; duck.current = null; }
+      }
+    };
+    try {
+      await v.join();
+      voice.current = v;
+      v.setRoster(roster.current);
+      setInVoice(true);
+      setMuted(false);
+    } catch (e) {
+      setVoiceMsg(e instanceof DOMException && e.name === "NotAllowedError"
+        ? tr("The microphone is blocked. Allow it for this site in the browser, then try again.")
+        : tr("No microphone was found."));
+    } finally { setVoiceBusy(false); }
+  };
+  const leaveVoice = () => {
+    voice.current?.leave();
+    voice.current = null;
+    setInVoice(false);
+    setVoicePeers([]);
+    if (duck.current && video.current) { video.current.volume = duck.current.base; duck.current = null; }
+  };
+  const toggleMute = () => { const m = !muted; voice.current?.setMuted(m); setMuted(m); };
+  const talking = new Set(voicePeers.filter((p) => p.speaking).map((p) => p.username));
+  if (meSpeaking) talking.add(user.username);
+
   const sendChat = (e: FormEvent) => { e.preventDefault(); if (draft.trim()) { send({ type: "chat", text: draft }); setDraft(""); } };
 
   const answer = async (rsvp: "going" | "declined") => setParty(await api.rsvp(id, rsvp));
@@ -274,6 +345,8 @@ function PartyRoom({ id }: { id: string }) {
                 <li key={p.user_id}>
                   <span className={`dot ${p.buffering ? "loading" : "on"}`} aria-hidden />
                   {p.username}{p.host && <span className="tag">{tr("host")}</span>}
+                  {p.voice && <Mic size={14} className={`voice-mic ${talking.has(p.username) ? "talking" : ""}`}
+                    aria-label={talking.has(p.username) ? tr("talking") : tr("in voice chat")} />}
                   {p.buffering && <span className="muted small">{" "}{tr("loading")}</span>}
                   {p.devices > 1 && <span className="muted small"> {p.devices}{" "}{tr("devices")}</span>}
                 </li>
@@ -285,6 +358,24 @@ function PartyRoom({ id }: { id: string }) {
                 </li>
               ))}
             </ul>
+          </section>
+
+          <section className="voice-panel" aria-label={tr("Voice chat")}>
+            {inVoice ? (
+              <>
+                <p className="small">{voicePeers.length === 0 ? tr("You're in the voice chat. Waiting for others to join.")
+                  : voicePeers.every((p) => p.connected) ? tr("Talking with {names}", { names: voicePeers.map((p) => p.username).join(", ") })
+                  : tr("Connecting voice…")}</p>
+                <div className="admin-row">
+                  <button className={muted ? "" : "primary"} onClick={toggleMute} aria-pressed={muted}>
+                    {muted ? <><MicOff size={16} />{" "}{tr("Unmute")}</> : <><Mic size={16} />{" "}{tr("Mute")}</>}</button>
+                  <button onClick={leaveVoice}><PhoneOff size={16} />{" "}{tr("Leave voice")}</button>
+                </div>
+              </>
+            ) : (
+              <button onClick={() => void joinVoice()} disabled={voiceBusy || conn !== "live"}><Mic size={16} />{" "}{tr("Join voice chat")}</button>
+            )}
+            {voiceMsg && <p className="muted small" role="status">{voiceMsg}</p>}
           </section>
 
           <section className="chat">

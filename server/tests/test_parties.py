@@ -236,3 +236,43 @@ def test_reminders(tc, family):
     titles = [n["title"] for n in tc.get("/api/notifications", headers=family["rina"]).json()["items"]]
     assert any(t.startswith("Monpura starts in") and t.endswith("minutes") for t in titles)
     assert asyncio  # keep import used
+
+
+def test_voice_chat_signalling(tc, family):
+    p = make_party(tc, family)
+    url = f"/api/parties/{p['id']}/ws"
+    with tc.websocket_connect(url, headers=family["host"]) as host, \
+            tc.websocket_connect(url, headers=family["rina"]) as rina:
+        h = recv(host, "hello")
+        r = recv(rina, "hello")
+        assert h["conn"] != r["conn"] and h["ice"] == []
+        # not in the voice chat yet: set-up messages aren't passed on
+        host.send_json({"type": "signal", "to": r["conn"], "data": {"sdp": "x"}})
+        host.send_json({"type": "voice", "join": True, "muted": False})
+        roster = recv(rina, "voice")
+        while not roster["peers"]:
+            roster = recv(rina, "voice")
+        assert roster["peers"] == [{"conn": h["conn"], "username": "mahbub", "muted": False}]
+        rina.send_json({"type": "voice", "join": True, "muted": True})
+        roster = recv(host, "voice")
+        while len(roster["peers"]) < 2:
+            roster = recv(host, "voice")
+        assert {p["username"]: p["muted"] for p in roster["peers"]} == {"mahbub": False, "rina": True}
+        people = recv(host, "people")
+        assert all(p["voice"] for p in people["people"])
+
+        offer = {"description": {"type": "offer", "sdp": "v=0..."}}
+        rina.send_json({"type": "signal", "to": h["conn"], "data": offer})
+        got = recv(host, "signal")
+        assert got == {"type": "signal", "from": r["conn"], "username": "rina", "data": offer}
+        # too big, or to someone who isn't there: dropped
+        rina.send_json({"type": "signal", "to": h["conn"], "data": {"sdp": "x" * 70_000}})
+        rina.send_json({"type": "signal", "to": "nobody", "data": offer})
+        rina.send_json({"type": "chat", "text": "after"})
+        between = []
+        while (m := host.receive_json())["type"] != "chat":
+            between.append(m["type"])
+        assert "signal" not in between and m["text"] == "after"
+    # leaving drops them from the roster
+    with tc.websocket_connect(url, headers=family["host"]) as host:
+        assert recv(host, "voice")["peers"] == []

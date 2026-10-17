@@ -865,3 +865,17 @@ body.has-player .tray { bottom: 88px; }
 .cast-panel p { margin: 0; display: flex; align-items: center; gap: 8px; }
 .cast-panel input[type=range] { width: min(520px, 90%); }
 .cast-panel .muted { color: #ddd; }
+
+/* Passkeys */
+.passkey-list { list-style: none; padding: 0; margin: 0 0 12px; display: grid; gap: 8px; }
+.passkey-list li { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px;
+  border: 1px solid var(--line, rgba(127,127,127,.25)); border-radius: var(--radius-m, 10px); }
+.passkey-list li > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.passkey-list .small { overflow-wrap: anywhere; }
+.signin .or { text-align: center; margin: 4px 0; font-size: .85rem; }
+
+/* Voice chat in watch parties */
+.voice-panel { display: grid; gap: 8px; padding-bottom: 12px; border-bottom: 1px solid var(--line); margin-bottom: 12px; }
+.voice-panel p { margin: 0; }
+.voice-mic { margin-left: 6px; vertical-align: -2px; color: var(--muted); transition: color .15s; }
+.voice-mic.talking { color: var(--jute); filter: drop-shadow(0 0 4px var(--jute)); }

@@ -1,7 +1,8 @@
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Images, Folder, Clapperboard, Headphones, BookOpen, Trash2, Settings, LogOut } from "lucide-react";
+import { Images, Folder, Clapperboard, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint } from "lucide-react";
 import { api, ApiError, type User } from "./api";
+import { cancelled, getPasskey, passkeyProblem } from "./passkeys";
 import { UploadProvider } from "./uploads";
 import { PrefsProvider } from "./prefs";
 import { AudioProvider } from "./audio";
@@ -164,6 +165,18 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
     } finally { setBusy(false); }
   };
 
+  const withPasskey = async () => {
+    setError("");
+    setBusy(true);
+    try {
+      const { options, state } = await api.passkeyLoginOptions();
+      const res = await api.passkeyLogin(state, await getPasskey(options));
+      onSignedIn(res.user);
+    } catch (err) {
+      if (!cancelled(err)) setError(err instanceof ApiError ? err.message : tr("The passkey couldn't be used."));
+    } finally { setBusy(false); }
+  };
+
   return (
     <div className="signin">
       <form onSubmit={submit}>
@@ -180,6 +193,13 @@ function SignIn({ firstRun, onSignedIn }: { firstRun: boolean; onSignedIn: (u: U
         )}
         {error && <p className="error" role="alert">{error}</p>}
         <button className="primary" disabled={busy}>{firstRun ? tr("Create admin account") : needCode ? tr("Verify and sign in") : tr("Sign in")}</button>
+        {!firstRun && !passkeyProblem() && (
+          <>
+            <p className="or muted">{tr("or")}</p>
+            <button type="button" onClick={() => void withPasskey()} disabled={busy}>
+              <Fingerprint size={17} aria-hidden />{" "}{tr("Sign in with a passkey")}</button>
+          </>
+        )}
         <button type="button" className="lang-switch" onClick={() => setLang(lang() === "bn" ? "en" : "bn")}
           lang={lang() === "bn" ? "en" : "bn"}>{lang() === "bn" ? "English" : "বাংলা"}</button>
       </form>
