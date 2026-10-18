@@ -1,7 +1,7 @@
 // Photos → Vault: private photos and videos, encrypted on this device. It is the same vault
 // as the Vault page (one passphrase, one recovery key); this view shows its photos and videos.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, CheckSquare, Download, ImageUp, Lock, ShieldCheck, Trash2, Upload, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckSquare, Download, Folder, FolderInput, FolderPlus, ImageUp, Lock, Pencil, ShieldCheck, Trash2, Upload, X } from "lucide-react";
 import { api, formatBytes } from "../api";
 import { locale, t as tr } from "../i18n";
 import { DropZone } from "./Files";
@@ -9,7 +9,10 @@ import { PhotoTabs, Tile } from "./Photos";
 import { VaultGate, type VaultCtx } from "./Vault";
 import { decryptItem, encryptAndUpload, isPhotoMeta, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
 import { moveToPhotos } from "../vault/photos";
+import AutoLock from "../components/AutoLock";
 import { lock } from "../vault/session";
+import { allFolders, createFolder, deleteFolder, filesWithin, folderOf, join, moveTo, nameOf, parentOf, renameFolder, ROOT } from "../vault/folders";
+import { FolderNameDialog, MoveToFolderDialog } from "../components/VaultFolders";
 
 const monthFmt = new Intl.DateTimeFormat(locale(), { month: "long", year: "numeric" });
 const when = (o: Opened) => o.meta.taken ?? o.meta.modified ?? new Date(o.item.created_at).getTime();
@@ -40,25 +43,34 @@ function Contents({ master, reload }: VaultCtx) {
   const [busy, setBusy] = useState<{ label: string; fraction: number } | null>(null);
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
+  const [everything, setEverything] = useState<Opened[]>([]);  // folders and non-photo files too
+  const [folder, setFolder] = useState<string | null>(null);  // null = all photos
+  const [naming, setNaming] = useState<"new" | "rename" | null>(null);
+  const [moving, setMoving] = useState<Opened[] | null>(null);
 
   const load = useCallback(async () => {
-    const all = (await openAll(master)).filter((o) => isPhotoMeta(o.meta)).sort((x, y) => when(y) - when(x));
+    const opened = await openAll(master);
+    const all = opened.filter((o) => isPhotoMeta(o.meta)).sort((x, y) => when(y) - when(x));
     if (!alive.current) return;
+    setEverything(opened);
     setItems(all);
     made.current.push(...await loadThumbs(all, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
   }, [master]);
+  const folders = useMemo(() => allFolders(everything), [everything]);
+  useEffect(() => { if (folder && folder !== ROOT && everything.length && !folders.includes(folder)) setFolder(null); }, [folders, folder, everything.length]);
+  const shownItems = useMemo(() => (items ?? []).filter((o) => folder === null || folderOf(o) === folder), [items, folder]);
   useEffect(() => { alive.current = true; void load(); return () => { alive.current = false; }; }, [load]);
   useEffect(() => () => { made.current.forEach(URL.revokeObjectURL); }, []);
 
   const months = useMemo(() => {
     const out: { month: string; list: { o: Opened; i: number }[] }[] = [];
-    (items ?? []).forEach((o, i) => {
+    shownItems.forEach((o, i) => {
       const month = monthFmt.format(new Date(when(o)));
       const last = out[out.length - 1];
       if (last?.month === month) last.list.push({ o, i }); else out.push({ month, list: [{ o, i }] });
     });
     return out;
-  }, [items]);
+  }, [shownItems]);
 
   const add = async (files: File[]) => {
     const list = files.filter((f) => /^(image|video)\//.test(f.type) || /\.(heic|heif|dng)$/i.test(f.name));
@@ -67,7 +79,7 @@ function Contents({ master, reload }: VaultCtx) {
     setJobs((js) => [...js, ...list.map((f) => ({ name: f.name, done: 0, total: f.size }))]);
     for (let i = 0; i < list.length; i++) {
       const set = (c: Partial<Job>) => setJobs((js) => js.map((j, k) => (k === start + i ? { ...j, ...c } : j)));
-      try { await encryptAndUpload(master, list[i], { taken: list[i].lastModified }, (done) => set({ done })); }
+      try { await encryptAndUpload(master, list[i], { taken: list[i].lastModified, folder: folder ?? ROOT }, (done) => set({ done })); }
       catch (e) { set({ error: e instanceof Error ? e.message : tr("Upload failed") }); }
     }
     await load();
@@ -104,21 +116,36 @@ function Contents({ master, reload }: VaultCtx) {
     return each(list, tr("Deleting…"), async (o) => { await api.deleteVaultItem(o.item.id); });
   };
   const chosen = () => (items ?? []).filter((o) => selected.has(o.item.id));
+  const removeFolder = async () => {
+    if (!folder || folder === ROOT) return;
+    const n = filesWithin(everything, folder).length;
+    const ask = n === 0 ? tr("Delete the empty folder \"{name}\"?", { name: nameOf(folder) })
+      : n === 1 ? tr("Delete \"{name}\" and the 1 file in it forever?", { name: nameOf(folder) })
+      : tr("Delete \"{name}\" and the {n} files in it forever?", { name: nameOf(folder), n });
+    if (!confirm(ask)) return;
+    setError("");
+    try { await deleteFolder(everything, folder); setFolder(null); }
+    catch (e) { setError(e instanceof Error ? e.message : tr("Something went wrong")); }
+    await load();
+    reload();
+  };
   const stopSelecting = () => { setSelecting(false); setSelected(new Set()); };
   const toggle = (id: string) => setSelected((s) => { const n = new Set(s); if (n.has(id)) n.delete(id); else n.add(id); return n; });
 
   const jobsBusy = jobs.some((j) => !j.error && j.done < j.total);
-  const viewingItems = items ?? [];
+  const viewingItems = shownItems;
+  const countIn = (p: string) => (items ?? []).filter((o) => folderOf(o) === p).length;
   return (
     <DropZone onFiles={(f) => void add(f)}>
       <div className="vault-bar">
         <span className="muted">
           <ShieldCheck size={15} aria-hidden /> {items ? (items.length === 1 ? tr("1 private item") : tr("{n} private items", { n: items.length })) : "…"}
-          {" · "}{tr("Locks itself after 10 minutes without use")}
         </span>
+        <AutoLock />
         {selecting ? (
           <>
             <span className="muted">{selected.size}{" "}{tr("selected")}</span>
+            <button disabled={!selected.size || !!busy} onClick={() => setMoving(chosen())}><FolderInput size={16} /> {tr("Move to folder")}</button>
             <button disabled={!selected.size || !!busy} onClick={() => void putBack(chosen()).then((g) => g.size && stopSelecting())}>
               <ImageUp size={16} /> {tr("Move back to Photos")}</button>
             <button className="danger" disabled={!selected.size || !!busy} onClick={() => void destroy(chosen()).then((g) => g.size && stopSelecting())}>
@@ -131,10 +158,29 @@ function Contents({ master, reload }: VaultCtx) {
             <input ref={input} type="file" multiple accept="image/*,video/*,.heic,.heif" hidden
               onChange={(e) => { void add(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
             <button className="primary" onClick={() => input.current?.click()}><Upload size={16} /> {tr("Add photos")}</button>
+            <button onClick={() => setNaming("new")}><FolderPlus size={16} /> {tr("New folder")}</button>
             <button onClick={lock}><Lock size={16} /> {tr("Lock")}</button>
           </>
         )}
       </div>
+      {items !== null && (folders.length > 0 || folder !== null) && (
+        <div className="vault-chips" role="tablist" aria-label={tr("Folders")}>
+          <button role="tab" aria-selected={folder === null} className={folder === null ? "on" : ""} onClick={() => setFolder(null)}>
+            {tr("All")} <small>{items.length}</small></button>
+          <button role="tab" aria-selected={folder === ROOT} className={folder === ROOT ? "on" : ""} onClick={() => setFolder(ROOT)}>
+            <ShieldCheck size={14} aria-hidden /> {tr("Not in a folder")} <small>{countIn(ROOT)}</small></button>
+          {folders.map((p) => (
+            <button key={p} role="tab" aria-selected={folder === p} className={folder === p ? "on" : ""} onClick={() => setFolder(p)} title={p.slice(1)}>
+              <Folder size={14} aria-hidden /> {p.split("/").length > 2 ? p.slice(1).split("/").join(" › ") : nameOf(p)} <small>{countIn(p)}</small></button>
+          ))}
+          {folder && folder !== ROOT && (
+            <span className="vault-folder-actions">
+              <button className="icon" onClick={() => setNaming("rename")} aria-label={tr("Rename folder")} title={tr("Rename folder")}><Pencil size={15} /></button>
+              <button className="icon" onClick={() => void removeFolder()} aria-label={tr("Delete folder")} title={tr("Delete folder")}><Trash2 size={15} /></button>
+            </span>
+          )}
+        </div>
+      )}
       {busy && (
         <div className="vault-busy" role="status"><span>{busy.label}</span><progress max={1} value={busy.fraction} /></div>
       )}
@@ -151,6 +197,9 @@ function Contents({ master, reload }: VaultCtx) {
         </ul>
       )}
       {items === null && <p className="muted">{tr("Unlocking…")}</p>}
+      {items !== null && items.length > 0 && shownItems.length === 0 && (
+        <p className="muted">{tr("No photos in this folder yet. Add photos here, or select photos and use Move to folder.")}</p>
+      )}
       {items?.length === 0 && (
         <div className="empty">
           <h2>{tr("No private photos yet")}</h2>
@@ -174,15 +223,32 @@ function Contents({ master, reload }: VaultCtx) {
       {viewing !== null && viewingItems[viewing] && (
         <VaultLightbox items={viewingItems} index={viewing} thumbs={thumbs} onIndex={setViewing} onClose={() => setViewing(null)} busy={!!busy}
           onPutBack={(o) => void putBack([o]).then((g) => g.size && setViewing(null))}
-          onDelete={(o) => void destroy([o]).then((g) => g.size && setViewing(null))} />
+          onDelete={(o) => void destroy([o]).then((g) => g.size && setViewing(null))}
+          onMove={(o) => setMoving([o])} />
+      )}
+      {naming && (
+        <FolderNameDialog items={everything} parent={naming === "new" ? (folder && folder !== ROOT ? folder : ROOT) : parentOf(folder!)}
+          current={naming === "rename" ? folder! : undefined} onClose={() => setNaming(null)}
+          onSave={async (name) => {
+            if (naming === "new") { const parent = folder && folder !== ROOT ? folder : ROOT; await createFolder(master, parent, name); await load(); setFolder(join(parent, name)); }
+            else { await renameFolder(master, everything, folder!, name); await load(); setFolder(join(parentOf(folder!), name)); }
+          }} />
+      )}
+      {moving && (
+        <MoveToFolderDialog master={master} items={everything} count={moving.length}
+          from={new Set(moving.map(folderOf)).size === 1 ? folderOf(moving[0]) : undefined} onClose={() => setMoving(null)}
+          onMove={async (to) => {
+            for (const o of moving) await moveTo(o, to);
+            setViewing(null); stopSelecting(); await load();
+          }} />
       )}
     </DropZone>
   );
 }
 
-function VaultLightbox({ items, index, thumbs, onIndex, onClose, onPutBack, onDelete, busy }: {
+function VaultLightbox({ items, index, thumbs, onIndex, onClose, onPutBack, onDelete, onMove, busy }: {
   items: Opened[]; index: number; thumbs: Record<string, string>; onIndex: (i: number) => void; onClose: () => void;
-  onPutBack: (o: Opened) => void; onDelete: (o: Opened) => void; busy: boolean;
+  onPutBack: (o: Opened) => void; onDelete: (o: Opened) => void; onMove: (o: Opened) => void; busy: boolean;
 }) {
   const o = items[index];
   const [src, setSrc] = useState<string | null>(null);
@@ -215,6 +281,7 @@ function VaultLightbox({ items, index, thumbs, onIndex, onClose, onPutBack, onDe
       <div className="lightbox-bar">
         <span><Lock size={13} aria-hidden /> {o.meta.name} · {formatBytes(o.meta.size)}</span>
         {src && <a className="icon" href={src} download={o.meta.name} aria-label={tr("Save")} title={tr("Save")}><Download size={18} /></a>}
+        <button className="icon" disabled={busy} onClick={() => onMove(o)} aria-label={tr("Move to folder")} title={tr("Move to folder")}><FolderInput size={18} /></button>
         <button className="icon" disabled={busy} onClick={() => onPutBack(o)} aria-label={tr("Move back to Photos")} title={tr("Move back to Photos")}><ImageUp size={18} /></button>
         <button className="icon" disabled={busy} onClick={() => onDelete(o)} aria-label={tr("Delete forever")} title={tr("Delete forever")}><Trash2 size={18} /></button>
         <button className="icon" onClick={onClose} aria-label={tr("Close")}><X size={20} /></button>

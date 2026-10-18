@@ -1,11 +1,14 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Download, FileText, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music } from "lucide-react";
+import { Download, FileText, Folder, FolderInput, FolderPlus, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music } from "lucide-react";
 import { api, ApiError, formatBytes, type VaultInfo } from "../api";
 import { t as tr, locale } from "../i18n";
 import Dialog from "../components/Dialog";
 import { createVault, rewrap, secureContextOk, sealMeta, unlockWithPassphrase, unlockWithRecovery } from "../vault/crypto";
 import { decryptItem, encryptAndUpload, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
+import { allFolders, createFolder, deleteFolder, filesIn, filesWithin, folderOf, isFolder, join, moveTo, nameOf, parentOf, renameFolder, ROOT, subfolders } from "../vault/folders";
+import { FolderNameDialog, MoveToFolderDialog } from "../components/VaultFolders";
+import AutoLock from "../components/AutoLock";
 import { lock, masterBytes, unlock, useVaultKey } from "../vault/session";
 
 const MIN_PASSPHRASE = 10;
@@ -150,7 +153,7 @@ export function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void
   return (
     <section className="panel vault-setup">
       <h2><Lock size={20} aria-hidden /> {tr("Your vault is locked")}</h2>
-      <p className="muted">{tr("{n} files, {size}", { n: info.item_count, size: formatBytes(info.bytes) })}</p>
+      <p className="muted">{tr("{n} encrypted items, {size}", { n: info.item_count, size: formatBytes(info.bytes) })}</p>
       <form className="stack-form" onSubmit={submit}>
         {mode === "pass" && <label>{tr("Vault passphrase")}<input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" required autoFocus /></label>}
         {mode === "recovery" && <label>{tr("Recovery key")}<input value={value} onChange={(e) => setValue(e.target.value)} placeholder="ABCD-EFGH-…" required autoFocus spellCheck={false} /></label>}
@@ -208,13 +211,17 @@ export function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8A
 
 interface Job { name: string; done: number; total: number; error?: string }
 
-function Contents({ info, master, reload }: VaultCtx) {
+function Contents({ master, reload }: VaultCtx) {
   const [items, setItems] = useState<Opened[] | null>(null);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const made = useRef<string[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [viewing, setViewing] = useState<Opened | null>(null);
   const [changing, setChanging] = useState(false);
+  const [here, setHere] = useState(ROOT);
+  const [naming, setNaming] = useState<"new" | "rename" | null>(null);
+  const [moving, setMoving] = useState<Opened | null>(null);
+  const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
 
   const alive = useRef(true);
@@ -227,19 +234,24 @@ function Contents({ info, master, reload }: VaultCtx) {
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => () => { made.current.forEach(URL.revokeObjectURL); }, []);
+  // a folder that no longer exists (deleted, renamed elsewhere): go up until one does
+  useEffect(() => {
+    if (!items || here === ROOT) return;
+    if (!allFolders(items).includes(here)) setHere(ROOT);
+  }, [items, here]);
 
-  const uploadOne = async (file: File, index: number) => {
+  const uploadOne = async (file: File, index: number, folder: string) => {
     const set = (c: Partial<Job>) => setJobs((js) => js.map((j, i) => (i === index ? { ...j, ...c } : j)));
-    try { await encryptAndUpload(master, file, {}, (done) => set({ done })); }
+    try { await encryptAndUpload(master, file, { folder }, (done) => set({ done })); }
     catch (e) { set({ error: e instanceof Error ? e.message : tr("Upload failed") }); }
   };
 
   const add = async (files: FileList | null) => {
     if (!files?.length) return;
     const list = Array.from(files);
-    const start = jobs.length;
+    const start = jobs.length, folder = here;
     setJobs((js) => [...js, ...list.map((f) => ({ name: f.name, done: 0, total: f.size }))]);
-    for (let i = 0; i < list.length; i++) await uploadOne(list[i], start + i);
+    for (let i = 0; i < list.length; i++) await uploadOne(list[i], start + i, folder);
     await load();
     reload();
   };
@@ -261,20 +273,54 @@ function Contents({ info, master, reload }: VaultCtx) {
     await load();
   };
 
+  const removeFolder = async () => {
+    if (!items) return;
+    const n = filesWithin(items, here).length;
+    const ask = n === 0 ? tr("Delete the empty folder \"{name}\"?", { name: nameOf(here) })
+      : n === 1 ? tr("Delete \"{name}\" and the 1 file in it forever?", { name: nameOf(here) })
+      : tr("Delete \"{name}\" and the {n} files in it forever?", { name: nameOf(here), n });
+    if (!confirm(ask)) return;
+    setError("");
+    try { await deleteFolder(items, here); setHere(parentOf(here)); }
+    catch (e) { setError(e instanceof Error ? e.message : tr("Something went wrong")); }
+    await load();
+    reload();
+  };
+
   if (changing) {
     return <ChangePassphrase raw={masterBytes()!} title={tr("Change vault passphrase")} onDone={() => { setChanging(false); reload(); }} onCancel={() => setChanging(false)} />;
   }
 
   const busy = jobs.some((j) => !j.error && j.done < j.total);
+  const files = items ? items.filter((o) => !isFolder(o)) : [];
+  const total = files.reduce((n, o) => n + o.meta.size, 0);
+  const folders = items ? subfolders(items, here) : [];
+  const shown = items ? filesIn(items, here) : [];
+  const crumbs = here === ROOT ? [] : here.split("/").slice(1).map((_, i, parts) => "/" + parts.slice(0, i + 1).join("/"));
   return (
     <>
       <div className="vault-bar">
-        <span className="muted">{tr("{n} files, {size}", { n: info.item_count, size: formatBytes(info.bytes) })} · {tr("Locks itself after 10 minutes without use")}</span>
+        <span className="muted">{tr("{n} files, {size}", { n: files.length, size: formatBytes(total) })}</span>
+        <AutoLock />
         <input ref={input} type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
         <button className="primary" onClick={() => input.current?.click()}><Upload size={16} /> {tr("Add files")}</button>
+        <button onClick={() => setNaming("new")}><FolderPlus size={16} /> {tr("New folder")}</button>
         <button onClick={() => setChanging(true)}><KeyRound size={16} /> {tr("Change passphrase")}</button>
         <button onClick={lock}><Lock size={16} /> {tr("Lock")}</button>
       </div>
+      <nav className="crumbs vault-crumbs" aria-label={tr("Folder")}>
+        <button className={here === ROOT ? "here" : ""} onClick={() => setHere(ROOT)}><ShieldCheck size={16} aria-hidden /> {tr("Vault")}</button>
+        {crumbs.map((p) => (
+          <span key={p}><span className="sep" aria-hidden>›</span><button className={p === here ? "here" : ""} onClick={() => setHere(p)}>{nameOf(p)}</button></span>
+        ))}
+        {here !== ROOT && (
+          <span className="vault-folder-actions">
+            <button className="icon" onClick={() => setNaming("rename")} aria-label={tr("Rename folder")} title={tr("Rename folder")}><Pencil size={15} /></button>
+            <button className="icon" onClick={() => void removeFolder()} aria-label={tr("Delete folder")} title={tr("Delete folder")}><Trash2 size={15} /></button>
+          </span>
+        )}
+      </nav>
+      {error && <p className="error" role="alert">{error}</p>}
       {jobs.length > 0 && (
         <ul className="vault-jobs" aria-live="polite">
           {jobs.map((j, i) => (
@@ -292,8 +338,20 @@ function Contents({ info, master, reload }: VaultCtx) {
           <p>{tr("Add private photos, ID scans, bank papers or anything else only you should see.")}</p>
         </div>
       )}
+      {items && items.length > 0 && here !== ROOT && folders.length === 0 && shown.length === 0 && (
+        <p className="muted">{tr("This folder is empty. Add files, or move files here from another folder.")}</p>
+      )}
       <div className="vault-grid">
-        {items?.map((o) => {
+        {folders.map((p) => {
+          const n = filesWithin(items!, p).length;
+          return (
+            <button key={p} className="vault-tile vault-folder" onClick={() => setHere(p)} aria-label={tr("Open folder {name}", { name: nameOf(p) })}>
+              <span className="vault-icon"><Folder size={34} /></span>
+              <span className="vault-name">{nameOf(p)} <small className="muted">· {n}</small></span>
+            </button>
+          );
+        })}
+        {shown.map((o) => {
           const k = kindOf(o.meta.type);
           return (
             <button key={o.item.id} className="vault-tile" onClick={() => setViewing(o)} aria-label={tr("Open {name}", { name: o.meta.name })}>
@@ -304,12 +362,25 @@ function Contents({ info, master, reload }: VaultCtx) {
           );
         })}
       </div>
-      {viewing && <Viewer o={viewing} onClose={() => setViewing(null)} onDelete={() => void remove(viewing)} onRename={() => void rename(viewing)} />}
+      {viewing && <Viewer o={viewing} onClose={() => setViewing(null)} onDelete={() => void remove(viewing)} onRename={() => void rename(viewing)}
+        onMove={() => setMoving(viewing)} />}
+      {naming && items && (
+        <FolderNameDialog items={items} parent={naming === "new" ? here : parentOf(here)} current={naming === "rename" ? here : undefined}
+          onClose={() => setNaming(null)}
+          onSave={async (name) => {
+            if (naming === "new") { await createFolder(master, here, name); await load(); }
+            else { await renameFolder(master, items, here, name); await load(); setHere(join(parentOf(here), name)); }
+          }} />
+      )}
+      {moving && items && (
+        <MoveToFolderDialog master={master} items={items} count={1} from={folderOf(moving)} onClose={() => setMoving(null)}
+          onMove={async (folder) => { await moveTo(moving, folder); setViewing(null); await load(); }} />
+      )}
     </>
   );
 }
 
-function Viewer({ o, onClose, onDelete, onRename }: { o: Opened; onClose: () => void; onDelete: () => void; onRename: () => void }) {
+function Viewer({ o, onClose, onDelete, onRename, onMove }: { o: Opened; onClose: () => void; onDelete: () => void; onRename: () => void; onMove: () => void }) {
   const [url, setUrl] = useState<string | null>(null);
   const [done, setDone] = useState(0);
   const [error, setError] = useState("");
@@ -337,6 +408,7 @@ function Viewer({ o, onClose, onDelete, onRename }: { o: Opened; onClose: () => 
       <div className="admin-row">
         {url && <a className="button primary" href={url} download={o.meta.name}><Download size={16} /> {tr("Save")}</a>}
         <button onClick={onRename}><Pencil size={16} /> {tr("Rename")}</button>
+        <button onClick={onMove}><FolderInput size={16} /> {tr("Move to folder")}</button>
         <button className="danger" onClick={onDelete}><Trash2 size={16} /> {tr("Delete forever")}</button>
       </div>
       <p className="muted small"><Link to="/files">{tr("Files outside the vault")}</Link></p>

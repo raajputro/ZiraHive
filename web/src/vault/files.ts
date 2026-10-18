@@ -12,7 +12,9 @@ export function kindOf(type: string) {
   return type.startsWith("image/") ? "image" : type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : "file";
 }
 /** Photos and videos (HEIC/HEIF included, whatever type the browser gave them). */
-export const isPhotoMeta = (m: FileMeta) => /^(image|video)\//.test(m.type) || /\.(heic|heif|dng)$/i.test(m.name);
+export const isPhotoMeta = (m: FileMeta) => m.type !== FOLDER_TYPE && (/^(image|video)\//.test(m.type) || /\.(heic|heif|dng)$/i.test(m.name));
+/** Folders are empty encrypted items of this type, so the server can't tell them from files. */
+export const FOLDER_TYPE = "inode/directory";
 
 export async function hexSha256(data: Blob | ArrayBuffer): Promise<string> {
   const buf = data instanceof Blob ? await data.arrayBuffer() : data;
@@ -50,12 +52,13 @@ export async function makeThumb(file: Blob, fallback?: Blob | null): Promise<{ b
 }
 
 /** Encrypt `file` and upload it into the vault. Returns the finished item. */
-export async function encryptAndUpload(master: CryptoKey, file: File, opts: { taken?: number; thumbFrom?: Blob | null } = {},
+export async function encryptAndUpload(master: CryptoKey, file: File, opts: { taken?: number; thumbFrom?: Blob | null; folder?: string } = {},
                                        onProgress?: (done: number) => void): Promise<VaultItem> {
   const { fk, wrapped } = await newFileKey(master);
-  const thumb = await makeThumb(file, opts.thumbFrom);
+  const thumb = file.size ? await makeThumb(file, opts.thumbFrom) : null;
   const meta: FileMeta = { name: file.name, type: file.type || "application/octet-stream", size: file.size, modified: file.lastModified,
-    width: thumb?.width, height: thumb?.height, ...(opts.taken ? { taken: opts.taken } : {}) };
+    width: thumb?.width, height: thumb?.height, ...(opts.taken ? { taken: opts.taken } : {}),
+    ...(opts.folder && opts.folder !== "/" ? { folder: opts.folder } : {}) };
   const item = await api.createVaultItem({ size: encryptedSize(file.size), chunk_size: CHUNK, wrapped_key: wrapped, meta: await sealMeta(fk, meta) });
   try {
     const n = Math.max(1, Math.ceil(file.size / CHUNK));
