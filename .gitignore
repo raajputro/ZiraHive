@@ -1,5 +1,7 @@
 # secrets and local data
 .env
+# vault recovery keys must never be committed (the browser may save them into this folder)
+*recovery-key*.txt
 zirahive-data/
 movies/
 server/data/
@@ -31,3 +33,7 @@ sync-client/*.spec
 sync-client/zirahive-sync.ico
 sync-client/*.egg-info/
 backup-disk/
+
+# test helper output (the scripts in test-zh/ are kept; what they write is not)
+test-zh/*.log
+test-zh/*.done
