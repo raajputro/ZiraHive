@@ -1,19 +1,21 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { Download, FileText, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music } from "lucide-react";
-import { api, ApiError, formatBytes, type VaultInfo, type VaultItem } from "../api";
+import { api, ApiError, formatBytes, type VaultInfo } from "../api";
 import { t as tr, locale } from "../i18n";
 import Dialog from "../components/Dialog";
-import {
-  CHUNK, createVault, decryptStream, encryptChunk, encryptedSize, newFileKey, open, openFileKey, openMeta, rewrap, seal,
-  sealMeta, secureContextOk, unb64, unlockWithPassphrase, unlockWithRecovery, type FileKey, type FileMeta,
-} from "../vault/crypto";
+import { createVault, rewrap, secureContextOk, sealMeta, unlockWithPassphrase, unlockWithRecovery } from "../vault/crypto";
+import { decryptItem, encryptAndUpload, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
 import { lock, masterBytes, unlock, useVaultKey } from "../vault/session";
 
 const MIN_PASSPHRASE = 10;
 const dateFmt = new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short", year: "numeric" });
 
-export default function VaultPage() {
+export interface VaultCtx { info: VaultInfo; master: CryptoKey; reload: () => void }
+
+/** Everything the vault needs before its contents can be shown: a secure page, a vault, and
+ *  an unlocked key. Used by the Vault page and by Photos → Vault. */
+export function VaultGate({ intro, children }: { intro?: ReactNode; children: (ctx: VaultCtx) => ReactNode }) {
   const key = useVaultKey();
   const [info, setInfo] = useState<VaultInfo | null>(null);
   const [error, setError] = useState("");
@@ -22,33 +24,31 @@ export default function VaultPage() {
 
   if (!secureContextOk()) {
     return (
-      <Shell>
-        <div className="empty">
-          <h2>{tr("The vault needs a secure connection")}</h2>
-          <p>{tr("Open ZiraHive through https (for example your Tailscale address) or on this computer as localhost. Over plain http the browser doesn't allow encryption.")}</p>
-        </div>
-      </Shell>
+      <div className="empty">
+        <h2>{tr("The vault needs a secure connection")}</h2>
+        <p>{tr("Open ZiraHive through https (for example your Tailscale address) or on this computer as localhost. Over plain http the browser doesn't allow encryption.")}</p>
+      </div>
     );
   }
-  if (error) return <Shell><p className="error">{error}</p></Shell>;
-  if (!info) return <Shell><div aria-busy="true" /></Shell>;
-  if (!info.set_up) return <Shell><SetUp onDone={load} /></Shell>;
-  if (!key) return <Shell><Unlock info={info} onReset={load} /></Shell>;
-  return <Shell><Contents info={info} master={key} reload={load} /></Shell>;
+  if (error) return <p className="error">{error}</p>;
+  if (!info) return <div aria-busy="true" />;
+  if (!info.set_up) return <SetUp onDone={load} intro={intro} />;
+  if (!key) return <Unlock info={info} onReset={load} />;
+  return <>{children({ info, master: key, reload: load })}</>;
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+export default function VaultPage() {
   return (
     <div className="page vault-page">
       <header className="page-head"><h1><ShieldCheck size={26} aria-hidden /> {tr("Vault")}</h1></header>
-      {children}
+      <VaultGate>{(ctx) => <Contents {...ctx} />}</VaultGate>
     </div>
   );
 }
 
 // ------------------------------------------------------------------ setting up
 
-function SetUp({ onDone }: { onDone: () => void }) {
+function SetUp({ onDone, intro }: { onDone: () => void; intro?: ReactNode }) {
   const [pass, setPass] = useState("");
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
@@ -103,7 +103,7 @@ function SetUp({ onDone }: { onDone: () => void }) {
 
   return (
     <section className="panel vault-setup">
-      <h2>{tr("A locked space for private files")}</h2>
+      {intro ?? <h2>{tr("A locked space for private files")}</h2>}
       <p>{tr("Files in the vault are encrypted on this device before they're sent. The server only stores scrambled data: the ZiraHive admin can't open them, and neither can anyone who takes the disk.")}</p>
       <p className="muted small">{tr("Choose a passphrase you don't use anywhere else. You'll also get a recovery key to keep somewhere safe.")}</p>
       <form className="stack-form" onSubmit={create}>
@@ -118,7 +118,7 @@ function SetUp({ onDone }: { onDone: () => void }) {
 
 // ------------------------------------------------------------------ unlocking
 
-function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
+export function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
   const [mode, setMode] = useState<"pass" | "recovery" | "reset">("pass");
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -171,7 +171,7 @@ function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
   );
 }
 
-function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8Array; title: string; onDone: () => void; onCancel?: () => void }) {
+export function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8Array; title: string; onDone: () => void; onCancel?: () => void }) {
   const [pass, setPass] = useState("");
   const [again, setAgain] = useState("");
   const [password, setPassword] = useState("");
@@ -206,38 +206,9 @@ function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8Array; t
 
 // ------------------------------------------------------------------ contents
 
-interface Opened { item: VaultItem; fk: FileKey; meta: FileMeta }
 interface Job { name: string; done: number; total: number; error?: string }
 
-function kindOf(type: string) {
-  return type.startsWith("image/") ? "image" : type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : "file";
-}
-
-async function makeThumb(file: File): Promise<{ blob: Blob; width: number; height: number } | null> {
-  try {
-    let source: CanvasImageSource, w: number, h: number;
-    if (file.type.startsWith("image/")) {
-      const bmp = await createImageBitmap(file);
-      source = bmp; w = bmp.width; h = bmp.height;
-    } else if (file.type.startsWith("video/")) {
-      const v = document.createElement("video");
-      v.muted = true; v.preload = "metadata"; v.src = URL.createObjectURL(file);
-      await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = rej; setTimeout(rej, 8000); });
-      v.currentTime = Math.min(1, (v.duration || 2) / 2);
-      await new Promise((res) => { v.onseeked = res; setTimeout(res, 3000); });
-      source = v; w = v.videoWidth; h = v.videoHeight;
-      setTimeout(() => URL.revokeObjectURL(v.src), 1000);
-    } else return null;
-    const scale = Math.min(1, 480 / Math.max(w, h));
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(w * scale)); c.height = Math.max(1, Math.round(h * scale));
-    c.getContext("2d")!.drawImage(source, 0, 0, c.width, c.height);
-    const blob = await new Promise<Blob | null>((res) => c.toBlob(res, "image/webp", 0.8));
-    return blob ? { blob, width: w, height: h } : null;
-  } catch { return null; }  // e.g. HEIC, which browsers can't draw: shown with an icon instead
-}
-
-function Contents({ info, master, reload }: { info: VaultInfo; master: CryptoKey; reload: () => void }) {
+function Contents({ info, master, reload }: VaultCtx) {
   const [items, setItems] = useState<Opened[] | null>(null);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const made = useRef<string[]>([]);
@@ -246,30 +217,12 @@ function Contents({ info, master, reload }: { info: VaultInfo; master: CryptoKey
   const [changing, setChanging] = useState(false);
   const input = useRef<HTMLInputElement>(null);
 
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const load = useCallback(async () => {
-    const rows = await api.vaultItems();
-    const opened: Opened[] = [];
-    for (const item of rows) {
-      try {
-        const fk = await openFileKey(master, item.wrapped_key);
-        opened.push({ item, fk, meta: await openMeta(fk, item.meta) });
-      } catch { /* not ours to read: skip */ }
-    }
+    const opened = await openAll(master);
     setItems(opened);
-    // thumbnails, a few at a time
-    const queue = opened.filter((o) => o.item.has_thumb);
-    const worker = async () => {
-      for (let o = queue.shift(); o; o = queue.shift()) {
-        try {
-          const res = await fetch(`/api/vault/items/${o.item.id}/thumb`, { credentials: "same-origin" });
-          const plain = await open(o.fk.key, new Uint8Array(await res.arrayBuffer()));
-          const url = URL.createObjectURL(new Blob([plain], { type: "image/webp" }));
-          made.current.push(url);
-          setThumbs((t) => ({ ...t, [o!.item.id]: url }));
-        } catch { /* leave the icon */ }
-      }
-    };
-    await Promise.all([worker(), worker(), worker(), worker()]);
+    made.current.push(...await loadThumbs(opened, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
   }, [master]);
 
   useEffect(() => { void load(); }, [load]);
@@ -277,27 +230,8 @@ function Contents({ info, master, reload }: { info: VaultInfo; master: CryptoKey
 
   const uploadOne = async (file: File, index: number) => {
     const set = (c: Partial<Job>) => setJobs((js) => js.map((j, i) => (i === index ? { ...j, ...c } : j)));
-    try {
-      const { fk, wrapped } = await newFileKey(master);
-      const thumb = await makeThumb(file);
-      const meta: FileMeta = { name: file.name, type: file.type || "application/octet-stream", size: file.size, modified: file.lastModified,
-        width: thumb?.width, height: thumb?.height };
-      const size = encryptedSize(file.size);
-      const item = await api.createVaultItem({ size, chunk_size: CHUNK, wrapped_key: wrapped, meta: await sealMeta(fk, meta) });
-      const n = Math.max(1, Math.ceil(file.size / CHUNK));
-      let offset = 0;
-      for (let i = 0; i < n; i++) {
-        const plain = new Uint8Array(await file.slice(i * CHUNK, (i + 1) * CHUNK).arrayBuffer());
-        const cipher = await encryptChunk(fk, i, i === n - 1, plain);
-        for (let attempt = 0; ; attempt++) {
-          try { await api.vaultChunk(item.id, offset, cipher); break; }
-          catch (e) { if (attempt >= 3) throw e; await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt)); }
-        }
-        offset += cipher.length;
-        set({ done: Math.min(file.size, (i + 1) * CHUNK) });
-      }
-      if (thumb) await api.vaultThumb(item.id, unb64(await seal(fk.key, new Uint8Array(await thumb.blob.arrayBuffer()))));
-    } catch (e) { set({ error: e instanceof Error ? e.message : tr("Upload failed") }); }
+    try { await encryptAndUpload(master, file, {}, (done) => set({ done })); }
+    catch (e) { set({ error: e instanceof Error ? e.message : tr("Upload failed") }); }
   };
 
   const add = async (files: FileList | null) => {
@@ -381,14 +315,11 @@ function Viewer({ o, onClose, onDelete, onRename }: { o: Opened; onClose: () => 
   const [error, setError] = useState("");
   useEffect(() => {
     let made: string | null = null, cancelled = false;
-    (async () => {
-      const res = await fetch(`/api/vault/items/${o.item.id}/data`, { credentials: "same-origin" });
-      if (!res.ok || !res.body) throw new Error(String(res.status));
-      const blob = await decryptStream(o.fk, res.body, o.item.size, o.item.chunk_size, setDone);
+    decryptItem(o, setDone).then((blob) => {
       if (cancelled) return;
-      made = URL.createObjectURL(new Blob([blob], { type: o.meta.type }));
+      made = URL.createObjectURL(blob);
       setUrl(made);
-    })().catch(() => setError(tr("This file couldn't be decrypted. It may be damaged.")));
+    }).catch(() => setError(tr("This file couldn't be decrypted. It may be damaged.")));
     return () => { cancelled = true; if (made) URL.revokeObjectURL(made); };
   }, [o]);
   const k = kindOf(o.meta.type);

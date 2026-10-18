@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint } from "lucide-react";
+import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { api, ApiError, type User } from "./api";
 import { cancelled, getPasskey, passkeyProblem } from "./passkeys";
 import { UploadProvider } from "./uploads";
@@ -27,11 +27,13 @@ import { AlbumDetailPage, AlbumsPage as MusicAlbumsPage, ArtistDetailPage, Artis
 import { ReadHome, ReadLibraryPage, ReadSeriesPage } from "./pages/Read";
 import ReaderRoute from "./pages/Reader";
 import VaultPage from "./pages/Vault";
+import PhotoVaultPage from "./pages/PhotoVault";
 import ScanPage from "./pages/Scan";
 import AdminPage from "./pages/Admin";
 import { TvHome, TvMoviePage, TvPage, TvPlayerPage, TvSeriesPage, TvSourcesPage } from "./pages/Tv";
 
 import { t as tr, adoptAccountLanguage, lang, setLang } from "./i18n";
+const RAIL_KEY = "zirahive.nav.collapsed";
 interface AuthCtx { user: User; signOut: () => void; refreshUser: () => void }
 const AuthContext = createContext<AuthCtx | null>(null);
 export const useAuth = () => useContext(AuthContext)!;
@@ -76,6 +78,7 @@ function SignedInApp() {
               <Route path="/photos/people" element={<PeoplePage />} />
               <Route path="/photos/people/:id" element={<PersonPage />} />
               <Route path="/photos/cleanup" element={<CleanupPage />} />
+              <Route path="/photos/vault" element={<PhotoVaultPage />} />
               <Route path="/ask" element={<AskPage />} />
               <Route path="/photos/albums/:id" element={<AlbumPage />} />
               <Route path="/files/*" element={<FilesPage />} />
@@ -129,6 +132,16 @@ function Shell({ children }: { children: ReactNode }) {
   const { pathname } = useLocation();
   const cinema = ["/watch", "/play", "/party", "/listen", "/tv"].some((p) => pathname.startsWith(p));
   useEffect(() => { document.documentElement.dataset.room = cinema ? "cinema" : "home"; }, [cinema]);
+  // The side navigation can shrink to icons. Remembered per browser; on narrower screens it starts small.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { const saved = localStorage.getItem(RAIL_KEY); if (saved !== null) return saved === "1"; } catch { /* private mode */ }
+    return window.innerWidth < 1100;
+  });
+  useEffect(() => { document.documentElement.dataset.rail = collapsed ? "collapsed" : "open"; }, [collapsed]);
+  const toggleRail = () => setCollapsed((c) => {
+    try { localStorage.setItem(RAIL_KEY, c ? "0" : "1"); } catch { /* private mode */ }
+    return !c;
+  });
   const links = [
     { to: "/photos", label: tr("Photos"), icon: Images },
     { to: "/files", label: tr("Files"), icon: Folder },
@@ -143,12 +156,20 @@ function Shell({ children }: { children: ReactNode }) {
   return (
     <div className="shell">
       <nav className="rail" aria-label={tr("Main")}>
-        <div className="brand"><HiveMark size={26} />{" "}{tr("ZiraHive")}</div>
+        <div className="brand">
+          <HiveMark size={26} /><span className="rail-label">{tr("ZiraHive")}</span>
+          <button className="icon rail-toggle" onClick={toggleRail} aria-expanded={!collapsed}
+            aria-label={collapsed ? tr("Expand navigation") : tr("Collapse navigation")} title={collapsed ? tr("Expand navigation") : tr("Collapse navigation")}>
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
         {links.map(({ to, label, icon: Icon, desktop }) => (
-          <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}><Icon size={19} aria-hidden /> <span>{label}</span></NavLink>
+          <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}
+            title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined}>
+            <Icon size={19} aria-hidden /> <span className="rail-label">{label}</span></NavLink>
         ))}
         <div className="rail-foot">
-          <span className="who">{user.username}</span>
+          <span className="who" title={user.username}>{user.username}</span>
           <NotificationBell />
           <button className="icon" onClick={signOut} aria-label={tr("Sign out")} title={tr("Sign out")}><LogOut size={17} /></button>
         </div>

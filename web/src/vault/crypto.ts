@@ -109,7 +109,8 @@ export async function rewrap(masterRaw: Uint8Array, passphrase: string) {
 
 // ------------------------------------------------------------------- files
 
-export interface FileMeta { name: string; type: string; size: number; modified: number; width?: number; height?: number }
+/** `taken`: when a photo or video was taken (ms), if it came from Photos. */
+export interface FileMeta { name: string; type: string; size: number; modified: number; width?: number; height?: number; taken?: number }
 export interface FileKey { key: CryptoKey; prefix: Uint8Array }
 
 export const encryptedSize = (plain: number, chunk = CHUNK) => plain + TAG * Math.max(1, Math.ceil(plain / chunk));

@@ -112,6 +112,22 @@ label { display: block; font-size: .9rem; font-weight: 500; color: var(--muted);
 .rail-foot .who { font-size: .9rem; }
 .rail-foot .icon { color: #9AA3B5; }
 .rail-foot .icon:hover { color: #fff; background: #2A3757; }
+.rail-toggle { margin-left: auto; color: #9AA3B5; }
+.rail-toggle:hover { color: #fff; background: #2A3757; }
+.rail-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; }
+
+/* Collapsed side navigation: icons only (desktop and tablet; phones use the bottom bar). */
+@media (min-width: 761px) {
+  .shell { transition: grid-template-columns .18s ease; }
+  :root[data-rail="collapsed"] { --rail-w: 68px; }
+  [data-rail="collapsed"] .rail { padding: 18px 10px; }
+  [data-rail="collapsed"] .rail .rail-label, [data-rail="collapsed"] .rail-foot .who { display: none; }
+  [data-rail="collapsed"] .brand { flex-direction: column; gap: 12px; padding: 0 0 18px; }
+  [data-rail="collapsed"] .rail-toggle { margin: 0; }
+  [data-rail="collapsed"] .rail a { justify-content: center; padding: 10px 0; }
+  [data-rail="collapsed"] .rail-foot { flex-direction: column; gap: 6px; padding: 0; }
+}
+@media (prefers-reduced-motion: reduce) { .shell { transition: none; } }
 main { min-width: 0; }
 
 .page { padding: 28px clamp(16px, 3vw, 40px) 120px; max-width: 1600px; }
@@ -548,6 +564,15 @@ label.check.grow { flex: 1; }
 .vault-jobs li { display: grid; grid-template-columns: 1fr 180px; gap: 12px; align-items: center; font-size: .9rem; }
 .vault-jobs li > span:first-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .vault-jobs progress { width: 100%; accent-color: var(--accent); }
+.vault-busy { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin: 0 0 16px; font-size: .92rem; }
+.vault-busy span { display: inline-flex; align-items: center; gap: 6px; }
+.vault-busy progress { flex: 1 1 200px; max-width: 360px; accent-color: var(--accent); }
+.vault-bar .muted svg { vertical-align: -2px; }
+.photo-tabs a svg { vertical-align: -2px; }
+.lightbox-stage .vault-decrypt { width: min(320px, 70vw); accent-color: var(--accent); }
+.vault-noshow { display: grid; justify-items: center; gap: 12px; text-align: center; }
+.vault-noshow img { max-height: 60vh; }
+.lightbox-bar span svg { vertical-align: -1px; }
 .vault-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
 .vault-tile {
   display: grid; grid-template-rows: 1fr auto; padding: 0; overflow: hidden; aspect-ratio: 1; border-radius: var(--radius-m);
