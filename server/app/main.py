@@ -11,8 +11,8 @@ from sqlalchemy import select
 from . import db
 from .config import get_settings
 from .models import Library
-from .routers import admin, albums, auth, backup, books, dlna, federation, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
-from .services import jobs, transcode
+from .routers import admin, albums, auth, backup, books, dlna, federation, iptv as iptv_router, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
+from .services import iptv_live, jobs, transcode
 from .services.libraries import discover
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
@@ -46,8 +46,10 @@ async def lifespan(_: FastAPI):
     await jobs.init_queue()
     await bootstrap_libraries()
     transcode.manager.start_janitor()
+    iptv_live.manager.start_janitor()
     log.info("ZiraHive %s ready (data: %s)", VERSION, settings.data_dir.resolve())
     yield
+    await iptv_live.manager.shutdown()
     await transcode.manager.shutdown()
     await jobs.close_queue()
     await db.dispose()
@@ -73,7 +75,7 @@ def create_app() -> FastAPI:
                            allow_methods=["*"], allow_headers=["*"],
                            expose_headers=["Upload-Offset", "Content-Range"])
     for r in (auth.router, passkeys.router, uploads.router, files.router, albums.router, shares.router,
-              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, federation.router, links.router, smart.router, admin.router):
+              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, federation.router, links.router, smart.router, iptv_router.router, admin.router):
         app.include_router(r)
 
     @app.get("/api/health", tags=["system"])

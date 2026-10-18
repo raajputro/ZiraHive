@@ -205,6 +205,14 @@ name his side sees.
 Both need this PC's home-network address as `ZIRAHIVE_LAN_URL` in `.env`; `setup.ps1` fills it in.
 Links given to a TV play only that one title, for 12 hours.
 
+### Live TV (IPTV)
+
+Got an IPTV subscription (Xtream Codes: a server address, username and password)? Open **Live TV**
+and add it. You get channels by category with the programme guide, movies and series, favourites,
+and channel up / down with the arrow keys, all through ZiraHive, so the login never reaches a
+browser and one channel watched on several screens counts as one connection. Admins can share a
+subscription with the family. Details: [docs/IPTV.md](docs/IPTV.md).
+
 ### Age limits for children
 
 1. In **Settings > People**, edit the child's account and choose **Only rated 7+ or younger** (or
@@ -212,7 +220,8 @@ Links given to a TV play only that one title, for 12 hours.
 2. Give titles an age. With a TMDB key, movies and series get their certificate automatically
    (India's CBFC first, then the US and UK). For a whole category, choose **Suits 7+** next to it in
    **Settings > Server**. An admin can also set the age on any single title.
-3. Titles without any age are hidden from limited profiles, to be safe.
+3. Titles without any age are hidden from limited profiles, to be safe. Live TV (IPTV) is hidden
+   from them too, since channels carry no ages.
 
 ## Listening and reading
 

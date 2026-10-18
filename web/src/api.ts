@@ -494,3 +494,60 @@ export function formatDuration(sec: number | null): string {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
   return h ? tr("{h} h {m} min", { h, m }) : digits(`${m}:${String(s).padStart(2, "0")}`);
 }
+
+// ------------------------------------------------------------------ IPTV (Live TV)
+export type IptvKind = "live" | "vod" | "series";
+export type IptvStreamKind = "live" | "vod" | "episode";
+export interface IptvSource { id: string; name: string; shared: boolean; mine: boolean; can_manage: boolean; server: string | null; username: string | null }
+export interface IptvAccount {
+  status: string; expires_at: string | null; max_connections: number | null; active_connections: number | null;
+  is_trial: boolean; timezone: string | null;
+}
+export interface IptvCategory { id: string; name: string; count: number }
+export interface IptvItem {
+  id: string; name: string; icon: string | null; category_id: string | null;
+  num?: number | null; epg_id?: string | null; archive?: boolean; rating?: number | null; added?: string | null;
+  ext?: string; year?: string | null;
+}
+export interface IptvPage { total: number; items: IptvItem[] }
+export interface IptvEpg { title: string; description: string | null; start: string | null; end: string | null }
+export interface IptvMovie {
+  id: string; name: string; plot: string | null; cast: string | null; director: string | null; genre: string | null;
+  year: string | null; rating: number | null; duration: number | null; height: number | null;
+  poster: string | null; backdrop: string | null; ext: string;
+}
+export interface IptvEpisode {
+  id: string; season: number; episode: number | null; title: string; plot: string | null; duration: number | null;
+  height: number | null; image: string | null; ext: string;
+}
+export interface IptvSeries {
+  id: string; name: string; plot: string | null; cast: string | null; genre: string | null; rating: number | null;
+  year: string | null; poster: string | null; backdrop: string | null; episodes: IptvEpisode[];
+}
+export interface IptvPlay {
+  mode: "live" | "direct" | "hls" | "convert"; url?: string; convert_url: string; direct_url?: string | null;
+  hls_url?: string | null; qualities?: string[]; duration?: number | null;
+}
+export interface IptvFavorite { id: string; source_id: string; kind: IptvKind; stream_id: string; name: string; icon: string | null; ext: string | null }
+export interface IptvSourceIn { name: string; server: string; port?: string; username: string; password: string; shared?: boolean }
+
+export const iptvApi = {
+  sources: () => request<IptvSource[]>("GET", "/api/iptv/sources"),
+  addSource: (body: IptvSourceIn) => request<IptvSource & { account: IptvAccount }>("POST", "/api/iptv/sources", body),
+  updateSource: (id: string, body: Partial<IptvSourceIn>) =>
+    request<IptvSource & { account: IptvAccount | null }>("PATCH", `/api/iptv/sources/${id}`, body),
+  deleteSource: (id: string) => request<void>("DELETE", `/api/iptv/sources/${id}`),
+  account: (id: string) => request<IptvAccount>("GET", `/api/iptv/sources/${id}/account`),
+  categories: (id: string, kind: IptvKind) => request<IptvCategory[]>("GET", `/api/iptv/sources/${id}/categories${q({ kind })}`),
+  items: (id: string, params: { kind: IptvKind; category?: string; q?: string; sort?: string; offset?: number; limit?: number }) =>
+    request<IptvPage>("GET", `/api/iptv/sources/${id}/items${q(params)}`),
+  epg: (id: string, streamId: string) => request<IptvEpg[]>("GET", `/api/iptv/sources/${id}/epg/${encodeURIComponent(streamId)}`),
+  movie: (id: string, vodId: string) => request<IptvMovie>("GET", `/api/iptv/sources/${id}/movie/${encodeURIComponent(vodId)}`),
+  series: (id: string, seriesId: string) => request<IptvSeries>("GET", `/api/iptv/sources/${id}/series/${encodeURIComponent(seriesId)}`),
+  play: (id: string, kind: IptvStreamKind, streamId: string, params: { ext?: string; duration?: number; height?: number }) =>
+    request<IptvPlay>("GET", `/api/iptv/sources/${id}/play/${kind}/${encodeURIComponent(streamId)}${q(params)}`),
+  favorites: (sourceId?: string) => request<IptvFavorite[]>("GET", `/api/iptv/favorites${q({ source_id: sourceId })}`),
+  addFavorite: (body: { source_id: string; kind: IptvKind; stream_id: string; name: string; icon?: string | null; ext?: string | null }) =>
+    request<IptvFavorite>("POST", "/api/iptv/favorites", body),
+  removeFavorite: (id: string) => request<void>("DELETE", `/api/iptv/favorites/${id}`),
+};

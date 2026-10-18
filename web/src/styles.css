@@ -943,3 +943,122 @@ body.has-player .tray { bottom: 88px; }
 .health-fail > svg { color: var(--danger, #b3261e); }
 .health-info > svg { color: var(--muted); }
 .health-list .muted { overflow-wrap: anywhere; }
+
+/* ------------------------------------------------------------ Live TV (IPTV) */
+.tv-page { padding: 16px clamp(12px, 3vw, 32px) 80px; }
+.tv-bar { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-bottom: 16px; }
+.tv-bar .lib-tabs { margin-right: auto; }
+.tv-bar select { max-width: 220px; }
+.tv-name { font-size: 1.05rem; }
+.tv-pad { padding: 10px 12px; margin: 0; }
+.tv-live { display: grid; grid-template-columns: 200px minmax(240px, 320px) minmax(0, 1fr); gap: 16px; align-items: start; }
+.tv-col {
+  background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m);
+  max-height: calc(100vh - 150px); overflow-y: auto; scrollbar-width: thin;
+}
+.tv-cats button, .tv-channels button.ch {
+  display: flex; align-items: center; gap: 8px; width: 100%; padding: 9px 12px; background: none; border: 0;
+  border-bottom: 1px solid var(--line); border-radius: 0; color: var(--ink); text-align: left; font: inherit; cursor: pointer;
+}
+.tv-cats button { justify-content: space-between; font-size: .92rem; }
+.tv-cats button:hover, .tv-channels button.ch:hover { background: color-mix(in srgb, var(--ink) 6%, transparent); }
+.tv-cats button.on, .tv-channels button.ch.on { background: var(--accent); color: var(--accent-ink); }
+.tv-cats .count { opacity: .7; font-size: .78rem; }
+.tv-mobile-cats { display: none; }
+.tv-search { position: sticky; top: 0; z-index: 1; width: auto; padding: 8px; background: var(--surface); border-bottom: 1px solid var(--line); }
+.tv-search svg { left: 19px; }
+.tv-channels button.ch { display: grid; grid-template-columns: 28px 46px minmax(0, 1fr) auto; padding: 7px 10px; }
+.ch-num { font-size: .78rem; color: var(--muted); text-align: right; }
+.ch.on .ch-num { color: inherit; opacity: .8; }
+.ch-name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ch-fav { color: var(--jute); }
+.ch-logo { width: 46px; height: 30px; object-fit: contain; display: block; }
+.ch-logo.blank { display: grid; place-items: center; font-size: .7rem; font-weight: 700; color: var(--muted);
+  background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: var(--radius-s); }
+.ch-logo.big { width: 64px; height: 40px; }
+.tv-more { display: block; width: calc(100% - 16px); margin: 10px 8px; }
+.tv-player { position: sticky; top: 12px; min-width: 0; }
+.tv-frame video { aspect-ratio: 16 / 9; max-height: 70vh; }
+.tv-overlay { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 10px; padding: 20px;
+  color: #fff; text-align: center; background: rgba(0, 0, 0, .5); pointer-events: none; }
+.tv-overlay p { margin: 0; max-width: 46ch; }
+.tv-overlay.error { pointer-events: auto; }
+.tv-now { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 12px 0 8px; }
+.tv-now h2 { flex: 1 1 10ch; min-width: 0; margin: 0 auto 0 6px; font-size: 1.15rem; line-height: 1.3; overflow-wrap: anywhere; }
+.tv-now .icon { flex: none; }
+.icon.on, .tv-star.on { color: var(--jute); }
+.tv-epg { list-style: none; padding: 0; margin: 0; }
+.tv-epg li { padding: 8px 0; border-bottom: 1px solid var(--line); }
+.tv-epg li p { margin: 4px 0 0; font-size: .9rem; }
+.tv-epg .time { color: var(--muted); font-size: .85rem; margin-right: 8px; }
+.tv-epg .now .time { display: block; }
+.tv-epg .bar { height: 3px; margin-top: 8px; background: var(--line); border-radius: 2px; overflow: hidden; }
+.tv-epg .bar span { display: block; height: 100%; background: var(--accent); }
+.tv-grid-wrap { display: grid; grid-template-columns: 200px minmax(0, 1fr); gap: 20px; align-items: start; }
+.tv-tools { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 18px; }
+.tv-back { display: inline-flex; align-items: center; gap: 4px; margin-bottom: 14px; text-decoration: none; color: var(--muted);
+  background: none; border: 0; padding: 4px 0; font: inherit; cursor: pointer; }
+.tv-back:hover { color: var(--ink); }
+.tv-detail { position: relative; display: grid; grid-template-columns: 220px minmax(0, 1fr); gap: 28px; padding: 24px;
+  border-radius: var(--radius-m); overflow: hidden; isolation: isolate; background: var(--surface); }
+.tv-detail::before { content: ""; position: absolute; inset: 0; z-index: -1; background-image: var(--tv-backdrop, none);
+  background-size: cover; background-position: center; opacity: .18; filter: blur(2px); }
+.tv-cover img, .tv-cover .poster-blank { width: 100%; aspect-ratio: 2 / 3; object-fit: cover; border-radius: var(--radius-m); display: grid; background: var(--line); }
+.tv-info h1 { font-size: 2rem; margin: 0 0 4px; }
+.tv-info p { max-width: 72ch; }
+.tv-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin: 14px 0; }
+.tv-actions .button { display: inline-flex; align-items: center; gap: 6px; text-decoration: none; }
+.tv-seasons { margin: 22px 0 10px; }
+.tv-episodes { list-style: none; padding: 0; margin: 12px 0 0; }
+.tv-episodes li a { display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 14px; padding: 10px; border-radius: var(--radius-m); text-decoration: none; color: var(--ink); }
+.tv-episodes li a:hover, .tv-episodes li.last a { background: var(--surface); }
+.tv-ep-art { position: relative; display: grid; place-items: center; aspect-ratio: 16 / 9; overflow: hidden; border-radius: var(--radius-s);
+  background: color-mix(in srgb, var(--ink) 10%, transparent); color: var(--muted); }
+.tv-ep-art img { width: 100%; height: 100%; object-fit: cover; }
+.tv-ep-text { display: grid; align-content: start; gap: 2px; }
+.tv-ep-plot { font-size: .88rem; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.tv-vod-title { font-size: 1.3rem; margin: 0 auto 0 0; align-self: center; }
+.tv-fav-channels { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; }
+.tv-fav-ch { display: flex; align-items: center; gap: 4px; padding: 8px 10px; background: var(--surface); border: 1px solid var(--line); border-radius: var(--radius-m); }
+.tv-fav-ch a { display: flex; align-items: center; gap: 10px; flex: 1; min-width: 0; text-decoration: none; color: var(--ink); }
+.tv-fav-ch span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tv-welcome { max-width: 560px; }
+.tv-form { display: grid; gap: 12px; max-width: 560px; padding: 18px; margin-bottom: 20px; background: var(--surface);
+  border: 1px solid var(--line); border-radius: var(--radius-m); }
+.tv-form label input { width: 100%; margin-top: 4px; }
+.tv-form label.check { display: flex; align-items: center; gap: 8px; color: var(--ink); }
+.tv-form label.check input { width: auto; margin: 0; }
+.tv-form-row { display: flex; gap: 10px; }
+.tv-form-row .grow { flex: 1; }
+.tv-form-row .port { width: 96px; }
+.tv-note { font-size: .85rem; margin: 0; }
+.tv-sources .rows li { flex-wrap: wrap; }
+.tv-source-row .tv-form { flex: 1; margin: 0; }
+.tv-tag { margin-left: 8px; padding: 1px 8px; font-size: .75rem; border-radius: 99px; background: var(--accent); color: var(--accent-ink); }
+@media (max-width: 1100px) {
+  .tv-live { grid-template-columns: minmax(220px, 300px) minmax(0, 1fr); }
+  .tv-live .tv-cats-col { display: none; }
+  .tv-live .tv-mobile-cats { display: block; grid-column: 1 / -1; max-width: 320px; }
+}
+/* Sidebar + channel list leave too little room for the player here: stack the player above the list. */
+@media (max-width: 960px) {
+  .tv-live { grid-template-columns: minmax(0, 1fr); }
+  .tv-live .tv-mobile-cats { max-width: none; }
+  .tv-player { position: static; order: -1; }
+  .tv-channels { max-height: 60vh; }
+}
+@media (max-width: 760px) {
+  .tv-live, .tv-grid-wrap { grid-template-columns: minmax(0, 1fr); }
+  .tv-grid-wrap .tv-cats-col { display: none; }
+  .tv-grid-wrap .tv-mobile-cats { display: block; margin-bottom: 12px; }
+  .tv-live .tv-mobile-cats { max-width: none; }
+  .tv-player { position: sticky; top: 0; z-index: 3; order: -1; margin: 0 -12px; padding: 0 12px 6px; background: var(--bg); }
+  .tv-player .tv-epg, .tv-player > .muted { display: none; }
+  .tv-col { max-height: none; }
+  .tv-detail { grid-template-columns: minmax(0, 1fr); padding: 16px; }
+  .tv-cover { max-width: 180px; }
+  .tv-episodes li a { grid-template-columns: 120px minmax(0, 1fr); }
+  .tv-form-row { flex-direction: column; }
+  .tv-form-row .port { width: 100%; }
+  .tv-page { padding-bottom: 140px; }
+}

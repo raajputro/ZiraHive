@@ -700,3 +700,35 @@ class DocChunk(Base):
     text: Mapped[str] = mapped_column(Text)
     vector: Mapped[bytes] = mapped_column(LargeBinary)
     sha256: Mapped[str] = mapped_column(String(64))  # of the file the passage came from
+
+
+class IptvSource(Base):
+    """An IPTV subscription (Xtream Codes API: server address, username, password).
+    The password never leaves the server; the web app only sees the name."""
+
+    __tablename__ = "iptv_sources"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    server: Mapped[str] = mapped_column(String(512))  # http://host:port, no path
+    username: Mapped[str] = mapped_column(String(255))
+    password: Mapped[str] = mapped_column(Text)
+    # shared by an admin: everyone in the family can watch it (but not see the login)
+    shared: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class IptvFavorite(Base):
+    __tablename__ = "iptv_favorites"
+    __table_args__ = (UniqueConstraint("user_id", "source_id", "kind", "stream_id"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("iptv_sources.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(8))  # live, vod or series
+    stream_id: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(255))
+    icon: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ext: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

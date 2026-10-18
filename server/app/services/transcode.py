@@ -134,6 +134,7 @@ class Session:
     last_access: float = field(default_factory=time.monotonic)
     paused: bool = False
     viewers: set[str] = field(default_factory=set)
+    input_args: list[str] = field(default_factory=list)  # e.g. a user agent for an IPTV source
 
     def latest_written(self) -> int:
         best = self.start_segment - 1
@@ -172,7 +173,7 @@ class TranscodeManager:
         self._locks.clear()
 
     def session(self, media_id: str, title: str, source: Path, duration: float, height: int | None,
-                quality: str, audio: int, viewer: str) -> Session:
+                quality: str, audio: int, viewer: str, input_args: list[str] | None = None) -> Session:
         key = f"{media_id}-{quality}-a{audio}"
         s = self.sessions.get(key)
         if s is None:
@@ -180,7 +181,8 @@ class TranscodeManager:
             if active >= get_settings().max_transcodes:
                 raise TooBusy()
             s = Session(key=key, media_id=media_id, title=title, source=source, duration=duration,
-                        height=height, quality=quality, audio=audio, folder=self.root / key)
+                        height=height, quality=quality, audio=audio, folder=self.root / key,
+                        input_args=list(input_args or []))
             s.folder.mkdir(parents=True, exist_ok=True)
             self.sessions[key] = s
         s.viewers.add(viewer)
@@ -224,7 +226,7 @@ class TranscodeManager:
         await self._stop(s, keep_files=True)
         start = n * SEGMENT
         cmd = [get_settings().ffmpeg_bin, "-hide_banner", "-loglevel", "error", "-nostdin",
-               "-ss", f"{start:.3f}", "-i", str(s.source), "-map", "0:v:0",
+               *s.input_args, "-ss", f"{start:.3f}", "-i", str(s.source), "-map", "0:v:0",
                *video_args(s.quality, s.height), *audio_args(s.quality, s.audio),
                "-sn", "-dn", "-output_ts_offset", f"{start:.3f}",
                "-f", "hls", "-hls_time", f"{SEGMENT:g}", "-hls_list_size", "0", "-hls_segment_type", "mpegts",

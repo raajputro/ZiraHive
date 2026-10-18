@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Images, Folder, Clapperboard, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint } from "lucide-react";
+import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint } from "lucide-react";
 import { api, ApiError, type User } from "./api";
 import { cancelled, getPasskey, passkeyProblem } from "./passkeys";
 import { UploadProvider } from "./uploads";
@@ -29,6 +29,7 @@ import ReaderRoute from "./pages/Reader";
 import VaultPage from "./pages/Vault";
 import ScanPage from "./pages/Scan";
 import AdminPage from "./pages/Admin";
+import { TvHome, TvMoviePage, TvPage, TvPlayerPage, TvSeriesPage, TvSourcesPage } from "./pages/Tv";
 
 import { t as tr, adoptAccountLanguage, lang, setLang } from "./i18n";
 interface AuthCtx { user: User; signOut: () => void; refreshUser: () => void }
@@ -88,6 +89,13 @@ function SignedInApp() {
               <Route path="/watch/parties" element={<PartiesPage />} />
               <Route path="/party/:id" element={<PartyRoute />} />
               <Route path="/movies" element={<Navigate to="/watch" replace />} />
+              <Route path="/tv" element={<TvHome />} />
+              <Route path="/tv/sources" element={<TvSourcesPage />} />
+              <Route path="/tv/:source" element={<TvPage />} />
+              <Route path="/tv/:source/movie/:id" element={<TvMoviePage />} />
+              <Route path="/tv/:source/show/:id" element={<TvSeriesPage />} />
+              <Route path="/tv/:source/play/:kind/:id" element={<TvPlayerPage />} />
+              <Route path="/tv/:source/:tab" element={<TvPage />} />
               <Route path="/listen" element={<ListenHome />} />
               <Route path="/listen/albums" element={<MusicAlbumsPage />} />
               <Route path="/listen/album/:id" element={<AlbumDetailPage />} />
@@ -119,12 +127,14 @@ function SignedInApp() {
 function Shell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
-  const cinema = ["/watch", "/play", "/party", "/listen"].some((p) => pathname.startsWith(p));
+  const cinema = ["/watch", "/play", "/party", "/listen", "/tv"].some((p) => pathname.startsWith(p));
   useEffect(() => { document.documentElement.dataset.room = cinema ? "cinema" : "home"; }, [cinema]);
   const links = [
     { to: "/photos", label: tr("Photos"), icon: Images },
     { to: "/files", label: tr("Files"), icon: Folder },
     { to: "/watch", label: tr("Watch"), icon: Clapperboard },
+    // IPTV channels carry no age ratings, so kids' profiles don't get Live TV
+    ...(user.max_age == null ? [{ to: "/tv", label: tr("Live TV"), icon: Tv, desktop: false }] : []),
     { to: "/listen", label: tr("Listen"), icon: Headphones },
     { to: "/read", label: tr("Read"), icon: BookOpen },
     { to: "/trash", label: tr("Trash"), icon: Trash2, desktop: true },

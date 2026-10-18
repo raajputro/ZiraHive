@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { NavLink } from "react-router-dom";
-import { Upload, Play, ChevronLeft, ChevronRight, X, Download, Check, CheckSquare, FolderPlus, Maximize } from "lucide-react";
+import { Upload, Play, ChevronLeft, ChevronRight, X, Download, Check, CheckSquare, FolderPlus, Maximize, Trash2 } from "lucide-react";
 import { api, url, formatDuration, type Asset, type Memory } from "../api";
 import { useUploads } from "../uploads";
 import { usePrefs } from "../prefs";
@@ -120,6 +120,40 @@ export default function PhotosPage() {
     return n;
   });
   const stopSelecting = () => { setSelecting(false); setSelected(new Set()); };
+  const [trashing, setTrashing] = useState(false);
+  // Moves photos to the trash (restorable for 30 days) and drops them from what's on screen.
+  const trash = async (ids: string[]) => {
+    setTrashing(true);
+    const gone = new Set<string>();
+    try {
+      for (const id of ids) { await api.trashAsset(id); gone.add(id); }
+      setError("");
+    } catch (e) { setError(e instanceof Error ? e.message : tr("Couldn't move to trash")); }
+    finally {
+      setTrashing(false);
+      if (gone.size) {
+        setItems((prev) => prev.filter((a) => !gone.has(a.id)));
+        setMemories((prev) => prev.map((m) => ({ ...m, items: m.items.filter((a) => !gone.has(a.id)) })).filter((m) => m.items.length));
+        setSelected((s) => new Set([...s].filter((id) => !gone.has(id))));
+      }
+    }
+    return gone;
+  };
+  const trashSelected = async () => {
+    const ask = selected.size === 1
+      ? tr("Move 1 item to the trash? You can restore it for 30 days.")
+      : tr("Move {count} items to the trash? You can restore them for 30 days.", { count: selected.size });
+    if (!confirm(ask)) return;
+    const gone = await trash([...selected]);
+    if (gone.size === selected.size) stopSelecting();
+  };
+  const trashFromViewer = async (a: Asset) => {
+    if (!viewer) return;
+    const gone = await trash([a.id]);
+    if (!gone.size) return;
+    const rest = viewer.items.filter((x) => x.id !== a.id);
+    setViewer(rest.length ? { items: rest, index: Math.min(viewer.index, rest.length - 1) } : null);
+  };
   const addFiles = (files: File[]) => enqueue(files.filter((f) => /^(image|video)\//.test(f.type) || /\.(heic|heif|dng)$/i.test(f.name)), "/Uploads");
 
   return (
@@ -131,6 +165,7 @@ export default function PhotosPage() {
             <>
               <span className="muted">{selected.size}{" "}{tr("selected")}</span>
               <button className="primary" disabled={!selected.size} onClick={() => setAlbumPicker(true)}><FolderPlus size={17} />{" "}{tr("Add to album")}</button>
+              <button className="danger" disabled={!selected.size || trashing} onClick={() => void trashSelected()}><Trash2 size={17} />{" "}{tr("Move to trash")}</button>
               <button onClick={stopSelecting}>{tr("Done")}</button>
             </>
           ) : (
@@ -171,7 +206,7 @@ export default function PhotosPage() {
         <div ref={sentinel} className="sentinel">{loading && tr("Loading…")}</div>
       </div>
       {viewer && viewer.items[viewer.index] && (
-        <Lightbox items={viewer.items} index={viewer.index} onIndex={(i) => setViewer({ ...viewer, index: i })} onClose={() => setViewer(null)} />
+        <Lightbox items={viewer.items} index={viewer.index} onIndex={(i) => setViewer({ ...viewer, index: i })} onClose={() => setViewer(null)} onTrash={(a) => void trashFromViewer(a)} />
       )}
       {albumPicker && (
         <AddToAlbumDialog assetIds={[...selected]} onClose={() => setAlbumPicker(false)} onDone={() => { setAlbumPicker(false); stopSelecting(); }} />
@@ -180,8 +215,8 @@ export default function PhotosPage() {
   );
 }
 
-export function Lightbox({ items, index, onIndex, onClose }:
-  { items: Asset[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
+export function Lightbox({ items, index, onIndex, onClose, onTrash }:
+  { items: Asset[]; index: number; onIndex: (i: number) => void; onClose: () => void; onTrash?: (a: Asset) => void }) {
   const a = items[index];
   const { lowData } = usePrefs();
   const [original, setOriginal] = useState(false);
@@ -207,6 +242,10 @@ export function Lightbox({ items, index, onIndex, onClose }:
           <button className="icon" onClick={() => setOriginal(true)} aria-label={tr("Show full size")} title={tr("Show full size")}><Maximize size={18} /></button>
         )}
         <a className="icon" href={url.file(a, true)} aria-label={tr("Download")}><Download size={18} /></a>
+        {onTrash && (
+          <button className="icon" onClick={() => confirm(tr("Move \"{filename}\" to the trash?", { filename: a.filename })) && onTrash(a)}
+            aria-label={tr("Move to trash")} title={tr("Move to trash")}><Trash2 size={18} /></button>
+        )}
         <button className="icon" onClick={onClose} aria-label={tr("Close")}><X size={20} /></button>
       </div>
       {index > 0 && <button className="lb-nav prev" onClick={() => onIndex(index - 1)} aria-label={tr("Previous")}><ChevronLeft size={30} /></button>}
