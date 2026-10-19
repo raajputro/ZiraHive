@@ -7,11 +7,15 @@ Free, open source and private: nothing leaves your home unless you share it.
 Everything runs in the web browser on phones, PCs and TVs. There are no apps to install from a
 store.
 
-> **Status:** version 1.0: all nine planned batches are done. Installing it for the first time?
-> Follow [docs/FIRST_RUN.md](docs/FIRST_RUN.md). What's next: [docs/ROADMAP.md](docs/ROADMAP.md).
+> **Status:** version 1.0 is released (`main`). The `develop` branch adds Live TV (IPTV), a photo
+> vault with folders, a vault auto-lock you can set, and a collapsible side menu, on the way to
+> 1.1. Installing it for the first time? Follow [docs/FIRST_RUN.md](docs/FIRST_RUN.md). What's
+> next: [docs/ROADMAP.md](docs/ROADMAP.md).
 
 ## Contents
 
+- [Why ZiraHive](#why-zirahive)
+- [How it works](#how-it-works)
 - [What it does](#what-it-does)
 - [Get started on Windows](#get-started-on-windows)
 - [Your media](#your-media)
@@ -26,6 +30,65 @@ store.
 - [Running it day to day](#running-it-day-to-day)
 - [For developers](#for-developers)
 
+## Why ZiraHive
+
+Most families already own what a private cloud needs: a PC with a few terabytes of disk that is on
+most of the day. Yet the photos live on phones that fill up, the backups sit in a paid cloud plan
+that grows every year, and the films on the PC's drive can only be watched sitting at that PC.
+Getting all of it right usually means several separate tools (one for photo backup, one for
+files, one for media), each with its own setup, accounts and updates.
+
+ZiraHive puts those jobs into **one** thing that runs on the PC you have:
+
+- **No monthly bill and no storage cap.** Storage is your own disks. Everything is free and open
+  source (AGPL-3.0), with nothing behind a paywall.
+- **Private by default.** Your photos and files stay in your home. Nothing is sent to a company,
+  the local AI runs on your PC, and the vault is encrypted on your own device.
+- **Made for the whole family.** An account per person, age limits for children, shared albums,
+  watch parties, and the whole interface in Bangla as well as English.
+- **Works on the internet you have.** Remote access goes through Tailscale, so it works behind the
+  carrier-grade NAT most Bangladeshi internet providers use, with no router changes and no open port.
+- **Nothing to install on phones or TVs.** It's a web app: any browser is the client.
+
+## How it works
+
+```mermaid
+flowchart LR
+    subgraph Devices["Phones, PCs, TVs (any browser)"]
+        B[Browser]
+    end
+    B -- "home Wi-Fi :8080" --> W
+    B -- "Tailscale https (away)" --> T[tailscale] --> W
+    subgraph PC["Your Windows PC (Docker)"]
+        W["web: Caddy + the app"] --> A["api: FastAPI"]
+        A --> P[("postgres")]
+        A --> R[("redis")] --> K["worker: thumbnails, scans,<br/>conversions, backups"]
+        A -. optional .-> AI["ai + ollama: CLIP, faces,<br/>Whisper, Ask"]
+        A --- D["Data folder<br/>photos, files, vault (encrypted)"]
+        A --- M["Media folder, read-only<br/>movies, series, music, books"]
+    end
+    A -. "IPTV, offsite backup,<br/>TMDB posters (optional)" .-> X((Internet))
+```
+
+A few rules shape everything else:
+
+1. **The PC is the server, the browser is the client.** `docker compose` runs the parts as
+   containers; `setup.ps1` does the whole Windows install, including the firewall rule and a
+   desktop shortcut.
+2. **Media is read where it already is.** Your media folder (for example `G:\Media`) is mounted
+   read-only. Each folder in it becomes a category, so nothing is copied, moved or renamed.
+3. **Your data stays readable without ZiraHive.** Backed-up photos and files are stored under
+   their real names in the data folder, so Explorer can browse them even when ZiraHive is off.
+4. **Uploads survive bad connections.** Phones upload in resumable chunks with a SHA-256 check,
+   and photos already backed up are skipped.
+5. **Anything plays.** What a browser can play is sent as it is; anything else is converted to
+   HLS while you watch (NVIDIA NVENC when present, the CPU otherwise).
+6. **The vault never reaches the server unencrypted.** Files, names, thumbnails and folders are
+   encrypted in the browser (AES-256-GCM, keys from your passphrase), so the server only stores
+   scrambled data.
+7. **Away from home through Tailscale only.** The app is never on the public internet; an
+   optional second address serves share links and nothing else.
+
 ## What it does
 
 | | |
@@ -36,12 +99,13 @@ store.
 | **Files** | Folders, a 30-day trash, and version history: upload a document with the same name and the old copy is kept. |
 | **Search and scan** | Find documents by the words inside them, in Bangla and English, even in scanned papers. Turn paper into a searchable PDF with the phone's camera. |
 | **Watch** | Movies and series from your own folders, with posters, seasons, "next episode" and skip intro. Every format plays: what the browser can't play is converted while you watch. |
+| **Live TV** | Your IPTV subscription (Xtream Codes) in ZiraHive: channels by category, programme guide, movies and series, favourites, channel up / down. The IPTV login never reaches a browser. |
 | **Watch parties** | Watch together from different places, in step, with chat, reactions and voice chat. |
 | **Linked servers** | Share some categories with family who have their own ZiraHive, and watch theirs. |
 | **On the TV** | Cast to a Chromecast, or browse ZiraHive from any smart TV's media menu (DLNA). |
 | **Listen** | Music by album and artist, playlists, and audiobooks that remember where you stopped. |
 | **Read** | EPUB and PDF books and comics, with your page saved on every device. |
-| **Vault** | A locked space for ID scans and private papers, encrypted on your device. Not even the admin can open it. |
+| **Vault** | A locked space for private photos, ID scans and papers, encrypted on your device, with folders and its own tab in Photos. Not even the admin can open it. |
 | **PC sync** | The ZiraHive Sync app keeps a folder on your Windows PC and in ZiraHive the same, both ways. |
 | **Family** | An account for each person, storage limits, and age limits for children. |
 | **Passkeys** | Sign in with your phone's or laptop's fingerprint, face or screen lock. |
@@ -251,9 +315,19 @@ subscription with the family. Details: [docs/IPTV.md](docs/IPTV.md).
   off.
 - **Scan:** **Scan** in Files turns paper into a searchable PDF with the phone's camera. ZiraHive
   finds the page, straightens it and cleans it up; add as many pages as you like.
-- **Vault:** for papers no one else should see. Files are encrypted on your device with your own
-  passphrase before upload. Keep the recovery key you're shown somewhere safe: without the
-  passphrase or the key, nobody can open the vault, including you.
+- **Vault:** for photos and papers no one else should see. Everything is encrypted on your device
+  with your own passphrase before it's uploaded: files, their names, thumbnails and folder names.
+  - **Photos > Vault** shows the vault's photos and videos by month, with folder chips. In
+    Photos, **Move to vault** (in the viewer or with **Select**) encrypts a photo, checks the vault
+    copy reads back identical, and only then deletes the unencrypted original for good. **Move back
+    to Photos** does the reverse.
+  - **Folders:** **New folder** in the vault, folders inside folders, **Move to folder**, rename
+    and delete. Folder names are encrypted too.
+  - **Auto-lock:** the vault locks itself after 5 minutes without use. Change it (1 to 120
+    minutes) in the vault bar; the setting is kept per browser.
+  - **The recovery key** is the only way in if you forget the passphrase: nobody can reset it,
+    including the admin. Save it in a password manager or somewhere **outside** the ZiraHive
+    folder, and never commit it to git (`*recovery-key*.txt` is ignored for that reason).
 - **PC sync:** the ZiraHive Sync app for Windows keeps a folder on your PC and one in ZiraHive the
   same, both ways. See [sync-client/README.md](sync-client/README.md).
 
@@ -305,6 +379,9 @@ options.
   disk, another computer or a cloud bucket, with regular checks. Set it up in **Settings > Server >
   Offsite backup**; restoring is in [docs/BACKUP.md](docs/BACKUP.md).
 - **Your media is read-only** to ZiraHive: it can never change or delete it.
+- **The vault** is end-to-end encrypted: an admin, or anyone who takes the disk, sees only
+  scrambled data. Photos moved in from the timeline existed unencrypted before the move, so for
+  the most private things add them straight into the vault from the phone.
 
 ## Local AI (optional)
 
@@ -368,6 +445,23 @@ space on every disk.
 | `tailscale` | Remote access, only with `--profile remote` |
 | `ai` | Local AI: CLIP, faces, Whisper; only with `--profile ai` |
 | `ollama` | Local language models for Ask; only with `--profile ai` |
+
+### Repository layout
+
+| Folder | What's in it |
+|---|---|
+| `server/` | The API and background jobs (FastAPI, SQLAlchemy, Alembic migrations, pytest tests) |
+| `web/` | The web app (React, TypeScript, Vite); Bangla texts in `web/src/locales/bn.ts` |
+| `ai/` | The optional local-AI helper container (CLIP, faces, Whisper) |
+| `sync-client/` | ZiraHive Sync for Windows (two-way folder sync, DLNA for TVs) |
+| `e2e/`, `loadtest/` | Playwright browser tests and the Locust load test |
+| `docs/` | Guides: first run, remote access, backup, IPTV, AI, plugins, roadmap |
+| `tailscale/`, `no-drive/`, `scripts/` | Remote-access config, a placeholder mount, CI and sample-media helpers |
+| `test-zh/` | Windows `.cmd` helpers used while testing on the PC (rebuild, setup run, Docker / network / firewall checks); each writes its log next to itself, and logs aren't committed |
+| `setup.ps1`, `update.ps1` | First-time Windows setup and updates |
+
+**Branches:** `main` holds releases (tagged, for example `v1.0.0`); new work goes to `develop`
+first.
 
 ### Running from source
 
