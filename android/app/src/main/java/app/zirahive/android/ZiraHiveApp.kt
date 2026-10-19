@@ -10,12 +10,17 @@ import app.zirahive.android.notify.NotificationPoller
 class ZiraHiveApp : Application() {
     override fun onCreate() {
         super.onCreate()
-        channels(this)
+        // background extras: if one fails on some device, the app still opens
+        safely { channels(this) }
         if (Server.isSetUp(this)) {
-            Backup.schedule(this)
-            NotificationPoller.schedule(this)
+            safely { Backup.schedule(this) }
+            safely { NotificationPoller.schedule(this) }
         }
-        app.zirahive.android.prayer.PrayerAlarms.schedule(this)
+        safely { app.zirahive.android.prayer.PrayerAlarms.schedule(this) }
+    }
+
+    private inline fun safely(block: () -> Unit) {
+        try { block() } catch (t: Throwable) { android.util.Log.w("ZiraHive", "startup", t) }
     }
 
     companion object {
