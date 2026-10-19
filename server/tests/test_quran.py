@@ -107,3 +107,46 @@ async def test_namaz_settings_and_tracker(client, admin):
     assert len(log) == 3
     assert (await client.put("/api/namaz/log", json={"day": "2026-13-40", "prayer": "fajr", "status": "ontime"})).status_code == 400
     assert (await client.put("/api/namaz/log", json={"day": "2026-10-19", "prayer": "lunch", "status": "ontime"})).status_code == 400
+
+
+async def test_recitations_never_mix_with_songs(tmp_path, monkeypatch, client, admin):
+    """A Quran folder inside the Music folder: its files are recitations, not songs."""
+    root = tmp_path / "media"
+    sample.tone(root / "Music" / "Band" / "Album" / "01 Song.mp3", 1, 600, {"title": "Song", "artist": "Band", "album": "Album"})
+    for n in (1, 112):
+        sample.tone(root / "Music" / "Quran" / "Sudais" / f"{n:03d}.mp3", 1, 300 + n,
+                    {"title": f"Surah {n}", "artist": "Sudais", "album": "Quran"})
+    sample.tone(root / "Music" / "Islamic" / "Tilawat" / "Yasin.mp3", 1, 400)   # a tilawat folder deeper down
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_ROOT", str(root))
+    from app.config import get_settings
+    get_settings.cache_clear()
+    await client.post("/api/libraries/discover")
+    await jobs.drain_local()
+
+    # Listen: songs only, everywhere
+    assert [s["title"] for s in (await client.get("/api/music/tracks")).json()] == ["Song"]
+    assert [s["title"] for s in (await client.get("/api/music/tracks", params={"q": "surah"})).json()] == []
+    assert [a["title"] for a in (await client.get("/api/music/albums")).json()] == ["Album"]
+    assert [a["name"] for a in (await client.get("/api/music/artists")).json()] == ["Band"]
+    assert (await client.get("/api/music/artist", params={"name": "Sudais"})).status_code == 404
+
+    # Quran & Namaz: the recitations, by qari
+    home = (await client.get("/api/quran")).json()
+    assert home["has_category"]
+    assert {r["name"]: r["surahs"] for r in home["reciters"]} == {"Sudais": 2, "Tilawat": 1}
+    rec = (await client.get("/api/quran/reciter", params={"name": "Sudais"})).json()["surahs"][0]["tracks"][0]
+    assert rec["quran"] is True
+
+    # played, favourited, put in a playlist: still never among songs
+    await client.post(f"/api/music/tracks/{rec['id']}/played")
+    await client.put(f"/api/music/tracks/{rec['id']}/favorite", json={"favorite": True})
+    p = (await client.post("/api/music/playlists", json={"name": "Mix", "track_ids": [rec["id"]]})).json()
+    assert p["tracks"] == []
+    music_home = (await client.get("/api/music/home")).json()
+    assert music_home["recently_played"] == [] and music_home["most_played"] == []
+    assert (await client.get("/api/music/tracks", params={"favorites": True})).json() == []
+    assert [t["id"] for t in (await client.get("/api/quran")).json()["recent"]] == [rec["id"]]
+
+    # notifications: "new songs" counts songs only
+    notes = [n["title"] for n in (await client.get("/api/notifications")).json()["items"]]
+    assert "1 new song in Music" in notes and "3 new recitations in Quran" in notes

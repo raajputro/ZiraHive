@@ -10,7 +10,7 @@ from sqlalchemy import delete, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session, one_row
-from ..models import Library, MusicAlbum, Playlist, PlaylistTrack, Track, TrackStat, User, utcnow, track_shown
+from ..models import Library, MusicAlbum, Playlist, PlaylistTrack, Track, TrackStat, User, utcnow, song_shown
 from ..schemas import (MusicAlbumDetailOut, MusicAlbumOut, ArtistDetailOut, ArtistOut, AudioReadyOut, FavoriteIn,
                        MusicHomeOut, PlaylistAddIn, PlaylistDetailOut, PlaylistIn, PlaylistOut,
                        PlaylistUpdateIn, TrackOut)
@@ -67,7 +67,7 @@ async def track_outs(session: AsyncSession, user: User, tracks: list[Track]) -> 
 
 def _album_query(lib_ids: list[str]):
     counts = (select(Track.album_id, func.count().label("n"), func.coalesce(func.sum(Track.duration), 0).label("d"))
-              .where(track_shown()).group_by(Track.album_id).subquery())
+              .where(song_shown()).group_by(Track.album_id).subquery())
     return (select(MusicAlbum, counts.c.n, counts.c.d).join(counts, counts.c.album_id == MusicAlbum.id)
             .where(MusicAlbum.library_id.in_(lib_ids)))
 
@@ -87,7 +87,7 @@ async def _track(session: AsyncSession, user: User, track_id: str) -> tuple[Trac
 
 
 def _visible_tracks(lib_ids: list[str]):
-    return select(Track).where(Track.library_id.in_(lib_ids), track_shown())
+    return select(Track).where(Track.library_id.in_(lib_ids), song_shown())
 
 
 _ORDER = (Track.disc_no.is_(None), Track.disc_no, Track.track_no.is_(None), Track.track_no, Track.rel_path)
@@ -101,15 +101,15 @@ async def music_home(user: User = Depends(current_user), session: AsyncSession =
     recent = (await session.execute(_album_query(ids).order_by(MusicAlbum.added_at.desc()).limit(18))).all()
     played_rows = (await session.execute(
         select(Track).join(TrackStat, TrackStat.track_id == Track.id)
-        .where(TrackStat.user_id == user.id, TrackStat.last_played.is_not(None), track_shown(),
+        .where(TrackStat.user_id == user.id, TrackStat.last_played.is_not(None), song_shown(),
                Track.library_id.in_(ids)).order_by(TrackStat.last_played.desc()).limit(18))).scalars().all()
     most = (await session.execute(
         select(Track).join(TrackStat, TrackStat.track_id == Track.id)
-        .where(TrackStat.user_id == user.id, TrackStat.plays > 0, track_shown(),
+        .where(TrackStat.user_id == user.id, TrackStat.plays > 0, song_shown(),
                Track.library_id.in_(ids)).order_by(TrackStat.plays.desc()).limit(18))).scalars().all()
     favs = await session.scalar(select(func.count()).select_from(TrackStat).join(Track, Track.id == TrackStat.track_id)
                                 .where(TrackStat.user_id == user.id, TrackStat.favorite.is_(True),
-                                       track_shown(), Track.library_id.in_(ids)))
+                                       song_shown(), Track.library_id.in_(ids)))
     return MusicHomeOut(recent_albums=[_album_out(r) for r in recent],
                         recently_played=await track_outs(session, user, list(played_rows)),
                         most_played=await track_outs(session, user, list(most)),
@@ -142,7 +142,7 @@ async def get_album(album_id: str, user: User = Depends(current_user), session: 
     if row is None:
         raise HTTPException(404, "Album not found")
     out = MusicAlbumDetailOut(**_album_out(row).model_dump())
-    tracks = (await session.scalars(select(Track).where(Track.album_id == album_id, track_shown())
+    tracks = (await session.scalars(select(Track).where(Track.album_id == album_id, song_shown())
                                     .order_by(*_ORDER))).all()
     out.tracks = await track_outs(session, user, list(tracks))
     return out
@@ -152,7 +152,7 @@ async def get_album(album_id: str, user: User = Depends(current_user), session: 
 async def album_cover(album_id: str, user: User = Depends(current_user),
                       session: AsyncSession = Depends(get_session)):
     album = await session.get(MusicAlbum, album_id)
-    if album is None or album.library_id not in await _lib_ids(session, user):
+    if album is None or album.library_id not in await visible_libraries(session, user, TRACK_KINDS):
         raise HTTPException(404, "Album not found")
     path = storage.cover_path("album", album.id)
     if not album.cover_ready or not path.is_file():
@@ -280,7 +280,7 @@ async def _playlist_outs(session: AsyncSession, user: User, lib_ids: list[str],
             select(Track.duration, Track.album_id, MusicAlbum.cover_ready)
             .join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
             .outerjoin(MusicAlbum, MusicAlbum.id == Track.album_id)
-            .where(PlaylistTrack.playlist_id == p.id, track_shown(), Track.library_id.in_(lib_ids))
+            .where(PlaylistTrack.playlist_id == p.id, song_shown(), Track.library_id.in_(lib_ids))
             .order_by(PlaylistTrack.position))).all()
         covers: list[str] = []
         for _d, album_id, cover in rows:
@@ -301,7 +301,8 @@ async def _playlist(session: AsyncSession, user: User, playlist_id: str) -> Play
 
 async def _checked_tracks(session: AsyncSession, user: User, track_ids: list[str]) -> list[str]:
     ids = await _lib_ids(session, user)
-    found = set((await session.scalars(select(Track.id).where(Track.id.in_(track_ids), Track.library_id.in_(ids)))).all())
+    found = set((await session.scalars(select(Track.id).where(Track.id.in_(track_ids), Track.library_id.in_(ids),
+                                                               Track.quran.is_(False)))).all())
     return [t for t in track_ids if t in found]
 
 
@@ -310,7 +311,7 @@ async def _detail(session: AsyncSession, user: User, p: Playlist) -> PlaylistDet
     base = (await _playlist_outs(session, user, ids, [p]))[0]
     tracks = (await session.scalars(
         select(Track).join(PlaylistTrack, PlaylistTrack.track_id == Track.id)
-        .where(PlaylistTrack.playlist_id == p.id, track_shown(), Track.library_id.in_(ids))
+        .where(PlaylistTrack.playlist_id == p.id, song_shown(), Track.library_id.in_(ids))
         .order_by(PlaylistTrack.position))).all()
     return PlaylistDetailOut(**base.model_dump(), tracks=await track_outs(session, user, list(tracks)))
 

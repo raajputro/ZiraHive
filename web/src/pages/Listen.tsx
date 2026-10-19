@@ -104,6 +104,7 @@ export function TrackList({ tracks, numbered = false, showAlbum = true, onRemove
                 </span>
                 <span className="muted small track-dur">{clock(t.duration)}</span>
               </button>
+              {!t.quran && <>
               <button className={`icon ${fav(t) ? "fav" : ""}`} onClick={() => void toggleFav(t)} aria-pressed={fav(t)}
                 aria-label={fav(t) ? tr("Remove {title} from favourites", { title: t.title }) : tr("Add {title} to favourites", { title: t.title })}>
                 <Heart size={16} fill={fav(t) ? "currentColor" : "none"} />
@@ -125,6 +126,7 @@ export function TrackList({ tracks, numbered = false, showAlbum = true, onRemove
                   </div>
                 )}
               </div>
+              </>}
             </li>
           );
         })}

@@ -50,6 +50,11 @@ def pretty_name(folder: str) -> str:
     return " ".join(out) or folder
 
 
+def is_quran_name(name: str) -> bool:
+    """A folder name that says it holds Quran recitations ("Quran", "Tilawat", "কুরআন"…)."""
+    return bool(_QURAN.search(name))
+
+
 def guess_kind(name: str) -> str:
     for kind, pattern in (("quran", _QURAN), ("audiobooks", _AUDIOBOOKS), ("music", _MUSIC), ("comics", _COMICS), ("books", _BOOKS)):
         if pattern.search(name):

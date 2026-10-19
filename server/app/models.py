@@ -408,12 +408,21 @@ class Track(Base):
     duplicate_of: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
     dup_moved: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
     dup_kept: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # A Quran recitation: in a Quran category, or in a Quran-named folder inside a music category.
+    # Recitations are only ever shown in Quran & Namaz, never among songs.
+    quran: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
 
 
 def track_shown():
-    """Songs to list: on disk and not a duplicate copy."""
+    """Audio files to list: on disk and not a duplicate copy."""
     from sqlalchemy import and_
     return and_(Track.missing.is_(False), Track.duplicate_of.is_(None))
+
+
+def song_shown():
+    """Songs (Listen): shown, and not a Quran recitation."""
+    from sqlalchemy import and_
+    return and_(track_shown(), Track.quran.is_(False))
 
 
 class TrackStat(Base):

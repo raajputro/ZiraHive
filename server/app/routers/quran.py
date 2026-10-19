@@ -26,6 +26,7 @@ from ..models import Library, MusicAlbum, PrayerLog, PrayerSettings, Track, Trac
 from ..schemas import TrackOut
 from ..security import admin_user, current_user
 from ..services.quran_data import SURAHS, parse_file
+from ..services.libraries import is_quran_name
 from ..services.shelf_files import AUDIO_EXT, clean_name
 from .music import track_outs, visible_libraries
 
@@ -34,20 +35,28 @@ router = APIRouter(prefix="/api", tags=["quran"])
 
 # ------------------------------------------------------------------ recitations
 
-def _reciter(t: Track, lib_name: str) -> str:
-    parts = PurePosixPath(t.rel_path).parts
-    if len(parts) > 1:
-        return clean_name(parts[0])
-    return t.artist or lib_name
+def _reciter(t: Track, lib: Library) -> str:
+    """The qari: the folder a file is in, below the Quran folder (or the category, for a Quran category)."""
+    folders = list(PurePosixPath(t.rel_path).parts[:-1])
+    if lib.kind == "quran":
+        return clean_name(folders[0]) if folders else (t.artist or lib.name)
+    # Music/…/Quran/<qari>/001.mp3: the folder below the Quran-named one; files straight in the
+    # Quran folder go under that folder's own name
+    cut = next((i for i, f in enumerate(folders) if is_quran_name(f)), None)
+    if cut is None:
+        return "Quran"
+    below = folders[cut + 1:]
+    return clean_name(below[0] if below else folders[cut])
 
 
 async def _quran_tracks(session: AsyncSession, user: User) -> list[tuple[Track, str]]:
-    libs = await visible_libraries(session, user, {"quran"})
+    """Every recitation this person may hear: Quran categories, and Quran folders inside music ones."""
+    libs = await visible_libraries(session, user, {"quran", "music"})
     if not libs:
         return []
-    rows = (await session.scalars(select(Track).where(Track.library_id.in_(list(libs)), track_shown())
-                                  .order_by(Track.rel_path))).all()
-    return [(t, _reciter(t, libs[t.library_id].name)) for t in rows]
+    rows = (await session.scalars(select(Track).where(Track.library_id.in_(list(libs)), Track.quran.is_(True),
+                                                      track_shown()).order_by(Track.rel_path))).all()
+    return [(t, _reciter(t, libs[t.library_id])) for t in rows]
 
 
 class ReciterOut(BaseModel):
@@ -116,7 +125,7 @@ async def quran_home(user: User = Depends(current_user), session: AsyncSession =
             select(Track).join(TrackStat, TrackStat.track_id == Track.id)
             .where(TrackStat.user_id == user.id, TrackStat.last_played.is_not(None), Track.id.in_(ids))
             .order_by(TrackStat.last_played.desc()).limit(12))).all())
-    has = bool(await visible_libraries(session, user, {"quran"}))
+    has = bool(await visible_libraries(session, user, {"quran"})) or bool(rows)
     return QuranHomeOut(reciters=reciters, recent=await track_outs(session, user, recent), has_category=has)
 
 

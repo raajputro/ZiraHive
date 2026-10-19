@@ -24,6 +24,7 @@ from sqlalchemy import select
 
 from ..db import sessionmaker
 from ..models import Book, Library, MusicAlbum, Track, User, track_shown
+from .libraries import is_quran_name
 from . import storage
 from .browse import marked, walk_filter
 from .shelf_files import (AUDIO_EXT, COMIC_EXT, EBOOK_EXT, IMAGE_EXT, audio_info, clean_name, comic_meta,
@@ -167,7 +168,11 @@ async def scan_music(session, lib: Library, root: Path, stats: dict) -> None:
     for rel, size, mtime in files:
         seen.add(rel)
         t = existing.get(rel)
+        quran = lib.kind == "quran" or any(is_quran_name(part) for part in PurePosixPath(rel).parts[:-1])
         if t and t.size == size and t.mtime == mtime and not t.missing:
+            if t.quran != quran:
+                t.quran = quran
+                stats["updated"] += 1
             continue
         fields = await asyncio.to_thread(_track_fields, root, rel)
         key, album_artist = fields.pop("_key"), fields.pop("_album_artist")
@@ -182,11 +187,13 @@ async def scan_music(session, lib: Library, root: Path, stats: dict) -> None:
             t = Track(library_id=lib.id, rel_path=rel, title=fields["title"])
             session.add(t)
             stats["added"] += 1
+            if quran and lib.kind == "music":
+                stats["added_quran"] = stats.get("added_quran", 0) + 1
         else:
             stats["updated"] += 1
         for k, v in fields.items():
             setattr(t, k, v)
-        t.album_id, t.size, t.mtime, t.missing = album.id, size, mtime, False
+        t.album_id, t.size, t.mtime, t.missing, t.quran = album.id, size, mtime, False, quran
         touched[album.id] = touched.get(album.id) or album_artist
         done += 1
         if done % 50 == 0:
@@ -354,8 +361,14 @@ async def scan(library_id: str) -> dict:
                 log.exception("duplicate-song check failed")
                 found = {"hidden": 0}
             stats["duplicates"] = found["hidden"]
-            # the new songs a person sees are the ones left after duplicates
-            stats["added"] = max(0, stats["added"] - found["hidden"])
+            # the new songs a person sees are the ones left after duplicates, without recitations
+            recitations = stats.get("added_quran", 0)
+            stats["added"] = max(0, stats["added"] - found["hidden"] - recitations)
+            if recitations:
+                from .events import notify
+                for user in (await session.scalars(select(User))).all():
+                    await notify(session, user, "media", f"{recitations} new {'recitation' if recitations == 1 else 'recitations'} in Quran",
+                                 link="/quran")
             if found["hidden"]:
                 from .events import notify_admins
                 n = found["hidden"]

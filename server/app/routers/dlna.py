@@ -19,7 +19,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_session
-from ..models import Library, MediaItem, MusicAlbum, Series, Track, User, WatchProgress, track_shown
+from ..models import Library, MediaItem, MusicAlbum, Series, Track, User, WatchProgress, song_shown
 from ..security import create_media_token, current_user
 from ..services.ratings import allowed
 from ..services.shelf_files import AUDIO_MIME
@@ -153,7 +153,7 @@ async def browse(id: str = "0", user: User = Depends(current_user), session: Asy
         lib = await session.get(Library, a.library_id) if a else None
         if a is None or lib is None or not allowed(user.max_age, lib.age_rating):
             raise HTTPException(404, "No such folder")
-        tracks = (await session.scalars(select(Track).where(Track.album_id == a.id, track_shown())
+        tracks = (await session.scalars(select(Track).where(Track.album_id == a.id, song_shown())
                                         .order_by(Track.disc_no, Track.track_no, Track.title))).all()
         art = f"/api/music/albums/{a.id}/cover?token={create_media_token(user, a.id)}" if a.cover_ready else None
         items = [DlnaItem(id=f"t:{t.id}", title=t.title, kind="audio", size=t.size, duration=t.duration,

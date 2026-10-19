@@ -58,6 +58,8 @@ export interface Track {
   id: string; library_id: string; album_id: string | null; title: string; artist: string | null; album_title: string | null;
   track_no: number | null; disc_no: number | null; year: number | null; genre: string | null; duration: number | null;
   codec: string | null; playable: boolean; favorite: boolean; plays: number; cover_ready: boolean;
+  /** A Quran recitation (Quran & Namaz), never shown among songs. */
+  quran?: boolean;
   /** Where the player's title links to (set by the page; the album page by default). */
   link?: string;
 }

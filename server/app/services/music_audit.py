@@ -214,7 +214,7 @@ async def run(session: AsyncSession, move_files: bool = True) -> dict:
     roots = {i: Path(lib.path) for i, lib in libs.items()}
     tracks = list((await session.scalars(select(Track).where(
         Track.library_id.in_(list(libs)), Track.missing.is_(False), Track.duplicate_of.is_(None),
-        Track.dup_kept.is_(False)))).all())
+        Track.dup_kept.is_(False), Track.quran.is_(False)))).all())
     album_ids = {t.album_id for t in tracks if t.album_id}
     covers = dict((await session.execute(select(MusicAlbum.id, MusicAlbum.cover_ready)
                                          .where(MusicAlbum.id.in_(album_ids)))).all()) if album_ids else {}

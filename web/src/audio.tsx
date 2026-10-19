@@ -246,7 +246,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   };
 
   const insert = (tracks: Track[], afterCurrent: boolean) => {
-    if (state.current.book || !queue.length) { playTracks(tracks); return; }
+    // recitations and songs never share a queue: adding one kind to the other starts a new queue
+    const isQuran = (t?: Track) => !!t?.quran;
+    if (state.current.book || !queue.length || tracks.some((t) => isQuran(t) !== isQuran(queue[0]?.track))) { playTracks(tracks); return; }
     const items = tracks.map(trackItem);
     setQueue((qu) => afterCurrent ? [...qu.slice(0, index + 1), ...items, ...qu.slice(index + 1)] : [...qu, ...items]);
   };
