@@ -1320,6 +1320,22 @@ const bn: Record<string, string> = {
   "Keep the newest of each, remove {n}": "প্রতিটির সবচেয়ে নতুনটি রেখে {n}টি সরান",
   "Checked {n} documents.": "{n}টি ডকুমেন্ট দেখা হয়েছে।",
   "Find duplicates": "একই ফাইলের কপি খুঁজুন",
+  "Version {name} is ready. Phones with the app will offer the update.": "সংস্করণ {name} তৈরি। অ্যাপ থাকা ফোনগুলো আপডেট করতে বলবে।",
+  "Android app": "অ্যান্ড্রয়েড অ্যাপ",
+  "You're using the app, version {name}, on {device}.": "আপনি {device}-এ অ্যাপের {name} সংস্করণ ব্যবহার করছেন।",
+  "Phone backup is on. {n} photos and videos backed up from this phone.": "ফোন ব্যাকআপ চালু। এই ফোন থেকে {n}টি ছবি ও ভিডিও ব্যাকআপ হয়েছে।",
+  "Phone backup is off.": "ফোন ব্যাকআপ বন্ধ।",
+  "Phone backup settings": "ফোন ব্যাকআপের সেটিংস",
+  "Change server address": "সার্ভারের ঠিকানা বদলান",
+  "Backs up your photos by itself, plays films in the phone's own player (also in a floating window), and lets you share files from any app to ZiraHive. Open this page on the phone to install it.": "নিজে থেকেই আপনার ছবি ব্যাকআপ করে, ফোনের নিজস্ব প্লেয়ারে সিনেমা চালায় (ভাসমান জানালাতেও), আর যেকোনো অ্যাপ থেকে ZiraHive-এ ফাইল পাঠাতে দেয়। ইনস্টল করতে এই পাতাটি ফোনে খুলুন।",
+  "Download for Android ({size})": "অ্যান্ড্রয়েডের জন্য ডাউনলোড ({size})",
+  "Android asks once to allow installing apps from your browser; that's expected, the app isn't on the Play Store.": "অ্যান্ড্রয়েড একবার ব্রাউজার থেকে অ্যাপ ইনস্টলের অনুমতি চাইবে; এটা স্বাভাবিক, অ্যাপটি প্লে স্টোরে নেই।",
+  "On this ZiraHive: version {name}, added {date}.": "এই ZiraHive-এ: সংস্করণ {name}, যোগ হয়েছে {date}।",
+  "No app has been added yet. Add the .apk file from the ZiraHive build to let phones download and update it.": "এখনো কোনো অ্যাপ যোগ হয়নি। ফোনে ডাউনলোড ও আপডেটের জন্য ZiraHive বিল্ডের .apk ফাইলটি যোগ করুন।",
+  "Uploading…": "আপলোড হচ্ছে…",
+  "Add a new version (.apk)": "নতুন সংস্করণ যোগ করুন (.apk)",
+  "Playing in the ZiraHive player.": "ZiraHive প্লেয়ারে চলছে।",
+  "Use the web player (watch parties, casting)": "ওয়েব প্লেয়ার ব্যবহার করুন (একসাথে দেখা, কাস্টিং)",
 };
 
 export default bn;

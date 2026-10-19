@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <style name="Theme.ZiraHive" parent="Theme.Material3.Dark.NoActionBar">
+        <item name="colorPrimary">@color/jute</item>
+        <item name="colorOnPrimary">@color/indigo_night</item>
+        <item name="colorSecondary">@color/jute</item>
+        <item name="android:colorBackground">@color/indigo_night</item>
+        <item name="android:windowBackground">@color/indigo_night</item>
+        <item name="android:statusBarColor">@color/indigo_night</item>
+        <item name="android:navigationBarColor">@color/indigo_night</item>
+    </style>
+    <style name="Theme.ZiraHive.Player" parent="Theme.ZiraHive">
+        <item name="android:windowBackground">@android:color/black</item>
+        <item name="android:statusBarColor">@android:color/black</item>
+        <item name="android:navigationBarColor">@android:color/black</item>
+    </style>
+    <style name="Theme.ZiraHive.Dialog" parent="Theme.Material3.Dark.Dialog">
+        <item name="colorPrimary">@color/jute</item>
+        <item name="windowNoTitle">true</item>
+    </style>
+</resources>

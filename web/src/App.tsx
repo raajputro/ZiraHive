@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { useStickyHeads } from "./stickyHead";
+import { nativeApp } from "./native";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { api, ApiError, type User } from "./api";
@@ -64,7 +65,7 @@ function SignedInApp() {
   if (user === undefined) return <div className="boot" aria-busy="true" />;
   if (user === null) return <SignIn firstRun={needsSetup} onSignedIn={(u) => { adoptAccountLanguage(u.language); setNeedsSetup(false); setUser(u); }} />;
 
-  const signOut = () => { void api.logout().finally(() => setUser(null)); };
+  const signOut = () => { nativeApp?.signedOut(); void api.logout().finally(() => setUser(null)); };
   const refreshUser = () => { void api.me().then(setUser).catch(() => undefined); };
   return (
     <AuthContext.Provider value={{ user, signOut, refreshUser }}>

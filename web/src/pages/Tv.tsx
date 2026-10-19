@@ -1,6 +1,7 @@
 // Live TV: an IPTV subscription (Xtream Codes) with channels and a programme guide, movies and
 // series, laid out like Televizo / IPTV Smarters. Video always comes through the ZiraHive server.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type FormEvent, type ReactNode } from "react";
+import { nativeApp, onPlayerClosed } from "../native";
 import { Link, NavLink, Navigate, useNavigate, useParams, useSearchParams } from "react-router-dom";
 import Hls from "hls.js";
 import { ChevronLeft, Maximize, Pencil, Play, Plus, RefreshCw, Search, Settings2, Star, Trash2 } from "lucide-react";
@@ -325,7 +326,7 @@ function LivePlayer({ source, channel, isFav, onFav, onZap }: {
   const convert = channel ? (override?.id === channel.id ? override.on : load<boolean>(convertKey, false)) : false;
   const setConvert = (on: boolean) => { if (channel) setOverride({ id: channel.id, on }); };
   const [attempt, setAttempt] = useState(0);
-  const [status, setStatus] = useState<"idle" | "tuning" | "playing" | "error">("idle");
+  const [status, setStatus] = useState<"idle" | "tuning" | "playing" | "error" | "native">("idle");
   const [message, setMessage] = useState("");
   const [epg, setEpg] = useState<IptvEpg[]>([]);
   const [now, setNow] = useState(Date.now());
@@ -335,6 +336,13 @@ function LivePlayer({ source, channel, isFav, onFav, onZap }: {
     if (!v || !channel) return;
     setStatus("tuning");
     setMessage("");
+    if (nativeApp) {  // in the Android app: the phone's player (handles more channel formats)
+      const live = (mode: string) => withViewer(`/api/iptv/sources/${source}/ch/live/${encodeURIComponent(channel.id)}/${mode}/index.m3u8`);
+      nativeApp.play({ url: live(convert ? "convert" : "copy"), fallbackUrl: convert ? undefined : live("convert"),
+        title: channel.name, poster: channel.icon, live: true, key: "tv-live" });
+      setStatus("native");
+      return;
+    }
     const onPlaying = () => setStatus("playing");
     v.addEventListener("playing", onPlaying);
     const src = `/api/iptv/sources/${source}/ch/live/${encodeURIComponent(channel.id)}/${convert ? "convert" : "copy"}/index.m3u8`;
@@ -357,6 +365,8 @@ function LivePlayer({ source, channel, isFav, onFav, onZap }: {
     window.addEventListener("pagehide", leave);
     return () => { window.removeEventListener("pagehide", leave); leave(); };
   }, []);
+  // the app's player closed: free the provider connection
+  useEffect(() => onPlayerClosed((r) => { if (r.key === "tv-live") stopWatching(); }), []);
 
   useEffect(() => {
     setEpg([]);
@@ -383,6 +393,12 @@ function LivePlayer({ source, channel, isFav, onFav, onZap }: {
         <video ref={video} controls playsInline autoPlay onDoubleClick={() => fullscreen(frame.current)} />
         {!channel && <div className="tv-overlay">{tr("Pick a channel")}</div>}
         {channel && status === "tuning" && <div className="tv-overlay">{tr("Tuning in to {name}…", { name: channel.name })}</div>}
+        {channel && status === "native" && (
+          <div className="tv-overlay">
+            <p>{tr("Playing in the ZiraHive player.")}</p>
+            <button onClick={() => setAttempt((a) => a + 1)}>{tr("Play")}</button>
+          </div>
+        )}
         {channel && status === "error" && (
           <div className="tv-overlay error" role="alert">
             <p>{message}</p>
@@ -637,8 +653,25 @@ export function TvPlayerPage() {
   }, [source, kind, id]);
 
   useEffect(() => {
+    if (!nativeApp || !info || !choice) return;
+    const hls = info.hls_url && info.qualities?.length ? info.hls_url.replace("{quality}", info.qualities.includes("720p") ? "720p" : info.qualities[0]) : null;
+    const url = choice === "direct" && info.direct_url ? info.direct_url
+      : choice === "convert" ? withViewer(info.convert_url) : (info.hls_url ?? "").replace("{quality}", choice);
+    const fallback = url === info.direct_url ? (hls ?? withViewer(info.convert_url)) : undefined;
+    nativeApp.play({ url, fallbackUrl: fallback, title, start: choice === "convert" ? 0 : startAt.current, key });
+  }, [info, choice]);  // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => onPlayerClosed((r) => {
+    if (r.key !== key) return;
+    if (r.finished || (r.duration && r.position > r.duration * 0.95)) { try { localStorage.removeItem(key); } catch { /* ignore */ } }
+    else if (r.position > 5) save(key, Math.floor(r.position));
+    stopWatching();
+    navigate(-1);
+  }), [key, navigate]);
+
+  useEffect(() => {
     const v = video.current;
-    if (!v || !info || !choice) return;
+    if (!v || !info || !choice || nativeApp) return;
     setError("");
     const at = v.currentTime > 1 ? v.currentTime : startAt.current;
     const fallback = () => {
@@ -683,6 +716,7 @@ export function TvPlayerPage() {
       <div className="player-frame" ref={frame}>
         <video ref={video} controls playsInline autoPlay onDoubleClick={() => fullscreen(frame.current)} />
         {!info && !error && <div className="tv-overlay">{tr("Loading…")}</div>}
+        {info && !error && nativeApp && <div className="tv-overlay">{tr("Playing in the ZiraHive player.")}</div>}
         {error && <div className="tv-overlay error" role="alert"><p>{error}</p></div>}
       </div>
       <div className="player-controls">

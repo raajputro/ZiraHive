@@ -11,7 +11,7 @@ from sqlalchemy import select
 from . import db
 from .config import get_settings
 from .models import Library
-from .routers import admin, albums, auth, backup, books, dlna, federation, iptv as iptv_router, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
+from .routers import admin, albums, app_downloads, auth, backup, books, dlna, federation, iptv as iptv_router, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
 from .services import iptv_live, jobs, transcode
 from .services.browse import same_folder_key
 from .services.libraries import discover, merge_duplicates
@@ -81,7 +81,7 @@ def create_app() -> FastAPI:
                            allow_methods=["*"], allow_headers=["*"],
                            expose_headers=["Upload-Offset", "Content-Range"])
     for r in (auth.router, passkeys.router, uploads.router, files.router, albums.router, shares.router,
-              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, federation.router, links.router, smart.router, iptv_router.router, admin.router):
+              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, federation.router, links.router, smart.router, iptv_router.router, app_downloads.router, admin.router):
         app.include_router(r)
 
     @app.get("/api/health", tags=["system"])
