@@ -81,18 +81,26 @@ export default function PhotosPage() {
   const input = useRef<HTMLInputElement>(null);
   const { enqueue, onComplete } = useUploads();
 
+  // A ref, not the `loading` state: the first load and the scroll watcher can both start in the
+  // same moment, before React has re-rendered, and the second would fetch the first page again.
+  const inFlight = useRef(false);
   const load = useCallback(async (reset = false) => {
-    if (loading) return;
+    if (inFlight.current && !reset) return;
+    inFlight.current = true;
     setLoading(true);
     try {
       const page = await api.photos(reset ? null : cursor);
-      setItems((prev) => (reset ? page.items : [...prev, ...page.items]));
+      setItems((prev) => {
+        if (reset) return page.items;
+        const have = new Set(prev.map((a) => a.id));
+        return [...prev, ...page.items.filter((a) => !have.has(a.id))];
+      });
       setCursor(page.next_cursor);
       setDone(!page.next_cursor);
       setError("");
     } catch (e) { setError(e instanceof Error ? e.message : tr("Couldn't load photos")); }
-    finally { setLoading(false); }
-  }, [cursor, loading]);
+    finally { inFlight.current = false; setLoading(false); }
+  }, [cursor]);
 
   useEffect(() => { void load(true); api.onThisDay().then(setMemories).catch(() => undefined); /* eslint-disable-next-line */ }, []);
   // thumbnails are made in the background; refresh shortly after uploads finish
