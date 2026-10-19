@@ -46,7 +46,7 @@ export interface Activity {
 }
 export interface FolderListing { folder: string; folders: string[]; assets: Asset[] }
 export interface PhotoPage { items: Asset[]; next_cursor: string | null }
-export type LibraryKind = "movies" | "shows" | "mixed" | "music" | "audiobooks" | "books" | "comics";
+export type LibraryKind = "movies" | "shows" | "mixed" | "music" | "audiobooks" | "books" | "comics" | "quran";
 export const VIDEO_KINDS: LibraryKind[] = ["movies", "shows", "mixed"];
 
 // ------------------------------------------------------------------ music
@@ -58,8 +58,19 @@ export interface Track {
   id: string; library_id: string; album_id: string | null; title: string; artist: string | null; album_title: string | null;
   track_no: number | null; disc_no: number | null; year: number | null; genre: string | null; duration: number | null;
   codec: string | null; playable: boolean; favorite: boolean; plays: number; cover_ready: boolean;
+  /** Where the player's title links to (set by the page; the album page by default). */
+  link?: string;
 }
 export interface MusicAlbumDetail extends MusicAlbum { tracks: Track[] }
+export interface DuplicateSong { id: string; title: string; artist: string | null; path: string; library: string; size: number; codec: string | null; duration: number | null; moved: boolean }
+export interface DuplicateSongGroup { keep: DuplicateSong; copies: DuplicateSong[] }
+export interface Surah { number: number; name: string; arabic: string; bangla: string; ayahs: number; place: "makkah" | "madinah" }
+export interface Reciter { name: string; surahs: number; files: number; duration: number; cover_album_id: string | null }
+export interface QuranHome { reciters: Reciter[]; recent: Track[]; has_category: boolean }
+export interface SurahFiles { number: number; tracks: Track[]; duration: number }
+export interface ReciterDetail { name: string; cover_album_id: string | null; surahs: SurahFiles[]; other: Track[] }
+export type PrayerStatus = "ontime" | "late" | "missed";
+export interface PrayerLogEntry { day: string; prayer: string; status: PrayerStatus; jamaah: boolean }
 export interface Artist { name: string; album_count: number; track_count: number; cover_album_id: string | null }
 export interface ArtistDetail { name: string; albums: MusicAlbum[]; tracks: Track[] }
 export interface Playlist { id: string; name: string; created_at: string; updated_at: string; track_count: number; duration: number; cover_album_ids: string[] }
@@ -251,6 +262,21 @@ export const api = {
 
   // music
   musicHome: () => request<MusicHome>("GET", "/api/music/home"),
+  songDuplicates: () => request<DuplicateSongGroup[]>("GET", "/api/music/duplicates"),
+  checkSongDuplicates: () => request<{ groups: number; hidden: number; moved: number }>("POST", "/api/music/duplicates/check"),
+  keepSongCopy: (id: string) => request<void>("POST", `/api/music/duplicates/${id}/keep`),
+  quranHome: () => request<QuranHome>("GET", "/api/quran"),
+  surahs: () => request<Surah[]>("GET", "/api/quran/surahs"),
+  reciter: (name: string) => request<ReciterDetail>("GET", `/api/quran/reciter${q({ name })}`),
+  surahReciters: (n: number) => request<{ reciter: string; tracks: Track[]; duration: number }[]>("GET", `/api/quran/surah/${n}`),
+  addRecitation: (reciter: string, file: File) =>
+    request<{ reciter: string; name: string; size: number }>("PUT", `/api/quran/files${q({ reciter, name: file.name })}`, file),
+  rescanQuran: () => request<{ scanning: number }>("POST", "/api/quran/rescan"),
+  prayerSettings: () => request<import("./prayer").PrayerSettings>("GET", "/api/namaz/settings"),
+  savePrayerSettings: (s: import("./prayer").PrayerSettings) => request<import("./prayer").PrayerSettings>("PUT", "/api/namaz/settings", s),
+  prayerLog: (start: string, end: string) => request<PrayerLogEntry[]>("GET", `/api/namaz/log${q({ start, end })}`),
+  setPrayer: (day: string, prayer: string, status: PrayerStatus | null, jamaah = false) =>
+    request<PrayerLogEntry | null>("PUT", "/api/namaz/log", { day, prayer, status, jamaah }),
   musicAlbums: (params: { library_id?: string; q?: string; artist?: string; sort?: "added" | "title" | "artist" | "year"; limit?: number } = {}) =>
     request<MusicAlbum[]>("GET", `/api/music/albums${q(params)}`),
   musicAlbum: (id: string) => request<MusicAlbumDetail>("GET", `/api/music/albums/${id}`),

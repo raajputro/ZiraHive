@@ -14,6 +14,7 @@ import PluginsPanel from "../components/PluginsPanel";
 import LinksPanel from "../components/LinksPanel";
 import AiPanel from "../components/AiPanel";
 import HealthPanel from "../components/HealthPanel";
+import DuplicateSongs from "../components/DuplicateSongs";
 import AndroidAppPanel from "../components/AndroidAppPanel";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(locale()) : tr("never"));
 
@@ -39,7 +40,7 @@ export default function AdminPage() {
         ))}
       </nav>
       {tab === "account" && <><AccountPanel /><AndroidAppPanel admin={user.is_admin} /><PasskeysPanel /><TwoFactorPanel /><NotificationsPanel /><Password /></>}
-      {tab === "server" && user.is_admin && <><HealthPanel /><SecurityPanel /><BackupPanel /><StatsPanel /><ActivityPanel /><Libraries /><AiPanel /><LinksPanel /><PluginsPanel /></>}
+      {tab === "server" && user.is_admin && <><HealthPanel /><SecurityPanel /><BackupPanel /><StatsPanel /><ActivityPanel /><Libraries /><DuplicateSongs /><AiPanel /><LinksPanel /><PluginsPanel /></>}
       {tab === "people" && user.is_admin && <Users />}
       {tab === "log" && user.is_admin && <AuditPanel />}
     </div>
@@ -78,6 +79,7 @@ const KIND_LABEL: Record<LibraryKind, string> = {
   audiobooks: tr("Audiobooks"),
   books: tr("Books (EPUB, PDF)"),
   comics: tr("Comics and manga"),
+  quran: tr("Quran recitations"),
 };
 
 function Libraries() {

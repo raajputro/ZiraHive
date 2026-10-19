@@ -55,4 +55,13 @@
     <string name="play">চালান</string>
     <string name="pause">থামান</string>
     <string name="player_error">এটি চালানো যায়নি: %1$s</string>
+    <string name="channel_prayer">নামাজের সময়</string>
+    <string name="prayer_fajr">ফজর</string>
+    <string name="prayer_dhuhr">যোহর</string>
+    <string name="prayer_jumuah">জুমা</string>
+    <string name="prayer_asr">আসর</string>
+    <string name="prayer_maghrib">মাগরিব</string>
+    <string name="prayer_isha">এশা</string>
+    <string name="prayer_now">%1$s-এর সময় হয়েছে</string>
+    <string name="prayer_soon">%2$d মিনিট পরে %1$s</string>
 </resources>

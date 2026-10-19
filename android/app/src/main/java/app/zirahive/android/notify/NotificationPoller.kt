@@ -52,6 +52,10 @@ class NotificationPoller(ctx: Context, params: WorkerParameters) : CoroutineWork
         } catch (e: Exception) {
             return Result.success()
         }
+        if (System.currentTimeMillis() - prefs.getLong("prayer_checked", 0) > 3600_000L) {
+            prefs.edit().putLong("prayer_checked", System.currentTimeMillis()).apply()
+            app.zirahive.android.prayer.PrayerAlarms.refresh(ctx)
+        }
         val day = 24 * 3600_000L
         if (System.currentTimeMillis() - prefs.getLong("update_checked", 0) > day) {
             prefs.edit().putLong("update_checked", System.currentTimeMillis()).apply()

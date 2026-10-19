@@ -402,6 +402,18 @@ class Track(Base):
     mtime: Mapped[float] = mapped_column(Float, default=0)
     missing: Mapped[bool] = mapped_column(Boolean, default=False)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Set by the duplicate-song check (services/music_audit.py): this file is another copy of that
+    # track, so it's left out of Listen. dup_moved: the file was moved to .zirahive-duplicates.
+    # dup_kept: someone chose to keep it, so the check leaves it alone from then on.
+    duplicate_of: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    dup_moved: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    dup_kept: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+
+
+def track_shown():
+    """Songs to list: on disk and not a duplicate copy."""
+    from sqlalchemy import and_
+    return and_(Track.missing.is_(False), Track.duplicate_of.is_(None))
 
 
 class TrackStat(Base):
@@ -732,3 +744,29 @@ class IptvFavorite(Base):
     icon: Mapped[str | None] = mapped_column(Text, nullable=True)
     ext: Mapped[str | None] = mapped_column(String(8), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PrayerSettings(Base):
+    """Where someone prays and how their prayer times are worked out (one row per person).
+    `settings` is JSON: {lat, lng, place, method, asr, offsets: {fajr: 2, ...}, reminders: {...}}."""
+
+    __tablename__ = "prayer_settings"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    settings: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PrayerLog(Base):
+    """One prayer on one day: prayed on time, prayed late (qaza) or missed."""
+
+    __tablename__ = "prayer_log"
+    __table_args__ = (UniqueConstraint("user_id", "day", "prayer"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)   # YYYY-MM-DD, the person's own calendar day
+    prayer: Mapped[str] = mapped_column(String(8))              # fajr dhuhr asr maghrib isha (or witr, jumuah)
+    status: Mapped[str] = mapped_column(String(8))              # ontime | late | missed
+    jamaah: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)

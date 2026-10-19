@@ -23,7 +23,7 @@ from pathlib import Path, PurePosixPath
 from sqlalchemy import select
 
 from ..db import sessionmaker
-from ..models import Book, Library, MusicAlbum, Track, User
+from ..models import Book, Library, MusicAlbum, Track, User, track_shown
 from . import storage
 from .browse import marked, walk_filter
 from .shelf_files import (AUDIO_EXT, COMIC_EXT, EBOOK_EXT, IMAGE_EXT, audio_info, clean_name, comic_meta,
@@ -32,7 +32,8 @@ from .shelf_files import (AUDIO_EXT, COMIC_EXT, EBOOK_EXT, IMAGE_EXT, audio_info
 
 log = logging.getLogger(__name__)
 
-SHELF_KINDS = {"music", "audiobooks", "books", "comics"}
+SHELF_KINDS = {"music", "audiobooks", "books", "comics", "quran"}
+TRACK_KINDS = {"music", "quran"}  # categories whose files are Track rows
 _DISC_DIR = re.compile(r"^(?:cd|disc|disk|part|pt)[ ._\-]?\d{1,2}\b", re.I)
 _LEADING_TRACK = re.compile(r"^\s*(?:\d{1,2}[-.])?(?P<n>\d{1,3})\s*[-._ )]+\s*(?=\S)")
 
@@ -197,7 +198,7 @@ async def scan_music(session, lib: Library, root: Path, stats: dict) -> None:
     await session.flush()
     for album_id, album_artist in touched.items():
         album = await session.get(MusicAlbum, album_id)
-        tracks = (await session.scalars(select(Track).where(Track.album_id == album_id, Track.missing.is_(False))
+        tracks = (await session.scalars(select(Track).where(Track.album_id == album_id, track_shown())
                                         .order_by(Track.disc_no, Track.track_no, Track.rel_path))).all()
         if not tracks:
             continue
@@ -320,8 +321,9 @@ async def scan_books(session, lib: Library, root: Path, stats: dict) -> None:
 # ------------------------------------------------------------------ entry
 
 _NOUN = {"music": ("song", "songs"), "audiobooks": ("audiobook", "audiobooks"),
-         "books": ("book", "books"), "comics": ("comic", "comics")}
-_SECTION = {"music": "/listen", "audiobooks": "/listen/audiobooks", "books": "/read", "comics": "/read"}
+         "books": ("book", "books"), "comics": ("comic", "comics"),
+         "quran": ("recitation", "recitations")}
+_SECTION = {"music": "/listen", "audiobooks": "/listen/audiobooks", "books": "/read", "comics": "/read", "quran": "/quran"}
 
 
 async def scan(library_id: str) -> dict:
@@ -333,16 +335,32 @@ async def scan(library_id: str) -> dict:
         root = Path(lib.path)
         if not root.is_dir():
             log.warning("library folder not found: %s", root)
-            model = Track if lib.kind == "music" else Book
+            model = Track if lib.kind in TRACK_KINDS else Book
             for row in (await session.scalars(select(model).where(model.library_id == lib.id))).all():
                 row.missing = True
             await session.commit()
             return stats
-        if lib.kind == "music":
+        if lib.kind in TRACK_KINDS:
             await scan_music(session, lib, root, stats)
         else:
             await scan_books(session, lib, root, stats)
         lib.last_scan_at = datetime.now(timezone.utc)
+        if lib.kind == "music":
+            await session.commit()
+            from . import music_audit
+            try:
+                found = await music_audit.run(session)
+            except Exception:  # never let the check break a scan
+                log.exception("duplicate-song check failed")
+                found = {"hidden": 0}
+            stats["duplicates"] = found["hidden"]
+            # the new songs a person sees are the ones left after duplicates
+            stats["added"] = max(0, stats["added"] - found["hidden"])
+            if found["hidden"]:
+                from .events import notify_admins
+                n = found["hidden"]
+                await notify_admins(session, "media", f"Took {n} duplicate songs out of Listen" if n != 1
+                                    else "Took 1 duplicate song out of Listen", link="/settings#server")
         if stats["added"]:
             from .events import notify
 

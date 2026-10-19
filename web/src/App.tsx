@@ -2,7 +2,7 @@ import { createContext, useContext, useEffect, useState, type FormEvent, type Re
 import { useStickyHeads } from "./stickyHead";
 import { nativeApp } from "./native";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint, PanelLeftClose, PanelLeftOpen } from "lucide-react";
+import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, MoonStar, Trash2, Settings, LogOut, Fingerprint, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { api, ApiError, type User } from "./api";
 import { cancelled, getPasskey, passkeyProblem } from "./passkeys";
 import { UploadProvider } from "./uploads";
@@ -28,6 +28,7 @@ import TrashPage from "./pages/Trash";
 import { AlbumDetailPage, AlbumsPage as MusicAlbumsPage, ArtistDetailPage, ArtistsPage, AudiobookPage, AudiobooksPage, ListenHome,
   PlaylistDetailPage, PlaylistsPage, SongsPage } from "./pages/Listen";
 import { ReadHome, ReadLibraryPage, ReadSeriesPage } from "./pages/Read";
+import { NamazPage, PrayerAlerts, QariPage, QuranHomePage, SurahPage, SurahsPage } from "./pages/Quran";
 import ReaderRoute from "./pages/Reader";
 import VaultPage from "./pages/Vault";
 import PhotoVaultPage from "./pages/PhotoVault";
@@ -113,6 +114,11 @@ function SignedInApp() {
               <Route path="/listen/playlist/:id" element={<PlaylistDetailPage />} />
               <Route path="/listen/audiobooks" element={<AudiobooksPage />} />
               <Route path="/listen/book/:id" element={<AudiobookPage />} />
+              <Route path="/quran" element={<QuranHomePage />} />
+              <Route path="/quran/qari" element={<QariPage />} />
+              <Route path="/quran/surahs" element={<SurahsPage />} />
+              <Route path="/quran/surah/:n" element={<SurahPage />} />
+              <Route path="/quran/namaz" element={<NamazPage />} />
               <Route path="/read" element={<ReadHome />} />
               <Route path="/read/c/:id" element={<ReadLibraryPage />} />
               <Route path="/read/series" element={<ReadSeriesPage />} />
@@ -154,6 +160,7 @@ function Shell({ children }: { children: ReactNode }) {
     ...(user.max_age == null ? [{ to: "/tv", label: tr("Live TV"), icon: Tv, desktop: false }] : []),
     { to: "/listen", label: tr("Listen"), icon: Headphones },
     { to: "/read", label: tr("Read"), icon: BookOpen },
+    { to: "/quran", label: tr("Quran & Namaz"), short: tr("Quran"), icon: MoonStar },
     { to: "/trash", label: tr("Trash"), icon: Trash2, desktop: true },
     { to: "/settings", label: tr("Settings"), icon: Settings, desktop: true },
   ];
@@ -168,10 +175,11 @@ function Shell({ children }: { children: ReactNode }) {
             {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
-        {links.map(({ to, label, icon: Icon, desktop }) => (
+        {links.map(({ to, label, short, icon: Icon, desktop }: { to: string; label: string; short?: string; icon: typeof Images; desktop?: boolean }) => (
           <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}
             title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined}>
-            <Icon size={19} aria-hidden /> <span className="rail-label">{label}</span></NavLink>
+            <Icon size={19} aria-hidden /> <span className="rail-label">{short
+              ? <><span className="label-long">{label}</span><span className="label-short">{short}</span></> : label}</span></NavLink>
         ))}
         <div className="rail-foot">
           <span className="who" title={user.username}>{user.username}</span>
@@ -187,6 +195,7 @@ function Shell({ children }: { children: ReactNode }) {
       </div>
       <main>{children}</main>
       <NowPlaying />
+      <PrayerAlerts />
     </div>
   );
 }

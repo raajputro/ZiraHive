@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..db import get_session, one_row
-from ..models import Book, Library, MediaItem, MusicAlbum, Series, Track, User, WatchProgress, utcnow
+from ..models import Book, Library, MediaItem, MusicAlbum, Series, Track, User, WatchProgress, utcnow, track_shown
 from ..schemas import (FolderBrowseOut, FolderPick, LibraryIn, LibraryOrderIn, LibraryOut, LibraryUpdateIn, MediaOut,
                        ProgressIn, SeasonOut, SeriesOut, TitleOut)
 from ..security import admin_user, create_token, current_user
@@ -132,7 +132,7 @@ async def _library_out(session: AsyncSession, libs: list[Library]) -> list[Libra
         .where(MediaItem.missing.is_(False)).group_by(Series.library_id))).all())
     albums = dict((await session.execute(
         select(Track.library_id, func.count(func.distinct(Track.album_id)))
-        .where(Track.missing.is_(False)).group_by(Track.library_id))).all())
+        .where(track_shown()).group_by(Track.library_id))).all())
     books = dict((await session.execute(select(Book.library_id, func.count()).where(
         Book.missing.is_(False)).group_by(Book.library_id))).all())
     out = []

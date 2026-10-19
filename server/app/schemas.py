@@ -158,7 +158,7 @@ class PhotoPage(BaseModel):
     next_cursor: str | None
 
 
-_KIND = r"^(movies|shows|mixed|music|audiobooks|books|comics)$"
+_KIND = r"^(movies|shows|mixed|music|audiobooks|books|comics|quran)$"
 
 
 class LibraryIn(BaseModel):

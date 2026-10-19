@@ -5,6 +5,7 @@ import { api, ApiError, url, type Artist, type ArtistDetail, type Book, type Boo
   type MusicHome, type Playlist, type PlaylistDetail, type Track } from "../api";
 import { clock, useAudio } from "../audio";
 import Dialog from "../components/Dialog";
+import { EqualizerButton } from "../components/Equalizer";
 
 import { t as tr } from "../i18n";
 // ---------------------------------------------------------------- shared bits
@@ -170,7 +171,7 @@ function Page({ title, children, back }: { title: string; children: React.ReactN
   return (
     <div className="page cinema-page listen-page">
       {back && <Link to={back.to} className="back"><ArrowLeft size={18} /> {back.label}</Link>}
-      <header className="page-head"><h1>{title}</h1></header>
+      <header className="page-head"><h1>{title}</h1><div className="head-actions"><EqualizerButton /></div></header>
       <ListenTabs />
       {children}
     </div>

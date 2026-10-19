@@ -43,6 +43,18 @@ class WebBridge(private val activity: MainActivity) {
         Server.forgetDeviceToken(activity)
     }
 
+    /** Asks for the phone's location; the answer comes as a "zirahive:location" event: {lat, lng, timezone} or {error}. */
+    @JavascriptInterface
+    fun requestLocation() {
+        activity.runOnUiThread { activity.requestLocation() }
+    }
+
+    /** The prayer settings changed on the Namaz page. */
+    @JavascriptInterface
+    fun prayerSettingsChanged() {
+        activity.runOnUiThread { activity.prayerSettingsChanged() }
+    }
+
     @JavascriptInterface
     fun openBackupSettings() {
         activity.runOnUiThread { activity.startActivity(Intent(activity, BackupSettingsActivity::class.java)) }

@@ -15,12 +15,14 @@ class ZiraHiveApp : Application() {
             Backup.schedule(this)
             NotificationPoller.schedule(this)
         }
+        app.zirahive.android.prayer.PrayerAlarms.schedule(this)
     }
 
     companion object {
         const val CH_BACKUP = "backup"
         const val CH_NEWS = "news"
         const val CH_UPLOADS = "uploads"
+        const val CH_PRAYER = "prayer"
 
         fun channels(ctx: Context) {
             val nm = ctx.getSystemService(NotificationManager::class.java)
@@ -28,6 +30,7 @@ class ZiraHiveApp : Application() {
                 NotificationChannel(CH_BACKUP, ctx.getString(R.string.channel_backup), NotificationManager.IMPORTANCE_LOW),
                 NotificationChannel(CH_NEWS, ctx.getString(R.string.channel_news), NotificationManager.IMPORTANCE_DEFAULT),
                 NotificationChannel(CH_UPLOADS, ctx.getString(R.string.channel_uploads), NotificationManager.IMPORTANCE_LOW),
+                NotificationChannel(CH_PRAYER, ctx.getString(R.string.channel_prayer), NotificationManager.IMPORTANCE_HIGH),
             ))
         }
     }

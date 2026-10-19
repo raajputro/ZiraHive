@@ -40,6 +40,7 @@ import androidx.core.view.updatePadding
 import androidx.lifecycle.lifecycleScope
 import app.zirahive.android.backup.Backup
 import app.zirahive.android.notify.NotificationPoller
+import app.zirahive.android.prayer.PrayerAlarms
 import app.zirahive.android.player.PlayerEvents
 import app.zirahive.android.update.Updater
 import com.google.android.material.button.MaterialButton
@@ -76,6 +77,55 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun has(p: String) = ContextCompat.checkSelfPermission(this, p) == PackageManager.PERMISSION_GRANTED
+
+    // ---- the phone's location, for prayer times (the web page can't ask on a plain http:// address)
+
+    private val askLocation = registerForActivityResult(ActivityResultContracts.RequestMultiplePermissions()) { grants ->
+        if (grants.values.any { it }) fetchLocation() else deliverLocation(JSONObject().put("error", "denied"))
+    }
+
+    fun requestLocation() {
+        if (has(Manifest.permission.ACCESS_COARSE_LOCATION) || has(Manifest.permission.ACCESS_FINE_LOCATION)) fetchLocation()
+        else askLocation.launch(arrayOf(Manifest.permission.ACCESS_COARSE_LOCATION, Manifest.permission.ACCESS_FINE_LOCATION))
+    }
+
+    @android.annotation.SuppressLint("MissingPermission")
+    private fun fetchLocation() {
+        val lm = getSystemService(android.location.LocationManager::class.java)
+        val providers = lm.getProviders(true)
+        val last = providers.mapNotNull { try { lm.getLastKnownLocation(it) } catch (e: Exception) { null } }.maxByOrNull { it.time }
+        val fresh = last != null && System.currentTimeMillis() - last.time < 30 * 60_000L
+        if (last != null && (fresh || Build.VERSION.SDK_INT < Build.VERSION_CODES.R)) { deliverLocation(last); return }
+        val provider = listOf(android.location.LocationManager.NETWORK_PROVIDER, android.location.LocationManager.GPS_PROVIDER)
+            .firstOrNull { it in providers }
+        if (provider == null || Build.VERSION.SDK_INT < Build.VERSION_CODES.R) {
+            if (last != null) deliverLocation(last) else deliverLocation(JSONObject().put("error", "off"))
+            return
+        }
+        var done = false
+        val signal = android.os.CancellationSignal()
+        lm.getCurrentLocation(provider, signal, mainExecutor) { loc ->
+            if (done) return@getCurrentLocation
+            done = true
+            if (loc != null) deliverLocation(loc) else if (last != null) deliverLocation(last) else deliverLocation(JSONObject().put("error", "unavailable"))
+        }
+        web.postDelayed({
+            if (!done) { done = true; signal.cancel(); if (last != null) deliverLocation(last) else deliverLocation(JSONObject().put("error", "timeout")) }
+        }, 20_000)
+    }
+
+    private fun deliverLocation(loc: android.location.Location) =
+        deliverLocation(JSONObject().put("lat", loc.latitude).put("lng", loc.longitude).put("timezone", java.util.TimeZone.getDefault().id))
+
+    private fun deliverLocation(result: JSONObject) {
+        if (!::web.isInitialized) return
+        web.post { web.evaluateJavascript("window.dispatchEvent(new CustomEvent('zirahive:location', {detail: $result}))", null) }
+    }
+
+    /** The Namaz page saved new settings: set the reminders again. */
+    fun prayerSettingsChanged() {
+        lifecycleScope.launch { PrayerAlarms.refresh(this@MainActivity) }
+    }
 
     private fun dp(v: Int) = (v * resources.displayMetrics.density).toInt()
 
@@ -201,6 +251,7 @@ class MainActivity : AppCompatActivity() {
                 base?.let { b -> lifecycleScope.launch { Server.ensureDeviceToken(this@MainActivity, b) } }
                 Backup.schedule(this@MainActivity)
                 NotificationPoller.schedule(this@MainActivity)
+                lifecycleScope.launch { PrayerAlarms.refresh(this@MainActivity) }
                 if (!checkedUpdate) { checkedUpdate = true; Updater.checkAndOffer(this@MainActivity) }
             }
         }

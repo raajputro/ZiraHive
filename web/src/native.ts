@@ -32,6 +32,8 @@ interface Bridge {
   openAddressSettings(): void;
   backupStatus(): string;
   signedOut(): void;
+  requestLocation?(): void;
+  prayerSettingsChanged?(): void;
 }
 
 const bridge = (window as unknown as { ZiraHiveApp?: Bridge }).ZiraHiveApp;
@@ -54,6 +56,18 @@ export const nativeApp = bridge ? {
   backupStatus: (): { enabled: boolean; running: boolean; lastRun: number; uploaded: number; permission: boolean } =>
     JSON.parse(bridge.backupStatus()),
   signedOut: () => { try { bridge.signedOut(); } catch { /* older app */ } },
+  /** The phone's location (null when the app is too old to have it). Resolves {lat, lng, timezone} or rejects. */
+  location: bridge.requestLocation ? (): Promise<{ lat: number; lng: number; timezone: string }> => new Promise((resolve, reject) => {
+    const on = (e: Event) => {
+      window.removeEventListener("zirahive:location", on);
+      const d = (e as CustomEvent<{ lat?: number; lng?: number; timezone?: string; error?: string }>).detail;
+      if (d.lat != null && d.lng != null) resolve({ lat: d.lat, lng: d.lng, timezone: d.timezone ?? "" });
+      else reject(new Error(d.error ?? "no location"));
+    };
+    window.addEventListener("zirahive:location", on);
+    bridge.requestLocation!();
+  }) : null,
+  prayerSettingsChanged: () => { try { bridge.prayerSettingsChanged?.(); } catch { /* older app */ } },
 } : null;
 
 /** Runs `fn` once when the app's player closes. Returns a function that stops listening. */

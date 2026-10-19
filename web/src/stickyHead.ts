@@ -8,7 +8,7 @@
 import { useEffect } from "react";
 
 /** What counts as "the bar under the title": section tabs, Watch/Photos tab-and-search rows, the Files search. */
-const BAR = ".watch-bar, .settings-tabs, .files-search";
+const BAR = ".watch-bar, .settings-tabs, .files-search, .lib-tabs";
 
 export function useStickyHeads() {
   useEffect(() => {

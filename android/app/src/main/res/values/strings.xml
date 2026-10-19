@@ -58,4 +58,13 @@
     <string name="play">Play</string>
     <string name="pause">Pause</string>
     <string name="player_error">This couldn\'t be played: %1$s</string>
+    <string name="channel_prayer">Prayer times</string>
+    <string name="prayer_fajr">Fajr</string>
+    <string name="prayer_dhuhr">Dhuhr</string>
+    <string name="prayer_jumuah">Jumu\'ah</string>
+    <string name="prayer_asr">Asr</string>
+    <string name="prayer_maghrib">Maghrib</string>
+    <string name="prayer_isha">Isha</string>
+    <string name="prayer_now">It\'s time for %1$s</string>
+    <string name="prayer_soon">%1$s in %2$d minutes</string>
 </resources>
