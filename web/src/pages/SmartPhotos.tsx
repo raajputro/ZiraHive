@@ -41,18 +41,28 @@ function Grid({ items }: { items: Asset[] }) {
   );
 }
 
+// Recent searches, so going back to one shows its photos at once (they are refreshed quietly).
+const recentSearches = new Map<string, { hits: Asset[]; english: string }>();
+
 export function PhotoSearchPage() {
   const [params] = useSearchParams();
   const q = params.get("q") ?? "";
-  const [hits, setHits] = useState<Asset[] | null>(null);
-  const [english, setEnglish] = useState("");
+  const [hits, setHits] = useState<Asset[] | null>(() => recentSearches.get(q)?.hits ?? null);
+  const [english, setEnglish] = useState(() => recentSearches.get(q)?.english ?? "");
   const [off, setOff] = useState("");
   const [error, setError] = useState("");
   useEffect(() => {
     if (!q) return;
-    setHits(null); setOff(""); setError("");
-    api.searchPhotos(q).then((r) => { setHits(r.hits.map((h) => h.asset)); setEnglish(r.searched_for !== r.query ? r.searched_for : ""); })
-      .catch((e) => { if (e instanceof ApiError && e.code === "ai_off") setOff(e.message); else setError(e.message); });
+    let current = true;
+    const seen = recentSearches.get(q);
+    setHits(seen?.hits ?? null); setEnglish(seen?.english ?? ""); setOff(""); setError("");
+    api.searchPhotos(q).then((r) => {
+      const found = { hits: r.hits.map((h) => h.asset), english: r.searched_for !== r.query ? r.searched_for : "" };
+      recentSearches.delete(q); recentSearches.set(q, found);
+      if (recentSearches.size > 30) recentSearches.delete(recentSearches.keys().next().value!);
+      if (current) { setHits(found.hits); setEnglish(found.english); }
+    }).catch((e) => { if (!current) return; if (e instanceof ApiError && e.code === "ai_off") setOff(e.message); else setError(e.message); });
+    return () => { current = false; };
   }, [q]);
   return (
     <div className="page">

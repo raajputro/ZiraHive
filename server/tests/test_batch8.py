@@ -37,8 +37,12 @@ def _clip_images(body: dict):
     return {"vectors": [_colour_vector(p) for p in body["paths"]]}
 
 
+CLIP_TEXT_CALLS: list[str] = []
+
+
 @fake_ai.post("/clip/text")
 def _clip_text(body: dict):
+    CLIP_TEXT_CALLS.extend(body["texts"])
     out = []
     for t in body["texts"]:
         v = next((v for k, v in COLOURS.items() if k in t), [0.3, 0.3, 0.3])
@@ -113,8 +117,11 @@ def local_ai(monkeypatch):
     monkeypatch.setattr(ai, "client", lambda base, timeout: httpx.AsyncClient(
         transport=httpx.ASGITransport(app=apps[base]), base_url=base))
     ai.forget_status()
+    from app.services import photo_search
+    photo_search.forget()
     yield
     ai.forget_status()
+    photo_search.forget()
     get_settings.cache_clear()
 
 
@@ -198,6 +205,23 @@ async def test_search_photos_by_description(client, admin, local_ai):
     assert r["searched_for"] == "red" and r["hits"][0]["asset"]["filename"] == "red car.jpg"
     st = (await client.get("/api/ai/status")).json()
     assert st["ai"] and st["photos_indexed"] == 3
+
+
+async def test_photo_search_remembers_what_doesnt_change(client, admin, local_ai):
+    got = await photos(client, {"red car.jpg": jpeg((220, 30, 30), detail=False),
+                                "red door.jpg": jpeg((200, 20, 40), detail=False),
+                                "lawn.jpg": jpeg((30, 200, 40), detail=False)})
+    CLIP_TEXT_CALLS.clear(); ASKED.clear()
+    for _ in range(3):
+        r = await client.get("/api/photos/search", params={"q": "লাল"})
+        assert {h["asset"]["filename"] for h in r.json()["hits"]} == {"red car.jpg", "red door.jpg"}
+    assert len(ASKED) == 1 and len(CLIP_TEXT_CALLS) == 1  # translated and looked up once
+    assert "words;dur=" in r.headers["server-timing"]
+    # a photo in the trash drops out at once; a new photo shows up at once
+    await client.delete(f"/api/assets/{got['red door.jpg']['id']}")
+    await photos(client, {"red kite.jpg": jpeg((230, 40, 20), detail=False)})
+    r = (await client.get("/api/photos/search", params={"q": "লাল"})).json()
+    assert {h["asset"]["filename"] for h in r["hits"]} == {"red car.jpg", "red kite.jpg"}
 
 
 async def test_people_from_faces(client, admin, local_ai):

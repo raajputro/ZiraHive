@@ -109,11 +109,18 @@ async def embed_texts(texts: list[str]) -> list[list[float]]:
     return [unit(v).tolist() for v in r["embeddings"]]
 
 
-async def chat(system: str, user: str) -> str:
+async def chat(system: str, user: str, max_words: int | None = None) -> str:
+    """`max_words`: for short answers (a translation), stop early instead of letting the model ramble."""
     model = get_settings().llm_model
     await _ensure_model(model)
+    options: dict = {"temperature": 0.2}
+    if max_words:
+        options["num_predict"] = max_words * 3  # tokens; Bangla and English words are a few each
     r = await _post("ollama", "/api/chat", {
-        "model": model, "stream": False, "options": {"temperature": 0.2},
+        "model": model, "stream": False, "options": options,
+        # keep the model in memory between uses (Ollama unloads it after 5 idle minutes, and
+        # loading it again takes longer than the answer itself)
+        "keep_alive": "30m",
         "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}]}, 600)
     return r["message"]["content"].strip()
 
