@@ -48,8 +48,8 @@ class ShareActivity : AppCompatActivity() {
             return
         }
         val uris = sharedUris(intent)
-        val text = if (uris.isEmpty()) intent.getStringExtra(Intent.EXTRA_TEXT) else null
-        if (uris.isEmpty() && text.isNullOrBlank()) { finish(); return }
+        val sharedText = if (uris.isEmpty()) intent.getStringExtra(Intent.EXTRA_TEXT) else null
+        if (uris.isEmpty() && sharedText.isNullOrBlank()) { finish(); return }
         val count = if (uris.isEmpty()) 1 else uris.size
 
         val box = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL; setPadding(dp(24), dp(20), dp(24), dp(16)) }
@@ -88,7 +88,7 @@ class ShareActivity : AppCompatActivity() {
                 val files = withContext(Dispatchers.IO) {
                     if (uris.isEmpty()) {
                         val stamp = SimpleDateFormat("yyyy-MM-dd HH.mm", Locale.US).format(Date())
-                        listOf(File(dir, "Shared text $stamp.txt").apply { writeText(text!!) })
+                        listOf(File(dir, "Shared text $stamp.txt").apply { writeText(sharedText!!) })
                     } else uris.mapNotNull { copy(it, dir) }
                 }
                 if (files.isEmpty()) {
