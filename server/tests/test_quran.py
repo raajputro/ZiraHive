@@ -18,6 +18,9 @@ def test_surah_names_in_files():
     assert guess_kind("Quran") == "quran"
     assert guess_kind("Quran Tilawat") == "quran"
     assert guess_kind("কুরআন") == "quran"
+    for name in ("Qura'an", "Qur'aan", "Quraan", "Qur'an", "Al-Quran", "Holy QURAN", "কোরান", "Tilawat"):
+        assert guess_kind(name) == "quran", name
+    assert guess_kind("Qurbani Songs") == "music"
     assert guess_kind("Music") == "music"
     cases = {"001": (1, None), "018-Kahf": (18, None), "Surah Yaseen": (36, None), "002255": (2, 255),
              "Mishary - Surah Ar-Rahman": (55, None), "Surah Al-Mulk (Sudais)": (67, None),
@@ -177,3 +180,19 @@ async def test_a_quran_category_set_to_music_leaves_listen(tmp_path, monkeypatch
     assert [s["title"] for s in (await client.get("/api/music/tracks")).json()] == ["Song"]
     reciters = {r["name"]: r["surahs"] for r in (await client.get("/api/quran")).json()["reciters"]}
     assert reciters == {"Mishary Alafasy": 3}
+
+
+async def test_album_tag_marks_a_recitation(tmp_path, monkeypatch, client, admin):
+    """A recitation dropped among songs, recognised by its album tag ("Alafasi Qura'an")."""
+    root = tmp_path / "media"
+    sample.tone(root / "Music" / "Playlist" / "Song.mp3", 1, 600, {"title": "Song", "artist": "Band", "album": "Hits"})
+    sample.tone(root / "Music" / "Playlist" / "001.mp3", 1, 300,
+                {"title": "Al-Fatihah", "artist": "Mishary Alafasi", "album": "Alafasi Qura'an"})
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_ROOT", str(root))
+    from app.config import get_settings
+    get_settings.cache_clear()
+    await client.post("/api/libraries/discover")
+    await jobs.drain_local()
+    assert [s["title"] for s in (await client.get("/api/music/tracks")).json()] == ["Song"]
+    reciters = (await client.get("/api/quran")).json()["reciters"]
+    assert [(r["name"], r["surahs"]) for r in reciters] == [("Mishary Alafasi", 1)]

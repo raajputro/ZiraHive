@@ -171,12 +171,14 @@ async def scan_music(session, lib: Library, root: Path, stats: dict) -> None:
         t = existing.get(rel)
         quran = whole_quran or any(is_quran_name(part) for part in PurePosixPath(rel).parts[:-1])
         if t and t.size == size and t.mtime == mtime and not t.missing:
+            quran = quran or is_quran_name(t.album_title or "")  # album tag "Alafasi Qura'an"
             if t.quran != quran:
                 t.quran = quran
                 stats["updated"] += 1
             continue
         fields = await asyncio.to_thread(_track_fields, root, rel)
         key, album_artist = fields.pop("_key"), fields.pop("_album_artist")
+        quran = quran or is_quran_name(fields.get("album_title") or "")
         album = albums.get(key)
         if album is None:
             album = MusicAlbum(library_id=lib.id, key=key, title=fields["album_title"])

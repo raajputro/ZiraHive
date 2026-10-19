@@ -28,7 +28,8 @@ log = logging.getLogger(__name__)
 
 _AUDIOBOOKS = re.compile(r"audio ?books?|\bgolpo\b|story ?tapes?", re.I)
 _MUSIC = re.compile(r"music|songs?\b|\bgaan\b|sangeet|sangit|\bgeet|qawwali|\bmp3\b|albums?\b|playlist", re.I)
-_QURAN = re.compile(r"quran|qur.an|koran|tilawa|qira.?at|qaris?\b|recitation|কুরআন|কোরআন|তিলাওয়াত", re.I)
+# Quran, Qur'an, Quraan, Qura'an, Qur'aan, Qur-an, Koran, Tilawat, Qira'at, কুরআন, কোরআন, কোরান…
+_QURAN = re.compile(r"qur[\W_]?a+[\W_]?a*n|koran|tilawa|qira.?at|qaris?\b|recitation|কুরআন|কোরআন|কোরান|তিলাওয়াত", re.I)
 _COMICS = re.compile(r"comic|manga|manhwa|webtoon|graphic novel", re.I)
 _BOOKS = re.compile(r"books?\b|ebook|novel|\bpdfs?\b|reading|library|\bboi\b", re.I)
 _SHOWS = re.compile(r"series|\bshows?\b|\btv\b|drama|sitcom|season|natok|serial", re.I)

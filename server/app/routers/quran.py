@@ -43,8 +43,8 @@ def _reciter(t: Track, lib: Library) -> str:
     # Music/…/Quran/<qari>/001.mp3: the folder below the Quran-named one; files straight in the
     # Quran folder go under that folder's own name
     cut = next((i for i, f in enumerate(folders) if is_quran_name(f)), None)
-    if cut is None:
-        return "Quran"
+    if cut is None:  # recognised by its album tag: the artist tag is the qari
+        return t.artist or "Quran"
     below = folders[cut + 1:]
     return clean_name(below[0] if below else folders[cut])
 
