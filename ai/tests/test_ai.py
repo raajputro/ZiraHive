@@ -9,7 +9,9 @@ from fastapi.testclient import TestClient
 
 HERE = Path(__file__).parent
 sys.path.insert(0, str(HERE.parent))
-os.environ.setdefault("ZIRAHIVE_AI_MODELS", "/tmp/claude-0/aimodels")
+import tempfile
+
+os.environ.setdefault("ZIRAHIVE_AI_MODELS", str(Path(tempfile.gettempdir()) / "zirahive-aimodels"))
 
 import zirahive_ai  # noqa: E402
 
@@ -21,7 +23,7 @@ def test_health():
     assert r["ok"] and "clip" in r["models"]
 
 
-def test_faces_found_and_compared():
+def test_faces_found_and_compared(tmp_path):
     r = client.post("/faces", json={"paths": [str(HERE / "astronaut.jpg"), str(HERE / "cat.jpg"),
                                               str(HERE / "missing.jpg")]}).json()["faces"]
     astronaut, cat, missing = r
@@ -33,7 +35,7 @@ def test_faces_found_and_compared():
     # the same face, smaller and mirrored, is still the same person
     from PIL import Image, ImageOps
     im = ImageOps.mirror(Image.open(HERE / "astronaut.jpg")).resize((380, 380))
-    other = Path("/tmp/claude-0/astro-small.jpg")
+    other = tmp_path / "astro-small.jpg"
     im.save(other)
     again = client.post("/faces", json={"paths": [str(other)]}).json()["faces"][0][0]
     import numpy as np

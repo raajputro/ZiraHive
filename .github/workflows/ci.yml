@@ -71,12 +71,15 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cp .env.example .env && sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci12345/' .env
+      # .env.example has placeholders to fill in (your_drive:/ZiraHiveData); CI uses folders here
+      - run: |
+          cp .env.example .env
+          sed -i -e 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci12345/' -e 's#^ZIRAHIVE_DATA_PATH=.*#ZIRAHIVE_DATA_PATH=./ci-data#' .env
       - run: |
           set -o pipefail
-          { docker compose build --progress plain && docker compose config --quiet \
+          { docker compose --progress plain build && docker compose config --quiet \
             && docker compose --profile ai --profile remote config --quiet \
-            && docker compose --profile ai build --progress plain ai; } 2>&1 | tee ${{ github.workspace }}/ci-docker.log
+            && docker compose --progress plain --profile ai build ai; } 2>&1 | tee ${{ github.workspace }}/ci-docker.log
         shell: bash
       - name: Share the log
         if: failure()
