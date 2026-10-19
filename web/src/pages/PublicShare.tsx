@@ -1,4 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
+import ZoomImage from "../components/ZoomImage";
 import { Download, Folder, FileText, Film, Image, File, Play, X, ChevronLeft, ChevronRight } from "lucide-react";
 import { api, ApiError, formatBytes, formatDuration, url, type PublicAsset, type PublicListing, type PublicShare } from "../api";
 
@@ -149,7 +150,8 @@ function PublicViewer({ items, index, token, shareKey, allowDownload, onIndex, o
       <div className="lightbox-stage">
         {a.kind === "video"
           ? <video key={a.id} src={url.publicFile(token, a, shareKey)} controls autoPlay playsInline />
-          : <img key={a.id} src={url.publicPreview(token, a, shareKey)} alt={a.filename} />}
+          : <ZoomImage key={a.id} src={url.publicPreview(token, a, shareKey)} alt={a.filename}
+              onSwipe={(d) => { if (d === "next" && index < items.length - 1) onIndex(index + 1); if (d === "prev" && index > 0) onIndex(index - 1); }} />}
       </div>
       {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label={tr("Next")}><ChevronRight size={30} /></button>}
     </div>

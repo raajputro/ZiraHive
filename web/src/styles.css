@@ -1283,3 +1283,17 @@ body.has-player .tray { bottom: 88px; }
 .dup-song-list ul li { display: flex; justify-content: space-between; gap: 10px; align-items: center; overflow-wrap: anywhere; }
 .label-short { display: none; }
 @media (max-width: 760px) { .rail .label-long { display: none; } .rail .label-short { display: inline; } }
+
+/* Zoomable photos (components/ZoomImage.tsx) */
+.zoom-box {
+  width: 100%; height: 100%; min-height: 0; display: grid; place-items: center; overflow: hidden;
+  touch-action: none; user-select: none; -webkit-user-select: none; cursor: zoom-in;
+}
+.zoom-box.zoomed { cursor: grab; }
+.zoom-box.zoomed.moving { cursor: grabbing; }
+.zoom-box img { transform-origin: center center; will-change: transform; -webkit-user-drag: none; }
+.zoom-box:not(.moving) img { transition: transform .18s ease-out; }
+.lightbox-stage .zoom-box img { max-width: 100%; max-height: calc(100vh - 90px); object-fit: contain; }
+.vault-view .zoom-box { max-height: 75vh; }
+.vault-view .zoom-box img { max-width: 100%; max-height: 75vh; object-fit: contain; }
+@media (max-width: 760px) { .lightbox-stage { padding-left: 0; padding-right: 0; } }

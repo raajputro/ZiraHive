@@ -1,5 +1,6 @@
 // Photos → Vault: private photos and videos, encrypted on this device. It is the same vault
 // as the Vault page (one passphrase, one recovery key); this view shows its photos and videos.
+import ZoomImage from "../components/ZoomImage";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { ChevronLeft, ChevronRight, CheckSquare, Download, Folder, FolderInput, FolderPlus, ImageUp, Lock, Pencil, ShieldCheck, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { api, formatBytes } from "../api";
@@ -313,7 +314,8 @@ function VaultLightbox({ items, index, thumbs, onIndex, onClose, onPutBack, onDe
               {thumbs[o.item.id] && <img src={thumbs[o.item.id]} alt={o.meta.name} />}
               <p className="muted">{tr("This browser can't show this photo at full size. Save it to see the original.")}</p>
             </div>
-          ) : <img key={o.item.id} src={shown!} alt={o.meta.name} onError={() => setCantShow(true)} />}
+          ) : <ZoomImage key={o.item.id} src={shown!} alt={o.meta.name} onError={() => setCantShow(true)}
+              onSwipe={(d) => { if (d === "next" && index < items.length - 1) onIndex(index + 1); if (d === "prev" && index > 0) onIndex(index - 1); }} />}
       </div>
       {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label={tr("Next")}><ChevronRight size={30} /></button>}
     </div>

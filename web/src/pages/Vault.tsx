@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import ZoomImage from "../components/ZoomImage";
 import { Link } from "react-router-dom";
 import { Download, FileText, Folder, FolderInput, FolderPlus, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music, Copy } from "lucide-react";
 import { api, ApiError, formatBytes, type VaultInfo } from "../api";
@@ -411,7 +412,7 @@ function Viewer({ o, onClose, onDelete, onRename, onMove }: { o: Opened; onClose
       <div className="vault-view">
         {error ? <p className="error">{error}</p>
           : !url ? <progress max={o.item.size} value={done} aria-label={tr("Decrypting")} />
-          : k === "image" ? (shown ? <img src={shown} alt={o.meta.name} /> : <progress aria-label={tr("Getting the photo ready")} />)
+          : k === "image" ? (shown ? <ZoomImage src={shown} alt={o.meta.name} /> : <progress aria-label={tr("Getting the photo ready")} />)
           : k === "video" ? <video src={url} controls autoPlay playsInline />
           : k === "audio" ? <audio src={url} controls autoPlay />
           : <p className="muted">{tr("This file opens after you save it.")}</p>}

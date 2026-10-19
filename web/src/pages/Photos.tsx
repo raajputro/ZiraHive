@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ZoomImage from "../components/ZoomImage";
 import { NavLink } from "react-router-dom";
 import { Upload, Play, ChevronLeft, ChevronRight, X, Download, Check, CheckSquare, FolderPlus, Maximize, Trash2, Lock, ShieldCheck } from "lucide-react";
 import { api, url, formatDuration, type Asset, type Memory } from "../api";
@@ -316,7 +317,8 @@ export function Lightbox({ items, index, onIndex, onClose, onTrash, onVault }:
         {a.kind === "video"
           ? <video key={a.id} src={url.file(a)} controls autoPlay={!lowData} preload={lowData ? "none" : "metadata"}
               poster={a.thumb_ready ? url.thumb(a) : undefined} playsInline />
-          : <img key={a.id + src} src={src} alt={a.filename} onError={() => original && setOriginal(false)} />}
+          : <ZoomImage key={a.id + src} src={src} alt={a.filename} onError={() => original && setOriginal(false)}
+              onSwipe={(d) => { if (d === "next" && index < items.length - 1) onIndex(index + 1); if (d === "prev" && index > 0) onIndex(index - 1); }} />}
       </div>
       {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label={tr("Next")}><ChevronRight size={30} /></button>}
     </div>
