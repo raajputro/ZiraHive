@@ -1,4 +1,5 @@
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useStickyHeads } from "./stickyHead";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { api, ApiError, type User } from "./api";
@@ -155,6 +156,7 @@ function Shell({ children }: { children: ReactNode }) {
     { to: "/trash", label: tr("Trash"), icon: Trash2, desktop: true },
     { to: "/settings", label: tr("Settings"), icon: Settings, desktop: true },
   ];
+  useStickyHeads();
   return (
     <div className="shell">
       <nav className="rail" aria-label={tr("Main")}>

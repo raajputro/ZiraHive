@@ -130,7 +130,23 @@ label { display: block; font-size: .9rem; font-weight: 500; color: var(--muted);
 @media (prefers-reduced-motion: reduce) { .shell { transition: none; } }
 main { min-width: 0; }
 
-.page { padding: 28px clamp(16px, 3vw, 40px) 120px; max-width: 1600px; }
+.page { --page-x: clamp(16px, 3vw, 40px); padding: 28px var(--page-x) 120px; max-width: 1600px; }
+
+/* The top of each section stays in view while scrolling (marked by stickyHead.ts): the title row
+   sticks to the top and the tabs/search bar under it sticks just below. Both reach the page edges
+   and are opaque, so nothing shows through. */
+:root { --head-h: 0px; --sticky-h: 0px; }
+html { scroll-padding-top: calc(var(--sticky-h) + 8px); }
+.page > [data-sticky] {
+  position: sticky; z-index: 12; background: var(--bg);
+  margin-inline: calc(-1 * var(--page-x)); padding-inline: var(--page-x);
+}
+.page > [data-sticky="head"] { top: 0; z-index: 13; margin-top: -12px; padding-top: 12px; padding-bottom: 14px; margin-bottom: 0; }
+.page > [data-sticky="head"]:not(:has(+ [data-sticky])) { padding-bottom: 12px; margin-bottom: 8px; }
+.page > [data-sticky="bar"] { top: var(--head-h); margin-top: 0; padding-bottom: 12px; margin-bottom: 14px; }
+.page > [data-sticky="only"] { top: 0; margin-top: -12px; padding-top: 12px; padding-bottom: 12px; margin-bottom: 14px; }
+.page > [data-scrolled] { box-shadow: 0 1px 0 var(--line), 0 8px 14px -12px rgba(0, 0, 0, .45); }
+@media (prefers-reduced-motion: no-preference) { .page > [data-sticky] { transition: box-shadow .15s ease; } }
 .page-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; margin-bottom: 20px; }
 .page-head h1, .page-head .crumbs { margin-right: auto; }
 .empty { padding: 64px 0; max-width: 46ch; }
@@ -169,7 +185,7 @@ main { min-width: 0; }
 /* ---------------------------------------------------------------- photos */
 .month { margin-bottom: 36px; }
 .month-title {
-  font-size: 1.5rem; padding: 8px 0; position: sticky; top: 0; z-index: 2;
+  font-size: 1.5rem; padding: 8px 0; position: sticky; top: var(--sticky-h); z-index: 2;
   background: var(--bg);
 }
 .day h3 { font-size: .9rem; font-weight: 500; color: var(--muted); margin: 14px 0 8px; }
@@ -391,7 +407,7 @@ fieldset.choice legend { font-size: .9rem; font-weight: 500; color: var(--muted)
 @keyframes fade-out { to { opacity: 0; } }
 .overlay-btn.tap { left: 50%; right: auto; bottom: 50%; transform: translate(-50%, 50%); }
 .overlay-wait { position: absolute; left: 16px; top: 14px; background: rgba(15, 20, 35, .85); color: #fff; padding: 8px 12px; border-radius: var(--radius-s); font-size: .9rem; }
-.party-side { display: grid; gap: 14px; position: sticky; top: 16px; }
+.party-side { display: grid; gap: 14px; position: sticky; top: calc(var(--sticky-h) + 16px); }
 .party-side > section { background: var(--surface); border-radius: var(--radius-m); padding: 14px; }
 .party-side h2 { font-size: 1rem; margin-bottom: 8px; display: flex; align-items: center; gap: 6px; }
 .people { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
@@ -1030,7 +1046,7 @@ body.has-player .tray { bottom: 88px; }
   background: color-mix(in srgb, var(--ink) 8%, transparent); border-radius: var(--radius-s); }
 .ch-logo.big { width: 64px; height: 40px; }
 .tv-more { display: block; width: calc(100% - 16px); margin: 10px 8px; }
-.tv-player { position: sticky; top: 12px; min-width: 0; }
+.tv-player { position: sticky; top: calc(var(--sticky-h) + 12px); min-width: 0; }
 .tv-frame video { aspect-ratio: 16 / 9; max-height: 70vh; }
 .tv-overlay { position: absolute; inset: 0; display: grid; place-items: center; align-content: center; gap: 10px; padding: 20px;
   color: #fff; text-align: center; background: rgba(0, 0, 0, .5); pointer-events: none; }
@@ -1105,7 +1121,7 @@ body.has-player .tray { bottom: 88px; }
   .tv-grid-wrap .tv-cats-col { display: none; }
   .tv-grid-wrap .tv-mobile-cats { display: block; margin-bottom: 12px; }
   .tv-live .tv-mobile-cats { max-width: none; }
-  .tv-player { position: sticky; top: 0; z-index: 3; order: -1; margin: 0 -12px; padding: 0 12px 6px; background: var(--bg); }
+  .tv-player { position: sticky; top: var(--sticky-h); z-index: 3; order: -1; margin: 0 -12px; padding: 0 12px 6px; background: var(--bg); }
   .tv-player .tv-epg, .tv-player > .muted { display: none; }
   .tv-col { max-height: none; }
   .tv-detail { grid-template-columns: minmax(0, 1fr); padding: 16px; }
