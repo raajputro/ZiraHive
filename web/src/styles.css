@@ -95,7 +95,9 @@ label { display: block; font-size: .9rem; font-weight: 500; color: var(--muted);
 .boot { min-height: 100vh; background: var(--indigo-night); }
 .shell { display: grid; grid-template-columns: var(--rail-w) 1fr; min-height: 100vh; align-content: start; }
 .rail {
-  position: sticky; top: 0; height: 100vh;
+  /* above the page (and its sticky header), so the notifications panel that opens from the
+     bottom of the rail is drawn over the photos, not under them */
+  position: sticky; top: 0; height: 100vh; z-index: 17;
   background: var(--indigo-night); color: #C7CEDD;
   display: flex; flex-direction: column; gap: 2px; padding: 22px 12px;
 }
