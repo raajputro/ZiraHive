@@ -136,9 +136,16 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium chrome
           sleep 10   # let the worker finish scanning the sample media
-          npx playwright test
+          set -o pipefail
+          npx playwright test --reporter=line 2>&1 | tee ${{ github.workspace }}/ci-e2e.log
+        shell: bash
       - if: failure()
-        run: tail -n 100 api.log worker.log web.log
+        run: |
+          tail -n 100 api.log worker.log web.log | tee -a ${{ github.workspace }}/ci-e2e.log
+          mkdir -p /tmp/cilog && cp ${{ github.workspace }}/ci-e2e.log /tmp/cilog/ 2>/dev/null || echo "no log" > /tmp/cilog/ci-e2e.log
+          cd /tmp/cilog && git init -q -b ci-log-e2e && git config user.name "ZiraHive CI" && git config user.email "ci@zirahive.invalid"
+          git add . && git commit -q -m "log ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-log-e2e
       - if: always()
         uses: actions/upload-artifact@v4
         with:
