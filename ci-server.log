@@ -1,0 +1,60 @@
+.........................................................F..ss.......... [ 45%]
+........................................................................ [ 91%]
+..............                                                           [100%]
+=================================== FAILURES ===================================
+_________________________ test_age_limits_and_rescans __________________________
+
+media_root = PosixPath('/tmp/pytest-of-runner/pytest-0/test_age_limits_and_rescans0/media')
+client = <httpx.AsyncClient object at 0x7f09f20e6510>
+admin = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiJiYTNlMDc4ZmM5ODU0ODg4OGI2MzMwYmE3MzI5NTAxOSIsInYiOjAsImV4cCI6MTc5NDk5OTUwNH0.tpYago4252otvdQYom5qg7XNVKON-RlF4vARKQpg7xg'
+
+    async def test_age_limits_and_rescans(media_root, client, admin):
+        libs = await _libs(client)
+        await client.post("/api/users", json={"username": "kid", "password": "kidpassword1"})
+        users = (await client.get("/api/users")).json()
+        kid = next(u for u in users if u["username"] == "kid")
+        await client.patch(f"/api/users/{kid['id']}", json={"max_age": 7})
+        token = (await client.post("/api/auth/login", json={"username": "kid", "password": "kidpassword1"})).json()["token"]
+        as_kid = {"Authorization": f"Bearer {token}"}
+    
+        # unrated categories are hidden from limited profiles
+        assert (await client.get("/api/books", headers=as_kid)).json() == []
+        assert (await client.get("/api/music/albums", headers=as_kid)).json() == []
+        comic = (await client.get("/api/books", params={"kind": "comic"})).json()[0]
+        assert (await client.get(f"/api/books/{comic['id']}/pages/1", headers=as_kid)).status_code == 404
+    
+        await client.patch(f"/api/libraries/{libs['Comics']['id']}", json={"age_rating": 7})
+        kids_books = (await client.get("/api/books", headers=as_kid)).json()
+        assert kids_books and {b["kind"] for b in kids_books} == {"comic"}
+        assert (await client.get(f"/api/books/{comic['id']}/pages/1", headers=as_kid)).status_code == 200
+    
+        # a deleted file is marked missing on the next scan; a new one appears
+        (media_root / "Comics" / "Moon Cat v01.cbz").unlink()
+        sample.cbz(media_root / "Comics" / "Star Fox 01.cbz", "Star Fox", 1, info=False)
+        await client.post(f"/api/libraries/{libs['Comics']['id']}/scan")
+        await jobs.drain_local()
+        titles = {b["title"] for b in (await client.get("/api/books", params={"kind": "comic"})).json()}
+        assert "Moon Cat #1: Issue 1" not in titles and "Star Fox 01" in titles
+    
+        # switching a category's kind starts it over
+        r = await client.patch(f"/api/libraries/{libs['Ebooks']['id']}", json={"kind": "comics"})
+        assert r.status_code == 200
+        await jobs.drain_local()
+        assert len((await client.get("/api/books", params={"library_id": libs["Ebooks"]["id"]})).json()) == 4
+    
+        notes = (await client.get("/api/notifications")).json()
+>       assert any("new songs in Music" in n["title"] for n in notes["items"])
+E       assert False
+E        +  where False = any(<generator object test_age_limits_and_rescans.<locals>.<genexpr> at 0x7f09f09a65a0>)
+
+tests/test_batch4.py:268: AssertionError
+=============================== warnings summary ===============================
+../../../../../../opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/fastapi/testclient.py:1
+  /opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/fastapi/testclient.py:1: StarletteDeprecationWarning: Using `httpx` with `starlette.testclient` is deprecated; install `httpx2` instead.
+    from starlette.testclient import TestClient as TestClient  # noqa
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_batch4.py::test_age_limits_and_rescans - assert False
+ +  where False = any(<generator object test_age_limits_and_rescans.<locals>.<genexpr> at 0x7f09f09a65a0>)
+1 failed, 155 passed, 2 skipped, 1 warning in 117.91s (0:01:57)
