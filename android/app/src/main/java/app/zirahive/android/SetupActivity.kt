@@ -77,10 +77,14 @@ class SetupActivity : AppCompatActivity() {
             status.visibility = View.VISIBLE
             status.text = getString(R.string.setup_checking)
             lifecycleScope.launch {
-                val ok = Server.answers(h) || (a != null && Server.answers(a))
+                val homeProblem = Server.problem(h)
+                val awayProblem = if (homeProblem != null && a != null) Server.problem(a) else null
                 connect.isEnabled = true
-                if (!ok) {
-                    status.text = getString(R.string.setup_unreachable, h)
+                if (homeProblem != null && (a == null || awayProblem != null)) {
+                    status.text = listOfNotNull(
+                        Server.explain(this@SetupActivity, h, homeProblem),
+                        if (a != null && awayProblem != null) Server.explain(this@SetupActivity, a, awayProblem) else null,
+                    ).joinToString("\n\n")
                     return@launch
                 }
                 Server.save(this@SetupActivity, h, a)

@@ -64,4 +64,13 @@
     <string name="prayer_isha">এশা</string>
     <string name="prayer_now">%1$s-এর সময় হয়েছে</string>
     <string name="prayer_soon">%2$d মিনিট পরে %1$s</string>
+    <string name="problem_name">%1$s: এই ঠিকানা নেই। বানান ঠিক আছে কি না দেখুন।</string>
+    <string name="problem_name_tailscale">%1$s: খুঁজে পাওয়া যাচ্ছে না। এই ফোনে Tailscale অ্যাপ চালু করুন (পিসির একই অ্যাকাউন্টে), তারপর আবার চেষ্টা করুন।</string>
+    <string name="problem_timeout">%1$s: কোনো সাড়া নেই। ঠিকানা আর পিসি চালু আছে কি না দেখুন।</string>
+    <string name="problem_timeout_home">%1$s: কোনো সাড়া নেই। ফোন কি বাসার ওয়াই-ফাইতে? পিসি চালু তো? পিসির ফায়ারওয়াল এই পোর্ট খুলে দিয়েছে কি না দেখুন।</string>
+    <string name="problem_timeout_tailscale">%1$s: কোনো সাড়া নেই। এই ফোনে আর পিসিতে Tailscale চালু আছে কি না দেখুন, তারপর আবার চেষ্টা করুন (প্রথমবার কয়েক সেকেন্ড লাগতে পারে)।</string>
+    <string name="problem_refused">%1$s: কম্পিউটার আছে, কিন্তু এই পোর্টে ZiraHive সাড়া দিচ্ছে না। পোর্ট নম্বর আর ZiraHive চালু আছে কি না দেখুন।</string>
+    <string name="problem_certificate">%1$s: নিরাপদ সংযোগ হয়নি। Tailscale-এর জন্য অ্যাডমিন কনসোলের DNS পাতায় HTTPS Certificates চালু করুন।</string>
+    <string name="problem_not_zirahive">%1$s: কিছু একটা সাড়া দিয়েছে, কিন্তু সেটা ZiraHive নয়। ঠিকানা আর পোর্ট দেখুন।</string>
+    <string name="problem_other">%1$s: সংযোগ হয়নি।</string>
 </resources>

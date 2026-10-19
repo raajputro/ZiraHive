@@ -67,4 +67,13 @@
     <string name="prayer_isha">Isha</string>
     <string name="prayer_now">It\'s time for %1$s</string>
     <string name="prayer_soon">%1$s in %2$d minutes</string>
+    <string name="problem_name">%1$s: this address doesn\'t exist. Check it for typing mistakes.</string>
+    <string name="problem_name_tailscale">%1$s: can\'t find it. Turn on the Tailscale app on this phone (signed in to the same account as the PC), then try again.</string>
+    <string name="problem_timeout">%1$s: no answer. Check the address, and that the PC is on.</string>
+    <string name="problem_timeout_home">%1$s: no answer. Is this phone on the home Wi-Fi? Is the PC on? On the PC, check the firewall lets this port in.</string>
+    <string name="problem_timeout_tailscale">%1$s: no answer. Check that Tailscale is on here and on the PC, then try again (the first connection can take a few seconds).</string>
+    <string name="problem_refused">%1$s: the computer is there but ZiraHive isn\'t answering on this port. Check the port number, and that ZiraHive is running.</string>
+    <string name="problem_certificate">%1$s: the secure connection failed. For Tailscale, turn on HTTPS Certificates in the Tailscale admin console (DNS page).</string>
+    <string name="problem_not_zirahive">%1$s: something answered, but it isn\'t ZiraHive. Check the address and port.</string>
+    <string name="problem_other">%1$s: couldn\'t connect.</string>
 </resources>

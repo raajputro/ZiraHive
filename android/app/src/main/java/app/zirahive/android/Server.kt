@@ -38,6 +38,19 @@ object Server {
     private val quick: OkHttpClient = http.newBuilder()
         .connectTimeout(2, TimeUnit.SECONDS).readTimeout(3, TimeUnit.SECONDS).build()
 
+    // Away from home the first connection can go through a Tailscale relay and take a few seconds
+    private val patient: OkHttpClient = http.newBuilder()
+        .connectTimeout(8, TimeUnit.SECONDS).readTimeout(10, TimeUnit.SECONDS).build()
+
+    /** An address on the home network (192.168.x, 10.x, 172.16-31.x, *.local): answers fast or not at all. */
+    fun isLocal(base: String): Boolean {
+        val host = try { java.net.URI(base).host ?: "" } catch (e: Exception) { "" }
+        return host.endsWith(".local") || host == "localhost" ||
+            Regex("""^(10\.|192\.168\.|127\.|172\.(1[6-9]|2\d|3[01])\.)""").containsMatchIn(host)
+    }
+
+    private fun clientFor(base: String) = if (isLocal(base)) quick else patient
+
     fun userAgent(): String =
         "ZiraHiveApp/${BuildConfig.VERSION_NAME} (Android ${Build.VERSION.RELEASE}; ${Build.MODEL})"
 
@@ -74,13 +87,42 @@ object Server {
     }
 
     /** True when ZiraHive answers at this address. */
-    suspend fun answers(base: String, client: OkHttpClient = quick): Boolean = withContext(Dispatchers.IO) {
+    suspend fun answers(base: String): Boolean = problem(base) == null
+
+    /** Why ZiraHive doesn't answer at this address (null when it does), in words for the person. */
+    suspend fun problem(base: String): Problem? = withContext(Dispatchers.IO) {
         try {
-            client.newCall(Request.Builder().url("$base/api/health").header("User-Agent", userAgent()).build())
-                .execute().use { r -> r.isSuccessful && (r.body?.string() ?: "").contains("\"ok\"") }
+            clientFor(base).newCall(Request.Builder().url("$base/api/health").header("User-Agent", userAgent()).build())
+                .execute().use { r ->
+                    val body = r.body?.string() ?: ""
+                    if (r.isSuccessful && body.contains("\"ok\"")) null else Problem.NOT_ZIRAHIVE
+                }
+        } catch (e: java.net.UnknownHostException) {
+            Problem.NO_NAME
+        } catch (e: java.net.SocketTimeoutException) {
+            Problem.TIMEOUT
+        } catch (e: java.net.ConnectException) {
+            Problem.REFUSED
+        } catch (e: javax.net.ssl.SSLException) {
+            Problem.CERTIFICATE
         } catch (e: Exception) {
-            false
+            Problem.OTHER
         }
+    }
+
+    enum class Problem { NO_NAME, TIMEOUT, REFUSED, CERTIFICATE, NOT_ZIRAHIVE, OTHER }
+
+    fun explain(ctx: Context, base: String, p: Problem): String {
+        val tailscale = base.contains(".ts.net")
+        return ctx.getString(when (p) {
+            Problem.NO_NAME -> if (tailscale) R.string.problem_name_tailscale else R.string.problem_name
+            Problem.TIMEOUT -> if (tailscale) R.string.problem_timeout_tailscale
+                               else if (isLocal(base)) R.string.problem_timeout_home else R.string.problem_timeout
+            Problem.REFUSED -> R.string.problem_refused
+            Problem.CERTIFICATE -> R.string.problem_certificate
+            Problem.NOT_ZIRAHIVE -> R.string.problem_not_zirahive
+            Problem.OTHER -> R.string.problem_other
+        }, base)
     }
 
     /** The address to use right now: home when it answers, otherwise the away address. */
