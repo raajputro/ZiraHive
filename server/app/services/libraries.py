@@ -175,6 +175,25 @@ async def _merge_into(session: AsyncSession, keep: Library, dup: Library) -> Non
     await session.flush()
 
 
+def is_quran_library(lib: Library) -> bool:
+    """A category that is Quran recitations by its name or folder (e.g. G:\\Media\\Quran)."""
+    return is_quran_name(lib.name) or is_quran_name(Path(lib.path).name)
+
+
+async def adopt_quran(session: AsyncSession) -> list[Library]:
+    """Music categories that are really Quran recitations become Quran categories, so the
+    recitations leave Listen. (Before the Quran type existed, a Quran folder had to be set to
+    Music to play.) Returns the changed ones, to scan again."""
+    changed = [lib for lib in (await session.scalars(select(Library).where(Library.kind == "music"))).all()
+               if is_quran_library(lib)]
+    for lib in changed:
+        lib.kind = "quran"
+        log.info("category %s holds Quran recitations: now a Quran category", lib.name)
+    if changed:
+        await session.commit()
+    return changed
+
+
 async def merge_duplicates(session: AsyncSession) -> list[Library]:
     """Fold categories that are the same folder into one, and store every category inside the
     media folder by its media-folder path. Returns the categories that were kept from a merge."""

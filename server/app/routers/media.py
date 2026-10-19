@@ -16,7 +16,7 @@ from ..schemas import (FolderBrowseOut, FolderPick, LibraryIn, LibraryOrderIn, L
 from ..security import admin_user, create_token, current_user
 from ..services import activity, jobs, storage
 from ..services import browse
-from ..services.libraries import discover, guess_kind, merge_duplicates, pretty_name
+from ..services.libraries import adopt_quran, discover, guess_kind, merge_duplicates, pretty_name
 from ..services.shelf_scan import SHELF_KINDS
 from ..services.ranged import ranged_file_response
 from ..services.ratings import allowed, effective_age
@@ -204,6 +204,8 @@ async def discover_libraries(_: User = Depends(admin_user),
         await jobs.enqueue("scan_library", lib.id)
     created = await discover(session)
     for lib in created:
+        await jobs.enqueue("scan_library", lib.id)
+    for lib in await adopt_quran(session):
         await jobs.enqueue("scan_library", lib.id)
     return await _library_out(session, created)
 

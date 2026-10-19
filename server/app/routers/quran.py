@@ -26,7 +26,7 @@ from ..models import Library, MusicAlbum, PrayerLog, PrayerSettings, Track, Trac
 from ..schemas import TrackOut
 from ..security import admin_user, current_user
 from ..services.quran_data import SURAHS, parse_file
-from ..services.libraries import is_quran_name
+from ..services.libraries import is_quran_library, is_quran_name
 from ..services.shelf_files import AUDIO_EXT, clean_name
 from .music import track_outs, visible_libraries
 
@@ -38,7 +38,7 @@ router = APIRouter(prefix="/api", tags=["quran"])
 def _reciter(t: Track, lib: Library) -> str:
     """The qari: the folder a file is in, below the Quran folder (or the category, for a Quran category)."""
     folders = list(PurePosixPath(t.rel_path).parts[:-1])
-    if lib.kind == "quran":
+    if lib.kind == "quran" or is_quran_library(lib):
         return clean_name(folders[0]) if folders else (t.artist or lib.name)
     # Music/…/Quran/<qari>/001.mp3: the folder below the Quran-named one; files straight in the
     # Quran folder go under that folder's own name

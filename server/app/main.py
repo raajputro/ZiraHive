@@ -14,7 +14,7 @@ from .models import Library
 from .routers import admin, albums, app_downloads, auth, backup, books, dlna, federation, iptv as iptv_router, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, quran, shares, sync, uploads, vault
 from .services import iptv_live, jobs, transcode
 from .services.browse import same_folder_key
-from .services.libraries import discover, merge_duplicates
+from .services.libraries import adopt_quran, discover, merge_duplicates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("zirahive")
@@ -29,6 +29,8 @@ async def bootstrap_libraries() -> None:
         for lib in await merge_duplicates(session):  # a folder that became two categories
             await jobs.enqueue("scan_library", lib.id)
         for lib in await discover(session):
+            await jobs.enqueue("scan_library", lib.id)
+        for lib in await adopt_quran(session):  # recitations out of Listen
             await jobs.enqueue("scan_library", lib.id)
         known = {same_folder_key(p) for p in (await session.scalars(select(Library.path))).all()}
         for name, path, kind in get_settings().parsed_libraries():

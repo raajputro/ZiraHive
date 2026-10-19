@@ -150,3 +150,30 @@ async def test_recitations_never_mix_with_songs(tmp_path, monkeypatch, client, a
     # notifications: "new songs" counts songs only
     notes = [n["title"] for n in (await client.get("/api/notifications")).json()["items"]]
     assert "1 new song in Music" in notes and "3 new recitations in Quran" in notes
+
+
+async def test_a_quran_category_set_to_music_leaves_listen(tmp_path, monkeypatch, client, admin):
+    """G:\\Media\\Quran with 001.mp3… straight inside, set to Music before the Quran type existed."""
+    root = tmp_path / "media"
+    for n in (1, 2, 3):
+        sample.tone(root / "Quran" / f"{n:03d}.mp3", 1, 300 + n, {"title": f"{n:03d}", "artist": "Mishary Alafasy"})
+    sample.tone(root / "Music" / "Playlist" / "Song.mp3", 1, 600, {"title": "Song", "artist": "Band"})
+    monkeypatch.setenv("ZIRAHIVE_MEDIA_ROOT", str(root))
+    from app.config import get_settings
+    get_settings.cache_clear()
+    await client.post("/api/libraries/discover")
+    await jobs.drain_local()
+    quran = next(l for l in (await client.get("/api/libraries")).json() if l["name"] == "Quran")
+    # the old situation: someone made it a Music category so it would play
+    await client.patch(f"/api/libraries/{quran['id']}", json={"kind": "music"})
+    await jobs.drain_local()
+    # even as "Music", its files are recitations
+    assert [s["title"] for s in (await client.get("/api/music/tracks")).json()] == ["Song"]
+    assert [a["title"] for a in (await client.get("/api/music/albums")).json()] == ["Playlist"]
+    # and the next look for folders (also done at startup) turns it back into a Quran category
+    await client.post("/api/libraries/discover")
+    await jobs.drain_local()
+    assert next(l for l in (await client.get("/api/libraries")).json() if l["name"] == "Quran")["kind"] == "quran"
+    assert [s["title"] for s in (await client.get("/api/music/tracks")).json()] == ["Song"]
+    reciters = {r["name"]: r["surahs"] for r in (await client.get("/api/quran")).json()["reciters"]}
+    assert reciters == {"Mishary Alafasy": 3}

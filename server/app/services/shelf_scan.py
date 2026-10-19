@@ -24,7 +24,7 @@ from sqlalchemy import select
 
 from ..db import sessionmaker
 from ..models import Book, Library, MusicAlbum, Track, User, track_shown
-from .libraries import is_quran_name
+from .libraries import is_quran_library, is_quran_name
 from . import storage
 from .browse import marked, walk_filter
 from .shelf_files import (AUDIO_EXT, COMIC_EXT, EBOOK_EXT, IMAGE_EXT, audio_info, clean_name, comic_meta,
@@ -165,10 +165,11 @@ async def scan_music(session, lib: Library, root: Path, stats: dict) -> None:
     albums = {a.key: a for a in (await session.scalars(select(MusicAlbum).where(MusicAlbum.library_id == lib.id))).all()}
     touched: dict[str, str | None] = {}  # album id -> album artist tag seen in this scan
     seen, done = set(), 0
+    whole_quran = lib.kind == "quran" or is_quran_library(lib)  # e.g. G:\Media\Quran, whatever its type
     for rel, size, mtime in files:
         seen.add(rel)
         t = existing.get(rel)
-        quran = lib.kind == "quran" or any(is_quran_name(part) for part in PurePosixPath(rel).parts[:-1])
+        quran = whole_quran or any(is_quran_name(part) for part in PurePosixPath(rel).parts[:-1])
         if t and t.size == size and t.mtime == mtime and not t.missing:
             if t.quran != quran:
                 t.quran = quran
@@ -187,7 +188,7 @@ async def scan_music(session, lib: Library, root: Path, stats: dict) -> None:
             t = Track(library_id=lib.id, rel_path=rel, title=fields["title"])
             session.add(t)
             stats["added"] += 1
-            if quran and lib.kind == "music":
+            if quran and lib.kind != "quran":
                 stats["added_quran"] = stats.get("added_quran", 0) + 1
         else:
             stats["updated"] += 1
