@@ -337,6 +337,13 @@ You can write your own in a few lines of Python; see [docs/PLUGINS.md](docs/PLUG
 **Updating:** right-click **update.ps1 > Run with PowerShell**. Your files, settings and
 accounts stay, and the database is upgraded by itself.
 
+**Moving the data folder to another drive:** right-click **move-data.ps1 > Run with PowerShell**
+and pick a drive (it shows how much room each has) or a folder. ZiraHive stops, everything is
+copied and checked file by file, `ZIRAHIVE_DATA_PATH` in `.env` is updated and ZiraHive starts again;
+if anything goes wrong it starts on the old folder as before. The old folder is only deleted if you
+say so at the end. It takes as long as copying your photos does, and ZiraHive is offline meanwhile.
+The database (accounts, watch history, albums) isn't in that folder: Docker keeps it.
+
 ```powershell
 docker compose ps                              # what's running
 docker compose exec api python -m app.doctor   # health check, also when the page won't open
@@ -427,7 +434,8 @@ and watch history stay as they were, and people stay signed in at home. Two thin
 - The PC app is now **ZiraHiveSync.exe**; it picks up the old app's folders and sign-in by itself.
   Remove GharBoxSync.exe from Windows start-up and run `ZiraHiveSync.exe startup on`.
 
-Your data folder can keep its old name (`GharBoxData`); it's just the path in `.env`.
+Your data folder can keep its old name (`GharBoxData`); it's just the path in `.env`. To move it to
+another drive, use `move-data.ps1` (see *Running it day to day*).
 
 ## License
 
