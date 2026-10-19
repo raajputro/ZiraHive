@@ -73,3 +73,33 @@ async def test_heic_through_a_share_link(client, admin):
     link = (await client.post("/api/shares", json={"target_type": "asset", "target_id": a["id"]})).json()
     r = await client.get(f"/api/s/{link['token']}/assets/{a['id']}/file", params={"view": "true"})
     assert r.status_code == 200 and r.headers["content-type"] == "image/jpeg"
+
+
+async def test_photo_still_gets_a_thumbnail_when_its_details_cant_be_read(client, admin, monkeypatch):
+    from app.services import media_tools
+
+    def broken(_path):
+        raise ValueError("odd EXIF")
+    monkeypatch.setattr(media_tools, "image_info", broken)
+    a = await _heic_asset(client)
+    assert (await client.get(f"/api/assets/{a['id']}/thumb")).status_code == 200
+
+
+async def test_missing_thumbnails_are_retried(client, admin):
+    from sqlalchemy import update
+
+    from app import db
+    from app.models import Asset
+    from app.services import storage
+
+    a = await _heic_asset(client)
+    # as if the first try had failed (or an older version couldn't read HEIC)
+    storage.thumb_path(a["id"]).unlink()
+    async with db.sessionmaker()() as session:
+        await session.execute(update(Asset).where(Asset.id == a["id"]).values(thumb_ready=False))
+        await session.commit()
+    assert (await client.get(f"/api/assets/{a['id']}/thumb")).status_code == 404
+    assert await jobs.retry_missing_thumbs() == 1
+    await jobs.drain_local()
+    assert (await client.get(f"/api/assets/{a['id']}/thumb")).status_code == 200
+    assert await jobs.retry_missing_thumbs() == 0

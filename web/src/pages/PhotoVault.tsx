@@ -7,7 +7,7 @@ import { locale, t as tr } from "../i18n";
 import { DropZone } from "./Files";
 import { PhotoTabs, Tile } from "./Photos";
 import { VaultGate, type VaultCtx } from "./Vault";
-import { decryptItem, encryptAndUpload, isPhotoMeta, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
+import { decryptItem, encryptAndUpload, isPhotoMeta, fillMissingThumbs, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
 import { moveToPhotos } from "../vault/photos";
 import { viewablePhoto } from "../heic";
 import AutoLock from "../components/AutoLock";
@@ -56,6 +56,7 @@ function Contents({ master, reload }: VaultCtx) {
     setEverything(opened);
     setItems(all);
     made.current.push(...await loadThumbs(all, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
+    made.current.push(...await fillMissingThumbs(all, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
   }, [master]);
   const folders = useMemo(() => allFolders(everything), [everything]);
   useEffect(() => { if (folder && folder !== ROOT && everything.length && !folders.includes(folder)) setFolder(null); }, [folders, folder, everything.length]);

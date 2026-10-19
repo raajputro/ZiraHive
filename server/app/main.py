@@ -50,6 +50,7 @@ async def lifespan(_: FastAPI):
     await db.create_all()
     await jobs.init_queue()
     await bootstrap_libraries()
+    await jobs.retry_missing_thumbs()
     transcode.manager.start_janitor()
     iptv_live.manager.start_janitor()
     log.info("ZiraHive %s ready (data: %s)", VERSION, settings.data_dir.resolve())

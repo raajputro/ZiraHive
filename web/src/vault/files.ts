@@ -128,3 +128,31 @@ export async function loadThumbs(items: Opened[], got: (id: string, url: string)
   await Promise.all([worker(), worker(), worker(), worker()]);
   return made;
 }
+
+const filling = new Set<string>();  // items being given a thumbnail right now (load() can run twice)
+
+/** Photos that went into the vault without a thumbnail (HEIC before this browser could read it):
+ * make one now, one photo at a time in the background, and save it encrypted like any other.
+ * Calls `got` for each; returns the object URLs made. */
+export async function fillMissingThumbs(items: Opened[], got: (id: string, url: string) => void,
+                                        isCancelled: () => boolean): Promise<string[]> {
+  const made: string[] = [];
+  const todo = items.filter((o) => !o.item.has_thumb && o.item.complete && o.meta.size > 0 && o.meta.size < 150 * 1024 * 1024
+    && kindOf(o.meta.type, o.meta.name) === "image" && !filling.has(o.item.id));
+  for (const o of todo) {
+    if (isCancelled()) break;
+    filling.add(o.item.id);
+    try {
+      const file = new File([await decryptItem(o)], o.meta.name, { type: o.meta.type });
+      const thumb = await makeThumb(file);
+      if (!thumb) continue;
+      await api.vaultThumb(o.item.id, unb64(await seal(o.fk.key, new Uint8Array(await thumb.blob.arrayBuffer()))));
+      o.item.has_thumb = true;
+      const url = URL.createObjectURL(thumb.blob);
+      made.push(url);
+      got(o.item.id, url);
+    } catch { /* leave the icon; tried again next time the vault opens */ }
+    finally { filling.delete(o.item.id); }
+  }
+  return made;
+}

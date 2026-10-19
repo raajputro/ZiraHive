@@ -5,7 +5,7 @@ import { api, ApiError, formatBytes, type VaultInfo } from "../api";
 import { t as tr, locale } from "../i18n";
 import Dialog from "../components/Dialog";
 import { createVault, rewrap, secureContextOk, sealMeta, unlockWithPassphrase, unlockWithRecovery } from "../vault/crypto";
-import { decryptItem, encryptAndUpload, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
+import { decryptItem, encryptAndUpload, fillMissingThumbs, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
 import { viewablePhoto } from "../heic";
 import { allFolders, createFolder, deleteFolder, filesIn, filesWithin, folderOf, isFolder, join, moveTo, nameOf, parentOf, renameFolder, ROOT, subfolders } from "../vault/folders";
 import { FolderNameDialog, MoveToFolderDialog } from "../components/VaultFolders";
@@ -231,6 +231,7 @@ function Contents({ master, reload }: VaultCtx) {
     const opened = await openAll(master);
     setItems(opened);
     made.current.push(...await loadThumbs(opened, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
+    made.current.push(...await fillMissingThumbs(opened, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
   }, [master]);
 
   useEffect(() => { void load(); }, [load]);

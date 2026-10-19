@@ -73,12 +73,18 @@ async def process_asset(_ctx: Any, asset_id: str) -> None:
         dest = storage.thumb_path(asset.id)
         try:
             if asset.kind == "photo":
-                w, h, taken = await asyncio.to_thread(media_tools.image_info, src)
-                asset.width, asset.height = w, h
-                if taken and asset.taken_at is None:
-                    asset.taken_at = media_tools.as_utc(taken)
+                try:  # size and date; a picture whose details can't be read still gets a thumbnail
+                    w, h, taken = await asyncio.to_thread(media_tools.image_info, src)
+                    asset.width, asset.height = w, h
+                    if taken and asset.taken_at is None:
+                        asset.taken_at = media_tools.as_utc(taken)
+                except Exception as exc:
+                    log.warning("reading details of %s failed: %s", asset.filename, exc)
                 await asyncio.to_thread(media_tools.make_image_thumb, src, dest)
                 asset.thumb_ready = True
+                # a new version of the picture: the screen-sized and full-size copies are remade when next opened
+                storage.preview_path(asset.id).unlink(missing_ok=True)
+                storage.fullview_path(asset.id).unlink(missing_ok=True)
                 from . import photo_quality
                 asset.phash, asset.sharpness = await asyncio.to_thread(photo_quality.measure, src)
             elif asset.kind == "video":
@@ -98,6 +104,21 @@ async def process_asset(_ctx: Any, asset_id: str) -> None:
 
     if kind == "photo" and get_settings().ai_url:
         await enqueue("ai_photo", asset_id)  # does nothing when the ai container isn't running
+
+
+async def retry_missing_thumbs(limit: int = 5000) -> int:
+    """Queue every photo that still has no thumbnail (its first try failed, or it came from an
+    older version that couldn't read it) for another go. Runs when the server starts."""
+    from sqlalchemy import select
+
+    async with sessionmaker()() as session:
+        ids = (await session.scalars(select(Asset.id).where(
+            Asset.kind == "photo", Asset.thumb_ready.is_(False), Asset.deleted_at.is_(None)).limit(limit))).all()
+    for asset_id in ids:
+        await enqueue("process_asset", asset_id)
+    if ids:
+        log.info("retrying %d photo thumbnails", len(ids))
+    return len(ids)
 
 
 async def make_offline_copy(_ctx: Any, copy_id: str) -> None:
