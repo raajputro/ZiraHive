@@ -55,7 +55,7 @@ object PrayerAlarms {
         val before = r.optInt("before", 0) * 60_000L
         val on = PrayerTimes.FARD.filter { r.optBoolean(it, true) }
         if (on.isEmpty()) return null
-        val today = LocalDate.ofInstant(Instant.ofEpochMilli(now), zone(s))
+        val today = Instant.ofEpochMilli(now).atZone(zone(s)).toLocalDate()
         for (d in 0..2) {
             val day = today.plusDays(d.toLong())
             val times = PrayerTimes.forDay(day, s)
@@ -69,7 +69,12 @@ object PrayerAlarms {
         return null
     }
 
+    /** Never throws: a problem with reminders must not stop the app from opening. */
     fun schedule(ctx: Context) {
+        try { scheduleNext(ctx) } catch (t: Throwable) { android.util.Log.w("ZiraHive", "prayer reminders", t) }
+    }
+
+    private fun scheduleNext(ctx: Context) {
         val am = ctx.getSystemService(AlarmManager::class.java)
         val pi = PendingIntent.getBroadcast(ctx, REQ, Intent(ctx, PrayerReceiver::class.java),
             PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT)
@@ -84,7 +89,7 @@ object PrayerAlarms {
     }
 
     fun label(ctx: Context, prayer: String, at: Long, s: JSONObject?): String {
-        val friday = s != null && LocalDate.ofInstant(Instant.ofEpochMilli(at), zone(s)).dayOfWeek == DayOfWeek.FRIDAY
+        val friday = s != null && Instant.ofEpochMilli(at).atZone(zone(s)).dayOfWeek == DayOfWeek.FRIDAY
         return ctx.getString(when (prayer) {
             "fajr" -> R.string.prayer_fajr
             "dhuhr" -> if (friday) R.string.prayer_jumuah else R.string.prayer_dhuhr
@@ -116,7 +121,9 @@ object PrayerAlarms {
 class PrayerReceiver : BroadcastReceiver() {
     override fun onReceive(ctx: Context, intent: Intent) {
         val prayer = intent.getStringExtra("prayer")
-        if (prayer != null) PrayerAlarms.notify(ctx, prayer, intent.getLongExtra("at", System.currentTimeMillis()))
+        if (prayer != null) try {
+            PrayerAlarms.notify(ctx, prayer, intent.getLongExtra("at", System.currentTimeMillis()))
+        } catch (t: Throwable) { android.util.Log.w("ZiraHive", "prayer reminder", t) }
         PrayerAlarms.schedule(ctx)
     }
 }
