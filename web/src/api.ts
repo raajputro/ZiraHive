@@ -204,6 +204,7 @@ export interface Plugin {
 export interface HealthItem { id: string; title: string; status: "ok" | "warn" | "fail" | "info"; detail: string; fix: string | null }
 export interface AiStatus { ai: boolean; ollama: boolean; models: Record<string, string>; photos: number; photos_indexed: number; people: number; documents_ready: number; llm_model: string; embed_model: string }
 export interface PersonSummary { id: string; name: string | null; photos: number; cover_face: string | null; hidden: boolean }
+export interface DocDuplicates { groups: { keep: string; same: boolean; similarity: number; files: Asset[] }[]; checked: number; waiting: number }
 export interface Cleanup { duplicates: { keep: string; photos: Asset[] }[]; blurry: Asset[]; measured: number; waiting: number }
 export interface AskAnswer { answer: string; sources: { n: number; asset_id: string; filename: string; folder: string; passage: string }[] }
 
@@ -301,6 +302,7 @@ export const api = {
   mergePeople: (id: string, into: string) => request<void>("POST", `/api/people/${id}/merge`, { into }),
   notThisPerson: (id: string, faceId: string) => request<void>("DELETE", `/api/people/${id}/faces/${faceId}`),
   cleanup: () => request<Cleanup>("GET", "/api/photos/cleanup"),
+  fileDuplicates: () => request<DocDuplicates>("GET", "/api/files/duplicates"),
   trashAsset: (id: string) => request<void>("DELETE", `/api/assets/${id}`),
   makeSubtitles: (mediaId: string, language?: string) =>
     request<{ status: string }>("POST", `/api/media/${mediaId}/ai-subtitles`, { language: language || undefined }),

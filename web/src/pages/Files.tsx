@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { Link, useLocation, useNavigate } from "react-router-dom";
-import { Upload, FolderPlus, Folder, FileText, Image, Film, File, Download, Pencil, Trash2, Link2, History, ShieldCheck, ScanLine, Search, Sparkles } from "lucide-react";
+import { Upload, FolderPlus, Folder, FileText, Image, Film, File, Download, Pencil, Trash2, Link2, History, ShieldCheck, ScanLine, Search, Sparkles, Copy } from "lucide-react";
 import { api, url, formatBytes, type Asset, type FolderListing, type SearchHit } from "../api";
 import { useUploads } from "../uploads";
 import { Lightbox } from "./Photos";
@@ -88,6 +88,7 @@ export default function FilesPage() {
           <Link to="/vault" className="button"><ShieldCheck size={17} />{" "}{tr("Vault")}</Link>
           <Link to={`/scan?folder=${encodeURIComponent(folder === "/" ? "/Scans" : folder)}`} className="button"><ScanLine size={17} />{" "}{tr("Scan")}</Link>
           <Link to="/ask" className="button"><Sparkles size={17} />{" "}{tr("Ask")}</Link>
+          <Link to="/duplicates" className="button"><Copy size={17} />{" "}{tr("Find duplicates")}</Link>
           <button onClick={newFolder}><FolderPlus size={17} />{" "}{tr("New folder")}</button>
           <button className="primary" onClick={() => input.current?.click()}><Upload size={17} />{" "}{tr("Upload")}</button>
           <input ref={input} type="file" multiple hidden

@@ -1,12 +1,13 @@
 import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
-import { Download, FileText, Folder, FolderInput, FolderPlus, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music } from "lucide-react";
+import { Download, FileText, Folder, FolderInput, FolderPlus, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music, Copy } from "lucide-react";
 import { api, ApiError, formatBytes, type VaultInfo } from "../api";
 import { t as tr, locale } from "../i18n";
 import Dialog from "../components/Dialog";
 import { createVault, rewrap, secureContextOk, sealMeta, unlockWithPassphrase, unlockWithRecovery } from "../vault/crypto";
 import { decryptItem, encryptAndUpload, fillMissingThumbs, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
 import { viewablePhoto } from "../heic";
+import VaultCleanup from "../components/VaultCleanup";
 import { allFolders, createFolder, deleteFolder, filesIn, filesWithin, folderOf, isFolder, join, moveTo, nameOf, parentOf, renameFolder, ROOT, subfolders } from "../vault/folders";
 import { FolderNameDialog, MoveToFolderDialog } from "../components/VaultFolders";
 import AutoLock from "../components/AutoLock";
@@ -222,6 +223,7 @@ function Contents({ master, reload }: VaultCtx) {
   const [here, setHere] = useState(ROOT);
   const [naming, setNaming] = useState<"new" | "rename" | null>(null);
   const [moving, setMoving] = useState<Opened | null>(null);
+  const [cleaning, setCleaning] = useState(false);
   const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
 
@@ -307,6 +309,7 @@ function Contents({ master, reload }: VaultCtx) {
         <input ref={input} type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
         <button className="primary" onClick={() => input.current?.click()}><Upload size={16} /> {tr("Add files")}</button>
         <button onClick={() => setNaming("new")}><FolderPlus size={16} /> {tr("New folder")}</button>
+        <button onClick={() => setCleaning(true)} disabled={!files.length}><Copy size={16} /> {tr("Find duplicates")}</button>
         <button onClick={() => setChanging(true)}><KeyRound size={16} /> {tr("Change passphrase")}</button>
         <button onClick={lock}><Lock size={16} /> {tr("Lock")}</button>
       </div>
@@ -364,6 +367,9 @@ function Contents({ master, reload }: VaultCtx) {
           );
         })}
       </div>
+      {cleaning && items && (
+        <VaultCleanup what="documents" items={items} thumbs={thumbs} onChanged={() => { void load(); reload(); }} onClose={() => setCleaning(false)} />
+      )}
       {viewing && <Viewer o={viewing} onClose={() => setViewing(null)} onDelete={() => void remove(viewing)} onRename={() => void rename(viewing)}
         onMove={() => setMoving(viewing)} />}
       {naming && items && (

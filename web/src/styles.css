@@ -962,6 +962,14 @@ body.has-player .tray { bottom: 88px; }
 .dupe-group figure.keep .dupe-pic { outline: 3px solid var(--jute); }
 .dupe-pic { padding: 0; border: 0; display: block; width: 150px; height: 112px; border-radius: 8px; overflow: hidden; background: var(--line); }
 .dupe-pic img { width: 100%; height: 100%; object-fit: cover; }
+.doc-dupes { margin: 12px 0; padding: 6px 12px; border: 1px solid var(--line); border-radius: var(--radius-m, 10px); }
+.doc-dupes-head { margin: 4px 0; }
+.doc-dupes ul { list-style: none; margin: 0; padding: 0; }
+.doc-dupes li { display: grid; grid-template-columns: auto 1fr auto auto auto; align-items: center; gap: 12px; padding: 8px 0; border-top: 1px solid var(--line); }
+.doc-dupes li:first-child { border-top: 0; }
+.doc-dupes li.keep .doc-dupes-name > :first-child { font-weight: 600; }
+.doc-dupes-name { display: flex; flex-direction: column; min-width: 0; overflow-wrap: anywhere; }
+@media (max-width: 600px) { .doc-dupes li { grid-template-columns: auto 1fr auto auto; } }
 .dupe-group figcaption { display: flex; justify-content: space-between; gap: 6px; margin-top: 4px; }
 .link-button { background: none; border: 0; padding: 0; color: var(--danger, #b3261e); text-decoration: underline; cursor: pointer; }
 

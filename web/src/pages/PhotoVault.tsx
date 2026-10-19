@@ -1,7 +1,7 @@
 // Photos → Vault: private photos and videos, encrypted on this device. It is the same vault
 // as the Vault page (one passphrase, one recovery key); this view shows its photos and videos.
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { ChevronLeft, ChevronRight, CheckSquare, Download, Folder, FolderInput, FolderPlus, ImageUp, Lock, Pencil, ShieldCheck, Trash2, Upload, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, CheckSquare, Download, Folder, FolderInput, FolderPlus, ImageUp, Lock, Pencil, ShieldCheck, Sparkles, Trash2, Upload, X } from "lucide-react";
 import { api, formatBytes } from "../api";
 import { locale, t as tr } from "../i18n";
 import { DropZone } from "./Files";
@@ -10,6 +10,7 @@ import { VaultGate, type VaultCtx } from "./Vault";
 import { decryptItem, encryptAndUpload, isPhotoMeta, fillMissingThumbs, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
 import { moveToPhotos } from "../vault/photos";
 import { viewablePhoto } from "../heic";
+import VaultCleanup from "../components/VaultCleanup";
 import AutoLock from "../components/AutoLock";
 import { lock } from "../vault/session";
 import { allFolders, createFolder, deleteFolder, filesWithin, folderOf, join, moveTo, nameOf, parentOf, renameFolder, ROOT } from "../vault/folders";
@@ -48,6 +49,7 @@ function Contents({ master, reload }: VaultCtx) {
   const [folder, setFolder] = useState<string | null>(null);  // null = all photos
   const [naming, setNaming] = useState<"new" | "rename" | null>(null);
   const [moving, setMoving] = useState<Opened[] | null>(null);
+  const [cleaning, setCleaning] = useState(false);
 
   const load = useCallback(async () => {
     const opened = await openAll(master);
@@ -161,6 +163,7 @@ function Contents({ master, reload }: VaultCtx) {
               onChange={(e) => { void add(Array.from(e.target.files ?? [])); e.target.value = ""; }} />
             <button className="primary" onClick={() => input.current?.click()}><Upload size={16} /> {tr("Add photos")}</button>
             <button onClick={() => setNaming("new")}><FolderPlus size={16} /> {tr("New folder")}</button>
+            <button onClick={() => setCleaning(true)} disabled={!items?.length}><Sparkles size={16} /> {tr("Clean up")}</button>
             <button onClick={lock}><Lock size={16} /> {tr("Lock")}</button>
           </>
         )}
@@ -243,6 +246,9 @@ function Contents({ master, reload }: VaultCtx) {
             for (const o of moving) await moveTo(o, to);
             setViewing(null); stopSelecting(); await load();
           }} />
+      )}
+      {cleaning && items && (
+        <VaultCleanup what="photos" items={items} thumbs={thumbs} onChanged={() => void load()} onClose={() => setCleaning(false)} />
       )}
     </DropZone>
   );

@@ -15,6 +15,7 @@ import AskPage from "./pages/Ask";
 import AlbumsPage, { AlbumPage } from "./pages/Albums";
 import PublicSharePage from "./pages/PublicShare";
 import FilesPage from "./pages/Files";
+import FileDuplicatesPage from "./pages/FileDuplicates";
 import WatchHome, { LibraryPage } from "./pages/Watch";
 import SeriesPage from "./pages/Series";
 import PlayerRoute from "./pages/Player";
@@ -82,6 +83,7 @@ function SignedInApp() {
               <Route path="/ask" element={<AskPage />} />
               <Route path="/photos/albums/:id" element={<AlbumPage />} />
               <Route path="/files/*" element={<FilesPage />} />
+              <Route path="/duplicates" element={<FileDuplicatesPage />} />
               <Route path="/watch" element={<WatchHome />} />
               <Route path="/watch/c/:id" element={<LibraryPage />} />
               <Route path="/watch/series/:id" element={<SeriesPage />} />

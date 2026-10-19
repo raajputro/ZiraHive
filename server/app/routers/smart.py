@@ -18,10 +18,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_session
-from ..models import Asset, DocChunk, Face, MediaItem, Person, PhotoVector, User
+from ..models import Asset, AssetText, DocChunk, Face, MediaItem, Person, PhotoVector, User
 from ..schemas import AssetOut
 from ..security import admin_user, current_user
-from ..services import ai, jobs, photo_quality, storage
+from ..services import ai, doc_compare, jobs, photo_quality, storage, textsearch
 
 router = APIRouter(prefix="/api", tags=["smart"])
 
@@ -280,6 +280,47 @@ async def cleanup(user: User = Depends(current_user), session: AsyncSession = De
                      and a.id not in in_groups), key=lambda a: a.sharpness)[:300]
     return CleanupOut(duplicates=dupes[:200], blurry=[AssetOut.model_validate(a) for a in blurry],
                       measured=len(photos), waiting=waiting)
+
+
+# ------------------------------------------------------------ duplicate documents
+
+class DocDuplicateGroup(BaseModel):
+    keep: str
+    same: bool          # all exact copies; otherwise edited versions of one document
+    similarity: float   # how much of the text the least alike two have in common (1.0 = identical)
+    files: list[AssetOut]
+
+
+class DocCleanupOut(BaseModel):
+    groups: list[DocDuplicateGroup]
+    checked: int
+    waiting: int  # documents whose words haven't been read yet (done in the background)
+
+
+@router.get("/files/duplicates", response_model=DocCleanupOut)
+async def document_duplicates(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    """Copies and edited versions of the same document. The newest of each group is marked Keep."""
+    rows = (await session.execute(
+        select(Asset, AssetText.text, AssetText.sha256).outerjoin(AssetText, AssetText.asset_id == Asset.id)
+        .where(Asset.owner_id == user.id, Asset.kind == "document", Asset.deleted_at.is_(None)))).all()
+    by_id = {a.id: a for a, _, _ in rows}
+    waiting = sum(1 for a, _, read_sha in rows
+                  if read_sha != a.sha256 and textsearch.wanted(a.filename, a.folder, a.kind))
+    if waiting:
+        await jobs.enqueue("text_backfill")  # reads them; harmless when already running
+    docs = [(a.id, a.sha256, text if read_sha == a.sha256 else None) for a, text, read_sha in rows]
+    found = await asyncio.to_thread(doc_compare.duplicate_groups, docs)
+
+    def newest(a: Asset):
+        return (a.updated_at or a.created_at, a.size)
+
+    groups = []
+    for g in found:
+        members = sorted((by_id[i] for i in g.ids), key=newest, reverse=True)
+        groups.append(DocDuplicateGroup(keep=members[0].id, same=g.same, similarity=g.similarity,
+                                        files=[AssetOut.model_validate(a) for a in members]))
+    groups.sort(key=lambda g: (-len(g.files), g.files[0].filename.lower()))
+    return DocCleanupOut(groups=groups[:300], checked=len(rows), waiting=waiting)
 
 
 # ------------------------------------------------------------ AI subtitles
