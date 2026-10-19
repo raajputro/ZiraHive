@@ -437,9 +437,13 @@ export const url = {
   shareLink: (s: { token: string }) => `${publicBase || location.origin}/s/${s.token}`,
   publicFile: (token: string, a: { id: string }, key?: string, download = false) =>
     `/api/s/${token}/assets/${a.id}/file${q({ key, download: download ? "true" : undefined })}`,
+  /** The original to look at in the browser: HEIC photos come back as a full-size JPEG. */
+  publicView: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/file${q({ key, view: "true" })}`,
   publicThumb: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/thumb${q({ key })}`,
   publicPreview: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/preview${q({ key })}`,
   file: (a: Asset, download = false) => `/api/assets/${a.id}/file${download ? "?download=true" : ""}`,
+  /** The original to look at in the browser: HEIC photos come back as a full-size JPEG. */
+  view: (a: { id: string }) => `/api/assets/${a.id}/file?view=true`,
   poster: (m: { id: string; base?: string }) => `${mediaBase(m)}/poster`,
   seriesPoster: (s: { id: string }) => `/api/series/${s.id}/poster`,
   titlePoster: (t: Title) => (t.type === "series" ? `/api/series/${t.id}/poster` : `/api/media/${t.id}/poster`),

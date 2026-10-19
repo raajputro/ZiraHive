@@ -6,6 +6,7 @@ import { t as tr, locale } from "../i18n";
 import Dialog from "../components/Dialog";
 import { createVault, rewrap, secureContextOk, sealMeta, unlockWithPassphrase, unlockWithRecovery } from "../vault/crypto";
 import { decryptItem, encryptAndUpload, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
+import { viewablePhoto } from "../heic";
 import { allFolders, createFolder, deleteFolder, filesIn, filesWithin, folderOf, isFolder, join, moveTo, nameOf, parentOf, renameFolder, ROOT, subfolders } from "../vault/folders";
 import { FolderNameDialog, MoveToFolderDialog } from "../components/VaultFolders";
 import AutoLock from "../components/AutoLock";
@@ -352,7 +353,7 @@ function Contents({ master, reload }: VaultCtx) {
           );
         })}
         {shown.map((o) => {
-          const k = kindOf(o.meta.type);
+          const k = kindOf(o.meta.type, o.meta.name);
           return (
             <button key={o.item.id} className="vault-tile" onClick={() => setViewing(o)} aria-label={tr("Open {name}", { name: o.meta.name })}>
               {thumbs[o.item.id] ? <img src={thumbs[o.item.id]} alt="" />
@@ -381,25 +382,29 @@ function Contents({ master, reload }: VaultCtx) {
 }
 
 function Viewer({ o, onClose, onDelete, onRename, onMove }: { o: Opened; onClose: () => void; onDelete: () => void; onRename: () => void; onMove: () => void }) {
-  const [url, setUrl] = useState<string | null>(null);
+  const [url, setUrl] = useState<string | null>(null);      // the file itself, for Save
+  const [shown, setShown] = useState<string | null>(null);  // what the page shows (HEIC as JPEG)
   const [done, setDone] = useState(0);
   const [error, setError] = useState("");
+  const k = kindOf(o.meta.type, o.meta.name);
   useEffect(() => {
-    let made: string | null = null, cancelled = false;
-    decryptItem(o, setDone).then((blob) => {
+    const made: string[] = [];
+    let cancelled = false;
+    const link = (b: Blob) => { const u = URL.createObjectURL(b); made.push(u); return u; };
+    decryptItem(o, setDone).then(async (blob) => {
       if (cancelled) return;
-      made = URL.createObjectURL(blob);
-      setUrl(made);
+      setUrl(link(blob));
+      const view = k === "image" ? await viewablePhoto(blob, o.meta.name).catch(() => blob) : blob;
+      if (!cancelled) setShown(view === blob ? made[0] : link(view));
     }).catch(() => setError(tr("This file couldn't be decrypted. It may be damaged.")));
-    return () => { cancelled = true; if (made) URL.revokeObjectURL(made); };
-  }, [o]);
-  const k = kindOf(o.meta.type);
+    return () => { cancelled = true; made.forEach((u) => URL.revokeObjectURL(u)); };
+  }, [o, k]);
   return (
     <Dialog title={o.meta.name} onClose={onClose} wide>
       <div className="vault-view">
         {error ? <p className="error">{error}</p>
           : !url ? <progress max={o.item.size} value={done} aria-label={tr("Decrypting")} />
-          : k === "image" ? <img src={url} alt={o.meta.name} />
+          : k === "image" ? (shown ? <img src={shown} alt={o.meta.name} /> : <progress aria-label={tr("Getting the photo ready")} />)
           : k === "video" ? <video src={url} controls autoPlay playsInline />
           : k === "audio" ? <audio src={url} controls autoPlay />
           : <p className="muted">{tr("This file opens after you save it.")}</p>}

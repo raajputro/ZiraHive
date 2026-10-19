@@ -171,7 +171,7 @@ function SearchResults({ hits, query }: { hits: SearchHit[]; query: string }) {
         const Icon = icons[a.kind];
         return (
           <li key={a.id}>
-            <a href={url.file(a)} target="_blank" rel="noreferrer" className="hit-name">
+            <a href={a.kind === "photo" ? url.view(a) : url.file(a)} target="_blank" rel="noreferrer" className="hit-name">
               {a.thumb_ready ? <img src={url.thumb(a)} alt="" className="mini" /> : <Icon size={18} className="ico" />}
               <Highlight text={a.filename} query={query} />
             </a>

@@ -16,7 +16,7 @@ from ..schemas import (FolderBrowseOut, FolderPick, LibraryIn, LibraryOrderIn, L
 from ..security import admin_user, create_token, current_user
 from ..services import activity, jobs, storage
 from ..services import browse
-from ..services.libraries import discover, guess_kind, pretty_name
+from ..services.libraries import discover, guess_kind, merge_duplicates, pretty_name
 from ..services.shelf_scan import SHELF_KINDS
 from ..services.ranged import ranged_file_response
 from ..services.ratings import allowed, effective_age
@@ -163,7 +163,10 @@ async def add_library(body: LibraryIn, _: User = Depends(admin_user),
     if folder is None or not folder.is_dir():
         raise HTTPException(400, "Pick a folder on one of your drives. With Docker, list the drive in .env first "
                                  "(for example DRIVE_E=E:/) and restart.")
-    body.path = str(folder)
+    body.path = browse.preferred(folder)
+    taken = {browse.same_folder_key(p) for p in (await session.scalars(select(Library.path))).all()}
+    if browse.same_folder_key(body.path) in taken:
+        raise HTTPException(409, "That folder is already a category")
     order = (await session.scalar(select(func.max(Library.sort_order)))) or 0
     lib = Library(name=body.name, path=body.path, kind=body.kind, sort_order=order + 1)
     session.add(lib)
@@ -195,7 +198,10 @@ async def browse_folders(path: str | None = None, _: User = Depends(admin_user))
 @router.post("/libraries/discover", response_model=list[LibraryOut])
 async def discover_libraries(_: User = Depends(admin_user),
                              session: AsyncSession = Depends(get_session)):
-    """Add every new folder in the media folder as a category and scan it."""
+    """Add every new folder in the media folder as a category and scan it (and fold together
+    any categories that turn out to be the same folder)."""
+    for lib in await merge_duplicates(session):
+        await jobs.enqueue("scan_library", lib.id)
     created = await discover(session)
     for lib in created:
         await jobs.enqueue("scan_library", lib.id)

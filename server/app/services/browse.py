@@ -105,6 +105,31 @@ def display(path: str | Path) -> str:
     return f"{parts[0].upper()}:\\" + "\\".join(parts[1:])
 
 
+def same_folder_key(path: str | Path) -> str:
+    """One key per real folder on the PC, however ZiraHive reaches it. With Docker, G:\\Media is
+    mounted twice (as the media folder /media and inside the drive /drives/g), so
+    /media/English Movies and /drives/g/Media/English Movies get the same key. Windows paths
+    ignore case, so the key does too."""
+    return display(path).replace("/", "\\").rstrip("\\").lower()
+
+
+def preferred(path: str | Path) -> str:
+    """The media-folder spelling of a folder that lies inside the media folder but was reached
+    through a drive (/drives/g/Media/English Movies -> /media/English Movies), so a category is
+    always stored the way automatic discovery would store it. Any other folder is returned as is."""
+    s = get_settings()
+    if not (s.media_root and s.media_host_path):
+        return str(path)
+    host = display(path).replace("/", "\\").rstrip("\\")
+    media_host = s.media_host_path.replace("/", "\\").rstrip("\\")
+    if host.lower() == media_host.lower():
+        return str(PurePosixPath(s.media_root))
+    if host.lower().startswith(media_host.lower() + "\\"):
+        rest = [p for p in host[len(media_host) + 1:].split("\\") if p]
+        return str(PurePosixPath(s.media_root, *rest))
+    return str(path)
+
+
 def list_folder(path: Path) -> list[Path]:
     try:
         children = [c for c in path.iterdir() if not _SKIP.match(c.name) and not marked(c)]

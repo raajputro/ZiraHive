@@ -16,7 +16,7 @@ from ..schemas import (AssetOut, AssetUpdateIn, FolderCreateIn, FolderListing, M
 from ..security import current_user
 from ..services import storage
 from ..services.ranged import ranged_file_response
-from ..services.assets import file_response, preview_response, thumb_response, viewable_asset
+from ..services.assets import file_response, preview_response, thumb_response, view_response, viewable_asset
 from ..services.events import audit
 from .uploads import add_version, ensure_folders
 
@@ -93,10 +93,14 @@ async def get_asset(asset_id: str, user: User = Depends(current_user),
 
 
 @router.get("/assets/{asset_id}/file")
-async def download_asset(asset_id: str, request: Request, download: bool = False,
+async def download_asset(asset_id: str, request: Request, download: bool = False, view: bool = False,
                          user: User = Depends(current_user),
                          session: AsyncSession = Depends(get_session)):
+    """The original. With ?view=true it is for looking at in the browser, so HEIC photos come
+    as a full-size JPEG; ?download=true always gives the untouched file."""
     asset = await viewable_asset(session, user.id, asset_id, include_deleted=True)
+    if view and not download:
+        return await view_response(request, asset)
     return file_response(request, asset, download)
 
 
@@ -208,6 +212,7 @@ async def purge_asset(asset: Asset, session: AsyncSession) -> None:
     storage.abs_storage_path(asset.storage_path).unlink(missing_ok=True)
     storage.thumb_path(asset.id).unlink(missing_ok=True)
     storage.preview_path(asset.id).unlink(missing_ok=True)
+    storage.fullview_path(asset.id).unlink(missing_ok=True)
     for version in (await session.scalars(select(AssetVersion).where(AssetVersion.asset_id == asset.id))).all():
         storage.abs_storage_path(version.storage_path).unlink(missing_ok=True)
     await session.delete(asset)

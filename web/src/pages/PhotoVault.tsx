@@ -9,6 +9,7 @@ import { PhotoTabs, Tile } from "./Photos";
 import { VaultGate, type VaultCtx } from "./Vault";
 import { decryptItem, encryptAndUpload, isPhotoMeta, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
 import { moveToPhotos } from "../vault/photos";
+import { viewablePhoto } from "../heic";
 import AutoLock from "../components/AutoLock";
 import { lock } from "../vault/session";
 import { allFolders, createFolder, deleteFolder, filesWithin, folderOf, join, moveTo, nameOf, parentOf, renameFolder, ROOT } from "../vault/folders";
@@ -213,7 +214,7 @@ function Contents({ master, reload }: VaultCtx) {
             {m.list.map(({ o, i }) => (
               <Tile key={o.item.id} thumbUrl={thumbs[o.item.id] ?? ""} selecting={selecting} selected={selected.has(o.item.id)}
                 onToggle={() => toggle(o.item.id)} onOpen={() => setViewing(i)}
-                a={{ id: o.item.id, width: o.meta.width ?? null, height: o.meta.height ?? null, kind: kindOf(o.meta.type) === "video" ? "video" : "photo",
+                a={{ id: o.item.id, width: o.meta.width ?? null, height: o.meta.height ?? null, kind: kindOf(o.meta.type, o.meta.name) === "video" ? "video" : "photo",
                   duration: null, thumb_ready: !!thumbs[o.item.id], filename: o.meta.name }} />
             ))}
             <span className="justified-filler" />
@@ -251,19 +252,27 @@ function VaultLightbox({ items, index, thumbs, onIndex, onClose, onPutBack, onDe
   onPutBack: (o: Opened) => void; onDelete: (o: Opened) => void; onMove: (o: Opened) => void; busy: boolean;
 }) {
   const o = items[index];
-  const [src, setSrc] = useState<string | null>(null);
+  const [src, setSrc] = useState<string | null>(null);      // the file itself, for Save
+  const [shown, setShown] = useState<string | null>(null);  // what the page shows (HEIC as JPEG)
   const [done, setDone] = useState(0);
   const [error, setError] = useState("");
   const [cantShow, setCantShow] = useState(false);
   useEffect(() => {
-    let made: string | null = null, cancelled = false;
-    setSrc(null); setDone(0); setError(""); setCantShow(false);
-    decryptItem(o, setDone).then((blob) => {
+    const made: string[] = [];
+    let cancelled = false;
+    const link = (b: Blob) => { const u = URL.createObjectURL(b); made.push(u); return u; };
+    setSrc(null); setShown(null); setDone(0); setError(""); setCantShow(false);
+    decryptItem(o, setDone).then(async (blob) => {
       if (cancelled) return;
-      made = URL.createObjectURL(blob);
-      setSrc(made);
+      const original = link(blob);
+      setSrc(original);
+      if (kindOf(o.meta.type, o.meta.name) === "video") { setShown(original); return; }
+      const view = await viewablePhoto(blob, o.meta.name).catch(() => null);
+      if (cancelled) return;
+      if (view === null) setCantShow(true);
+      else setShown(view === blob ? original : link(view));
     }).catch(() => !cancelled && setError(tr("This file couldn't be decrypted. It may be damaged.")));
-    return () => { cancelled = true; if (made) URL.revokeObjectURL(made); };
+    return () => { cancelled = true; made.forEach((u) => URL.revokeObjectURL(u)); };
   }, [o]);
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
@@ -275,7 +284,7 @@ function VaultLightbox({ items, index, thumbs, onIndex, onClose, onPutBack, onDe
     return () => window.removeEventListener("keydown", onKey);
   }, [index, items.length, onClose, onIndex]);
 
-  const video = kindOf(o.meta.type) === "video";
+  const video = kindOf(o.meta.type, o.meta.name) === "video";
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={o.meta.name}>
       <div className="lightbox-bar">
@@ -291,12 +300,13 @@ function VaultLightbox({ items, index, thumbs, onIndex, onClose, onPutBack, onDe
         {error ? <p className="error">{error}</p>
           : !src ? <progress className="vault-decrypt" max={o.item.size} value={done} aria-label={tr("Decrypting")} />
           : video ? <video key={o.item.id} src={src} controls autoPlay playsInline />
+          : !shown && !cantShow ? <progress className="vault-decrypt" aria-label={tr("Getting the photo ready")} />
           : cantShow ? (
             <div className="vault-noshow">
               {thumbs[o.item.id] && <img src={thumbs[o.item.id]} alt={o.meta.name} />}
               <p className="muted">{tr("This browser can't show this photo at full size. Save it to see the original.")}</p>
             </div>
-          ) : <img key={o.item.id} src={src} alt={o.meta.name} onError={() => setCantShow(true)} />}
+          ) : <img key={o.item.id} src={shown!} alt={o.meta.name} onError={() => setCantShow(true)} />}
       </div>
       {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label={tr("Next")}><ChevronRight size={30} /></button>}
     </div>

@@ -1259,6 +1259,7 @@ const bn: Record<string, string> = {
   "No private photos yet": "এখনো কোনো গোপন ছবি নেই",
   "Something went wrong": "কিছু একটা ভুল হয়েছে",
   "This browser can't show this photo at full size. Save it to see the original.": "এই ব্রাউজার ছবিটি পুরো আকারে দেখাতে পারে না। আসলটি দেখতে সেভ করুন।",
+  "Getting the photo ready": "ছবিটি দেখানোর জন্য তৈরি করা হচ্ছে",
   "Unlock your vault": "আপনার ভল্ট খুলুন",
   "Unlocking…": "খোলা হচ্ছে…",
   "{n} songs": "{n}টি গান",

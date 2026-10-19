@@ -291,9 +291,9 @@ export function Lightbox({ items, index, onIndex, onClose, onTrash, onVault }:
     return () => window.removeEventListener("keydown", onKey);
   }, [index, items.length, onClose, onIndex]);
 
-  // Screen-sized preview by default (works for HEIC in every browser); low-data mode uses
-  // the small thumbnail; "Full size" loads the untouched original.
-  const src = original ? url.file(a) : lowData ? url.thumb(a) : url.preview(a);
+  // Screen-sized preview by default; low-data mode uses the small thumbnail; "Full size" loads
+  // the original (HEIC photos as a full-size JPEG, so it works in every browser).
+  const src = original ? url.view(a) : lowData ? url.thumb(a) : url.preview(a);
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={a.filename}>
       <div className="lightbox-bar">

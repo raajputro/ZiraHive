@@ -13,7 +13,8 @@ from .config import get_settings
 from .models import Library
 from .routers import admin, albums, auth, backup, books, dlna, federation, iptv as iptv_router, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
 from .services import iptv_live, jobs, transcode
-from .services.libraries import discover
+from .services.browse import same_folder_key
+from .services.libraries import discover, merge_duplicates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("zirahive")
@@ -25,10 +26,14 @@ async def bootstrap_libraries() -> None:
     """Add a category for every folder in the media folder, plus any listed in
     ZIRAHIVE_MEDIA_LIBRARIES, and scan the new ones."""
     async with db.sessionmaker()() as session:
+        for lib in await merge_duplicates(session):  # a folder that became two categories
+            await jobs.enqueue("scan_library", lib.id)
         for lib in await discover(session):
             await jobs.enqueue("scan_library", lib.id)
+        known = {same_folder_key(p) for p in (await session.scalars(select(Library.path))).all()}
         for name, path, kind in get_settings().parsed_libraries():
-            if not await session.scalar(select(Library.id).where(Library.path == path)):
+            if same_folder_key(path) not in known:
+                known.add(same_folder_key(path))
                 lib = Library(name=name, path=path, kind=kind)
                 session.add(lib)
                 await session.commit()

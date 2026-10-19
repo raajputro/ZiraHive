@@ -1,6 +1,7 @@
 // Putting files into the vault and getting them back out. Everything here runs in the browser:
 // the server only ever receives and returns encrypted bytes.
 import { api, type VaultItem } from "../api";
+import { heicToJpeg, looksHeic } from "../heic";
 import {
   CHUNK, decryptStream, encryptChunk, encryptedSize, newFileKey, open, openFileKey, openMeta, seal, sealMeta, unb64,
   type FileKey, type FileMeta,
@@ -8,7 +9,8 @@ import {
 
 export interface Opened { item: VaultItem; fk: FileKey; meta: FileMeta }
 
-export function kindOf(type: string) {
+export function kindOf(type: string, name = "") {
+  if (looksHeic(name, type)) return "image";  // Windows often gives .heic files no type at all
   return type.startsWith("image/") ? "image" : type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : "file";
 }
 /** Photos and videos (HEIC/HEIF included, whatever type the browser gave them). */
@@ -22,7 +24,8 @@ export async function hexSha256(data: Blob | ArrayBuffer): Promise<string> {
   return Array.from(new Uint8Array(digest)).map((b) => b.toString(16).padStart(2, "0")).join("");
 }
 
-/** A small preview, drawn from the file itself or (for HEIC, which browsers can't draw) from `fallback`. */
+/** A small preview, drawn from the file itself (HEIC is decoded here first when the browser can't
+ * draw it), or else from `fallback`. */
 export async function makeThumb(file: Blob, fallback?: Blob | null): Promise<{ blob: Blob; width: number; height: number } | null> {
   const draw = async (src: Blob) => {
     let source: CanvasImageSource, w: number, h: number;
@@ -46,7 +49,10 @@ export async function makeThumb(file: Blob, fallback?: Blob | null): Promise<{ b
     const blob = await new Promise<Blob | null>((res) => c.toBlob(res, "image/webp", 0.8));
     return blob ? { blob, width: w, height: h } : null;
   };
-  try { return await draw(file); } catch { /* e.g. HEIC */ }
+  try { return await draw(file); } catch { /* e.g. HEIC outside Safari */ }
+  if (looksHeic(file instanceof File ? file.name : "", file.type)) {
+    try { return await draw(await heicToJpeg(file)); } catch { /* not a photo we can decode */ }
+  }
   if (fallback) { try { return await draw(fallback); } catch { /* give up: shown with an icon */ } }
   return null;
 }
