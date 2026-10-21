@@ -1,0 +1,319 @@
+
+Running 29 tests using 1 worker
+
+[1A[2K[1/29] [desktop] › tests/albums.spec.ts:6:1 › select photos, make an album and share it with a family member
+[1A[2K[2/29] [desktop] › tests/backup.spec.ts:3:1 › turn on offsite backup, back up now and check it
+[1A[2K[3/29] [desktop] › tests/cast.spec.ts:54:1 › casting a film to a Chromecast and controlling it from the page
+[1A[2K[4/29] [desktop] › tests/files.spec.ts:4:1 › folders, upload, rename, trash and restore
+[1A[2K[5/29] [desktop] › tests/files.spec.ts:29:1 › uploading the same document again keeps the old version
+[1A[2K[6/29] [desktop] › tests/folders.spec.ts:3:1 › add a category by choosing a folder where it already is
+[1A[2K[7/29] [desktop] › tests/language.spec.ts:3:1 › switch the interface to Bangla and back; the choice follows the account
+[1A[2K[8/29] [desktop] › tests/linked.spec.ts:6:1 › share a category with another ZiraHive, add the code there, watch from the linked shelf
+[1A[2K[9/29] [desktop] › tests/listen.spec.ts:12:1 › play an album, use the queue, favourite a song and make a playlist
+[1A[2K[10/29] [desktop] › tests/listen.spec.ts:62:1 › a WMA song is converted, then plays
+[1A[2K[11/29] [desktop] › tests/listen.spec.ts:70:1 › an audiobook remembers where you stopped, with chapters and speed
+[1A[2K[12/29] [desktop] › tests/passkey.spec.ts:4:1 › add a passkey, sign out, sign in with it
+[1A[2K[13/29] [desktop] › tests/plugins.spec.ts:3:1 › plugins: settings, turn on, send a test, see the problem, turn off
+[1A[2K[14/29] [desktop] › tests/read.spec.ts:16:1 › read an EPUB: turn pages, change the text, come back to the same place
+[1A[2K[15/29] [desktop] › tests/read.spec.ts:43:1 › read a PDF page by page
+[1A[2K[16/29] [desktop] › tests/read.spec.ts:52:1 › read a comic, including right-to-left manga and scrolling
+[1A[2K[17/29] [desktop] › tests/scan.spec.ts:21:1 › scan a page: it's found, straightened, saved as a searchable PDF
+[1A[2K[18/29] [desktop] › tests/security.spec.ts:5:1 › two-factor sign-in: set up, then a code is needed to sign in
+[1A[2K[19/29] [desktop] › tests/share.spec.ts:4:1 › a password-protected link opens for someone without an account
+[1A[2K[20/29] [desktop] › tests/smart.spec.ts:23:1 › clean up: duplicates found and removed, the best copy kept (a fresh account, nothing else touched)
+[1A[2K[21/29] [desktop] › tests/smart.spec.ts:46:1 › photo search, people and Ask explain when the local AI is off
+[1A[2K[22/29] [desktop] › tests/vault.spec.ts:8:1 › vault: set up, upload encrypted, lock, unlock by passphrase and by recovery key
+[1A[2K[23/29] [desktop] › tests/watch.spec.ts:3:1 › watch categories, series page and player
+[1A[2K[24/29] [party] › tests/party-voice.spec.ts:5:1 › voice chat in a watch party: join, hear each other, mute, leave
+[1A[2K[25/29] [party] › tests/party.spec.ts:7:1 › two people watch in sync, pause for each other and chat
+[1A[2K[26/29] [party] › tests/party.spec.ts:7:1 › two people watch in sync, pause for each other and chat (retry #1)
+[1A[2K  1) [party] › tests/party.spec.ts:7:1 › two people watch in sync, pause for each other and chat ───
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32mfalse[39m
+    Received: [31mtrue[39m
+
+    Call Log:
+    - Timeout 15000ms exceeded while waiting on the predicate
+
+      32 |   // Host presses play: both start, close together.
+      33 |   await host.locator("video").evaluate((v: HTMLVideoElement) => v.play());
+    > 34 |   await expect.poll(() => paused(guest), { timeout: 15_000 }).toBe(false);
+         |   ^
+      35 |   await host.waitForTimeout(3000);
+      36 |   const [a, b] = await Promise.all([time(host), time(guest)]);
+      37 |   expect(a).toBeGreaterThan(1);
+        at /home/runner/work/ZiraHive/ZiraHive/e2e/tests/party.spec.ts:34:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party/test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Retry #1 ───────────────────────────────────────────────────────────────────────────────────────
+
+    Error: [2mexpect([22m[31mreceived[39m[2m).[22mtoBe[2m([22m[32mexpected[39m[2m) // Object.is equality[22m
+
+    Expected: [32mfalse[39m
+    Received: [31mtrue[39m
+
+    Call Log:
+    - Timeout 15000ms exceeded while waiting on the predicate
+
+      32 |   // Host presses play: both start, close together.
+      33 |   await host.locator("video").evaluate((v: HTMLVideoElement) => v.play());
+    > 34 |   await expect.poll(() => paused(guest), { timeout: 15_000 }).toBe(false);
+         |   ^
+      35 |   await host.waitForTimeout(3000);
+      36 |   const [a, b] = await Promise.all([time(host), time(guest)]);
+      37 |   expect(a).toBeGreaterThan(1);
+        at /home/runner/work/ZiraHive/ZiraHive/e2e/tests/party.spec.ts:34:3
+
+    attachment #1: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party-retry1/test-failed-1.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    attachment #2: screenshot (image/png) ──────────────────────────────────────────────────────────
+    test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party-retry1/test-failed-2.png
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+    Error Context: test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party-retry1/error-context.md
+
+    attachment #4: trace (application/zip) ─────────────────────────────────────────────────────────
+    test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party-retry1/trace.zip
+    Usage:
+
+        npx playwright show-trace test-results/party-two-people-watch-in-sync-pause-for-each-other-and-chat-party-retry1/trace.zip
+
+    ────────────────────────────────────────────────────────────────────────────────────────────────
+
+
+[1A[2K[27/29] [player] › tests/player.spec.ts:22:1 › a film browsers can't play is converted: skip intro, audio, subtitles, quality
+[1A[2K[28/29] [player] › tests/player.spec.ts:50:1 › make an offline copy and download it
+[1A[2K[29/29] [player] › tests/player.spec.ts:64:1 › next episode counts down when the credits start
+[1A[2K[30/29] (retries) [phone] › tests/mobile.spec.ts:3:1 › phone layout: bottom navigation and notifications
+[1A[2K  1 failed
+    [party] › tests/party.spec.ts:7:1 › two people watch in sync, pause for each other and chat ────
+  2 skipped
+  26 passed (1.6m)
+==> api.log <==
+INFO:     127.0.0.1:58298 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58310 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/offline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58316 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/index.m3u8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58330 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/subtitles/e0.vtt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58344 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/subtitles/x0.vtt HTTP/1.1" 200 OK
+2026-10-21 07:29:24,531 INFO app.services.transcode: transcoding Dhaka Nights at 360p from 0s with libx264
+INFO:     127.0.0.1:58356 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/0.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58378 - "PUT /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/progress HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:58370 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/1.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58382 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/2.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58412 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/1/index.m3u8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58398 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/3.ts HTTP/1.1" 200 OK
+2026-10-21 07:29:26,227 INFO app.services.transcode: transcoding Dhaka Nights at 360p from 0s with libx264
+INFO:     127.0.0.1:58418 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/1/seg/0.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58432 - "PUT /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/progress HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:58428 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/1/seg/1.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58438 - "GET /api/titles?q=Dhaka%20Nights HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58444 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58460 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58468 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58488 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/tracks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58476 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58504 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/link HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58500 - "GET /api/namaz/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58516 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58520 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58522 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/offline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58538 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/index.m3u8 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58542 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/subtitles/e0.vtt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58550 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/subtitles/x0.vtt HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58566 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/0.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58568 - "POST /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/offline HTTP/1.1" 202 Accepted
+INFO:     127.0.0.1:58574 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/offline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:58584 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/1.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35626 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/2.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35630 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/3.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35636 - "PUT /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/progress HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35650 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/4.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35660 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/5.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35676 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/hls/360p/0/seg/6.ts HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35692 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/offline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35708 - "GET /api/offline/aed675c0baf74415b8dbf6b8085ec717/file HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35712 - "PUT /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/progress HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:35720 - "GET /api/titles?q=Mirzapur HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35730 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35734 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35736 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35778 - "GET /api/namaz/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35764 - "GET /api/media/continue HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35794 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35752 - "GET /api/libraries HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35798 - "GET /api/fed/info HTTP/1.1" 401 Unauthorized
+2026-10-21 07:29:32,997 INFO httpx: HTTP Request: GET http://localhost:4173/api/fed/info "HTTP/1.1 401 Unauthorized"
+INFO:     127.0.0.1:35740 - "GET /api/links HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35806 - "GET /api/titles?library_id=cbcc93a7555a40bfb78057187602cd0b&limit=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35824 - "GET /api/titles?library_id=f9300d58dc5f4b82bd7a1c2f03bc7ad0&limit=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35784 - "PUT /api/series/353699c1b3ea492bb03302f3f1ef1d41/markers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35828 - "GET /api/titles?library_id=fab678cae0054402b88722cc6a1c9c87&limit=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35812 - "GET /api/titles?library_id=44e700abbf074939942aa93e5740a601&limit=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35832 - "GET /api/titles?library_id=2537f66ddaec41d2bf2e85ad73b752ee&limit=24 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35844 - "GET /api/media/9d404a31e88341c89b76e8f0568afaa1/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35864 - "GET /api/media/8e17bc2af3e648ff8b0a72fa553acfa9/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35870 - "GET /api/media/b1ff594be12c451e90ffc8c2e4a0b7fd/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35858 - "GET /api/series/e473bc1b39924a609f7a427a92595da8/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35880 - "GET /api/media/56bc41de28e64771837517d3461314e4/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35910 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35900 - "GET /api/media/1e65e174ceb943a3b4ff3977bf67c9f4/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35888 - "GET /api/media/4ebb5b226b2d4be5b96ffdf11e8e2d43/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35922 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35926 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35960 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/link HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35946 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/tracks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35976 - "GET /api/namaz/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35940 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:35992 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36004 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36002 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/offline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36014 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/stream HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:36016 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/stream HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:36032 - "GET /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/stream HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:36040 - "PUT /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/progress HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:36056 - "PUT /api/media/9b7e946f0e9346b8bf61f6ec52ffb229/progress HTTP/1.1" 204 No Content
+INFO:     127.0.0.1:36088 - "GET /api/media/9f9cfb496c6743809a20d8710a8b4b35/link HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36074 - "GET /api/media/9f9cfb496c6743809a20d8710a8b4b35/tracks HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36060 - "GET /api/media/9f9cfb496c6743809a20d8710a8b4b35 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36104 - "PUT /api/series/353699c1b3ea492bb03302f3f1ef1d41/markers HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36116 - "GET /api/media/9f9cfb496c6743809a20d8710a8b4b35/offline HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36108 - "GET /api/media/9f9cfb496c6743809a20d8710a8b4b35/poster HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36118 - "GET /api/media/9f9cfb496c6743809a20d8710a8b4b35/stream HTTP/1.1" 206 Partial Content
+INFO:     127.0.0.1:36128 - "GET /api/config HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36142 - "GET /api/auth/me HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36158 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36164 - "GET /api/photos?limit=200 HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36178 - "GET /api/photos/on-this-day HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36182 - "GET /api/namaz/settings HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36184 - "GET /api/notifications HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36186 - "GET /api/assets/d56525d893b14fcfa1d28dad7f9bded3/thumb HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36202 - "GET /api/assets/33ac568995154f6a8e0dc2ebb0c0594a/thumb HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36212 - "GET /api/files?folder=%2F HTTP/1.1" 200 OK
+INFO:     127.0.0.1:36218 - "POST /api/notifications/read HTTP/1.1" 204 No Content
+
+==> worker.log <==
+  File "<sqlalchemy generated _go() wrapper for sqlalchemy.orm.session.SessionTransaction._prepare_impl>", line 2, in _prepare_impl
+    return target(fn, self)
+           ^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/state_changes.py", line 137, in _go
+    ret_value = fn(self, *arg, **kw)
+                ^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 1304, in _prepare_impl
+    self.session.flush()
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4536, in flush
+    self._flush(objects)
+  File "<sqlalchemy generated warned() wrapper for sqlalchemy.orm.session.Session._flush>", line 2, in _flush
+    return target(fn, self, objects=objects)
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/util/deprecations.py", line 281, in warned
+    return fn(*args, **kwargs)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4679, in _flush
+    with util.safe_reraise():
+         ^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/util/langhelpers.py", line 166, in __exit__
+    raise exc_value.with_traceback(exc_tb)
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/session.py", line 4640, in _flush
+    flush_context.execute()
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 467, in execute
+    rec.execute(self)
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/unitofwork.py", line 643, in execute
+    util.preloaded.orm_persistence._save_obj(
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 92, in _save_obj
+    _emit_insert_statements(
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/orm/persistence.py", line 1052, in _emit_insert_statements
+    result = connection.execute(
+             ^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1458, in execute
+    return meth(
+           ^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/sql/elements.py", line 533, in _execute_on_connection
+    return connection._execute_clauseelement(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1678, in _execute_clauseelement
+    ret = self._execute_context(
+          ^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1832, in _execute_context
+    return self._exec_single_context(
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1972, in _exec_single_context
+    self._handle_dbapi_exception(
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 2342, in _handle_dbapi_exception
+    raise sqlalchemy_exception.with_traceback(exc_info[2]) from e
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/engine/base.py", line 1953, in _exec_single_context
+    self.dialect.do_execute(
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/engine/default.py", line 1192, in do_execute
+    cursor.execute(statement, parameters)
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 656, in execute
+    await_(self._prepare_and_execute(operation, parameters))
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/util/concurrency.py", line 167, in await_
+    return current.parent.switch(awaitable)  # type: ignore[no-any-return]
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/util/concurrency.py", line 205, in greenlet_spawn
+    value = await result
+            ^^^^^^^^^^^^
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 618, in _prepare_and_execute
+    self._handle_exception(error)
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 568, in _handle_exception
+    self._adapt_connection._handle_exception(error)
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 847, in _handle_exception
+    super()._handle_exception(error)
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/connectors/asyncio.py", line 412, in _handle_exception
+    self._handle_exception_no_connection(self.dbapi, error)
+  File "/opt/hostedtoolcache/Python/3.12.15/x64/lib/python3.12/site-packages/sqlalchemy/dialects/postgresql/asyncpg.py", line 840, in _handle_exception_no_connection
+    raise translated_error from error
+sqlalchemy.exc.IntegrityError: (sqlalchemy.dialects.postgresql.asyncpg.UniqueViolationError) duplicate key value violates unique constraint "asset_texts_pkey"
+[SQL: INSERT INTO asset_texts (asset_id, text, method, pages, sha256, created_at) VALUES ($1::VARCHAR, $2::VARCHAR, $3::VARCHAR, $4::INTEGER, $5::VARCHAR, $6::TIMESTAMP WITH TIME ZONE)]
+[parameters: ('4df2b0e598fc46d19af2e2465c543f00', 'second draft, longer', 'text', None, '8f40a4ff4ca374b08621591857513a269762c7024c4f95fb8c1509219695fc10', datetime.datetime(2026, 10, 21, 7, 28, 7, 286240, tzinfo=datetime.timezone.utc))]
+(Background on this error at: https://sqlalche.me/e/21/gkpj)
+07:28:35:   0.38s → 912ab2c1ad384763a4e8756bd4ed2a54:extract_text('3e76d3fe47274326904ba0a07ba12eab')
+07:28:35:   0.00s ← 912ab2c1ad384763a4e8756bd4ed2a54:extract_text ● 'text'
+07:28:37:   0.29s → 9be875616d4b4bd19af9511483c8e549:process_asset('8c7dd4ac01db4ef7a41a4644d814cf45')
+07:28:37:   0.29s → cb20c55de70740f28b621009a44d9df6:extract_text('8c7dd4ac01db4ef7a41a4644d814cf45')
+07:28:37:   0.27s → 5826736e26dd4e8d9904207166737b5c:process_asset('7334d8fb66ec429eac842b75f5e1f35b')
+07:28:37:   0.28s → 3ada831931f8446590762a41fe176dbf:extract_text('7334d8fb66ec429eac842b75f5e1f35b')
+07:28:37:   0.02s ← 9be875616d4b4bd19af9511483c8e549:process_asset ● 
+07:28:37:   0.01s ← 5826736e26dd4e8d9904207166737b5c:process_asset ● 
+07:28:37:   0.13s ← cb20c55de70740f28b621009a44d9df6:extract_text ● 'none'
+07:28:37:   0.12s ← 3ada831931f8446590762a41fe176dbf:extract_text ● 'none'
+07:28:37:   0.74s → 146779b1adfc4535909d26a75f22cc80:extract_text('fe3fad1d15c14283860fde361a0c18a8')
+07:28:37:   0.75s → 65afc41a364d4d42ac81019983d33ea1:process_asset('fe3fad1d15c14283860fde361a0c18a8')
+07:28:37:   0.74s → dddb575005204e0fa8c37696d1cfd82a:ai_backfill()
+07:28:37:   0.01s ← 65afc41a364d4d42ac81019983d33ea1:process_asset ● 
+07:28:37:   0.64s → 9f1b39d977a247a9a20f288e16781d4c:ai_backfill()
+07:28:37:   0.01s ← dddb575005204e0fa8c37696d1cfd82a:ai_backfill ● {'quality': 0, 'photos': 0, 'documents': 0}
+07:28:37:   0.00s ← 9f1b39d977a247a9a20f288e16781d4c:ai_backfill ● {'quality': 0, 'photos': 0, 'documents': 0}
+07:28:38:   0.16s ← 146779b1adfc4535909d26a75f22cc80:extract_text ● 'none'
+07:28:38:   0.86s → d25684a991d448b7b10e7fce7a466888:ai_backfill()
+07:28:38:   0.64s → f1047d6727884723ae94435ec78dfd0f:ai_backfill()
+07:28:38:   0.00s ← d25684a991d448b7b10e7fce7a466888:ai_backfill ● {'quality': 0, 'photos': 0, 'documents': 0}
+07:28:38:   0.00s ← f1047d6727884723ae94435ec78dfd0f:ai_backfill ● {'quality': 0, 'photos': 0, 'documents': 0}
+07:29:05:   1.00s → cron:party_reminders()
+07:29:05:   0.00s ← cron:party_reminders ● 
+07:29:28:   0.13s → 75ec6940b49e4243afa3799e86d21c7d:make_offline_copy('aed675c0baf74415b8dbf6b8085ec717')
+07:29:30:   2.31s ← 75ec6940b49e4243afa3799e86d21c7d:make_offline_copy ● 
+
+==> web.log <==
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m4173[22m/[39m
+[2m  [32m➜[39m  [1mNetwork[22m[2m: use [22m[1m--host[22m[2m to expose[22m
