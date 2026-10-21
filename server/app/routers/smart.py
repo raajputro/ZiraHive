@@ -7,10 +7,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import logging
 import re
+import time
 from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from fastapi.responses import FileResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import func, select
@@ -18,12 +20,13 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..config import get_settings
 from ..db import get_session
-from ..models import Asset, DocChunk, Face, MediaItem, Person, PhotoVector, User
+from ..models import Asset, AssetText, DocChunk, Face, MediaItem, Person, PhotoVector, User
 from ..schemas import AssetOut
 from ..security import admin_user, current_user
-from ..services import ai, jobs, photo_quality, storage
+from ..services import ai, doc_compare, jobs, photo_quality, photo_search, storage, textsearch
 
 router = APIRouter(prefix="/api", tags=["smart"])
+log = logging.getLogger(__name__)
 
 AI_OFF = {"code": "ai_off", "message": "Local AI isn't running. An admin can start it with "
                                         "docker compose --profile ai up -d (see docs/AI.md)."}
@@ -83,32 +86,60 @@ class PhotoSearchOut(BaseModel):
 
 
 @router.get("/photos/search", response_model=PhotoSearchOut)
-async def search_photos(q: str, user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+async def search_photos(q: str, response: Response, user: User = Depends(current_user),
+                        session: AsyncSession = Depends(get_session)):
     q = q.strip()[:200]
     if not q:
         raise HTTPException(400, "Type what's in the photo")
     if not await ai.ai_info():
         raise HTTPException(409, AI_OFF)
+    took: dict[str, float] = {}
+    started = mark = time.perf_counter()
+
+    def step(name: str) -> None:
+        nonlocal mark
+        now = time.perf_counter()
+        took[name] = (now - mark) * 1000
+        mark = now
+
+    key = " ".join(q.lower().split())
     english = q
-    if _BANGLA.search(q) and await ai.ollama_info():
-        try:  # the picture model only knows English words
-            english = (await ai.chat("Translate the user's words into short, plain English. "
-                                     "Reply with the translation only.", q)).strip().strip('"')[:200] or q
-        except (ai.AiOff, RuntimeError):
+    if _BANGLA.search(q):
+        english = photo_search.translations.get(key)
+        if english is None:
             english = q
-    try:
-        qv = await ai.clip_text(f"a photo of {english}")
-    except ai.AiOff:
-        raise HTTPException(409, AI_OFF) from None
-    rows = (await session.execute(select(PhotoVector.asset_id, PhotoVector.vector).join(
-        Asset, Asset.id == PhotoVector.asset_id).where(PhotoVector.owner_id == user.id, Asset.deleted_at.is_(None)))).all()
-    ranked = await asyncio.to_thread(ai.best, qv, [(r[0], r[1]) for r in rows], 80, 0.2)
+            if await ai.ollama_info():
+                try:  # the picture model only knows English words
+                    english = (await ai.chat("Translate the user's words into short, plain English. "
+                                             "Reply with the translation only.", q, max_words=24)).strip().strip('"')[:200] or q
+                    photo_search.translations.put(key, english)
+                except (ai.AiOff, RuntimeError):
+                    english = q
+        step("translate")
+    qv = photo_search.phrase_vectors.get(english.lower())
+    if qv is None:
+        try:
+            qv = await ai.clip_text(f"a photo of {english}")
+        except ai.AiOff:
+            raise HTTPException(409, AI_OFF) from None
+        photo_search.phrase_vectors.put(english.lower(), qv)
+    step("words")
+    ids, matrix = await photo_search.vectors_for(session, user.id)
+    step("load")
+    ranked = await asyncio.to_thread(photo_search.rank, qv, ids, matrix, 200, 0.2)
     if ranked:  # keep the clear matches: within reach of the best one
         top = ranked[0][1]
         ranked = [(i, s) for i, s in ranked if s >= top - 0.06]
-    assets = {a.id: a for a in (await session.scalars(select(Asset).where(Asset.id.in_([i for i, _ in ranked])))).all()}
-    return PhotoSearchOut(query=q, searched_for=english, hits=[
-        PhotoHit(asset=AssetOut.model_validate(assets[i]), score=round(s, 4)) for i, s in ranked if i in assets])
+    step("match")
+    assets = {a.id: a for a in (await session.scalars(select(Asset).where(
+        Asset.id.in_([i for i, _ in ranked]), Asset.deleted_at.is_(None)))).all()}
+    hits = [PhotoHit(asset=AssetOut.model_validate(assets[i]), score=round(s, 4)) for i, s in ranked if i in assets][:80]
+    step("photos")
+    total = (time.perf_counter() - started) * 1000
+    response.headers["Server-Timing"] = ", ".join(f"{k};dur={v:.0f}" for k, v in took.items())
+    (log.info if total > 1500 else log.debug)("photo search %r: %.0f ms (%s)", q, total,
+                                             ", ".join(f"{k} {v:.0f} ms" for k, v in took.items()))
+    return PhotoSearchOut(query=q, searched_for=english, hits=hits)
 
 
 # ------------------------------------------------------------ people
@@ -280,6 +311,47 @@ async def cleanup(user: User = Depends(current_user), session: AsyncSession = De
                      and a.id not in in_groups), key=lambda a: a.sharpness)[:300]
     return CleanupOut(duplicates=dupes[:200], blurry=[AssetOut.model_validate(a) for a in blurry],
                       measured=len(photos), waiting=waiting)
+
+
+# ------------------------------------------------------------ duplicate documents
+
+class DocDuplicateGroup(BaseModel):
+    keep: str
+    same: bool          # all exact copies; otherwise edited versions of one document
+    similarity: float   # how much of the text the least alike two have in common (1.0 = identical)
+    files: list[AssetOut]
+
+
+class DocCleanupOut(BaseModel):
+    groups: list[DocDuplicateGroup]
+    checked: int
+    waiting: int  # documents whose words haven't been read yet (done in the background)
+
+
+@router.get("/files/duplicates", response_model=DocCleanupOut)
+async def document_duplicates(user: User = Depends(current_user), session: AsyncSession = Depends(get_session)):
+    """Copies and edited versions of the same document. The newest of each group is marked Keep."""
+    rows = (await session.execute(
+        select(Asset, AssetText.text, AssetText.sha256).outerjoin(AssetText, AssetText.asset_id == Asset.id)
+        .where(Asset.owner_id == user.id, Asset.kind == "document", Asset.deleted_at.is_(None)))).all()
+    by_id = {a.id: a for a, _, _ in rows}
+    waiting = sum(1 for a, _, read_sha in rows
+                  if read_sha != a.sha256 and textsearch.wanted(a.filename, a.folder, a.kind))
+    if waiting:
+        await jobs.enqueue("text_backfill")  # reads them; harmless when already running
+    docs = [(a.id, a.sha256, text if read_sha == a.sha256 else None) for a, text, read_sha in rows]
+    found = await asyncio.to_thread(doc_compare.duplicate_groups, docs)
+
+    def newest(a: Asset):
+        return (a.updated_at or a.created_at, a.size)
+
+    groups = []
+    for g in found:
+        members = sorted((by_id[i] for i in g.ids), key=newest, reverse=True)
+        groups.append(DocDuplicateGroup(keep=members[0].id, same=g.same, similarity=g.similarity,
+                                        files=[AssetOut.model_validate(a) for a in members]))
+    groups.sort(key=lambda g: (-len(g.files), g.files[0].filename.lower()))
+    return DocCleanupOut(groups=groups[:300], checked=len(rows), waiting=waiting)
 
 
 # ------------------------------------------------------------ AI subtitles

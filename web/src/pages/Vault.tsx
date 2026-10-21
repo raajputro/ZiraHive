@@ -1,19 +1,27 @@
-import { useCallback, useEffect, useRef, useState, type FormEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type FormEvent, type ReactNode } from "react";
+import ZoomImage from "../components/ZoomImage";
 import { Link } from "react-router-dom";
-import { Download, FileText, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music } from "lucide-react";
-import { api, ApiError, formatBytes, type VaultInfo, type VaultItem } from "../api";
+import { Download, FileText, Folder, FolderInput, FolderPlus, KeyRound, Lock, Pencil, ShieldCheck, Trash2, Upload, Film, Music, Copy } from "lucide-react";
+import { api, ApiError, formatBytes, type VaultInfo } from "../api";
 import { t as tr, locale } from "../i18n";
 import Dialog from "../components/Dialog";
-import {
-  CHUNK, createVault, decryptStream, encryptChunk, encryptedSize, newFileKey, open, openFileKey, openMeta, rewrap, seal,
-  sealMeta, secureContextOk, unb64, unlockWithPassphrase, unlockWithRecovery, type FileKey, type FileMeta,
-} from "../vault/crypto";
+import { createVault, rewrap, secureContextOk, sealMeta, unlockWithPassphrase, unlockWithRecovery } from "../vault/crypto";
+import { decryptItem, encryptAndUpload, fillMissingThumbs, kindOf, loadThumbs, openAll, type Opened } from "../vault/files";
+import { viewablePhoto } from "../heic";
+import VaultCleanup from "../components/VaultCleanup";
+import { allFolders, createFolder, deleteFolder, filesIn, filesWithin, folderOf, isFolder, join, moveTo, nameOf, parentOf, renameFolder, ROOT, subfolders } from "../vault/folders";
+import { FolderNameDialog, MoveToFolderDialog } from "../components/VaultFolders";
+import AutoLock from "../components/AutoLock";
 import { lock, masterBytes, unlock, useVaultKey } from "../vault/session";
 
 const MIN_PASSPHRASE = 10;
 const dateFmt = new Intl.DateTimeFormat(locale(), { day: "numeric", month: "short", year: "numeric" });
 
-export default function VaultPage() {
+export interface VaultCtx { info: VaultInfo; master: CryptoKey; reload: () => void }
+
+/** Everything the vault needs before its contents can be shown: a secure page, a vault, and
+ *  an unlocked key. Used by the Vault page and by Photos → Vault. */
+export function VaultGate({ intro, children }: { intro?: ReactNode; children: (ctx: VaultCtx) => ReactNode }) {
   const key = useVaultKey();
   const [info, setInfo] = useState<VaultInfo | null>(null);
   const [error, setError] = useState("");
@@ -22,33 +30,31 @@ export default function VaultPage() {
 
   if (!secureContextOk()) {
     return (
-      <Shell>
-        <div className="empty">
-          <h2>{tr("The vault needs a secure connection")}</h2>
-          <p>{tr("Open ZiraHive through https (for example your Tailscale address) or on this computer as localhost. Over plain http the browser doesn't allow encryption.")}</p>
-        </div>
-      </Shell>
+      <div className="empty">
+        <h2>{tr("The vault needs a secure connection")}</h2>
+        <p>{tr("Open ZiraHive through https (for example your Tailscale address) or on this computer as localhost. Over plain http the browser doesn't allow encryption.")}</p>
+      </div>
     );
   }
-  if (error) return <Shell><p className="error">{error}</p></Shell>;
-  if (!info) return <Shell><div aria-busy="true" /></Shell>;
-  if (!info.set_up) return <Shell><SetUp onDone={load} /></Shell>;
-  if (!key) return <Shell><Unlock info={info} onReset={load} /></Shell>;
-  return <Shell><Contents info={info} master={key} reload={load} /></Shell>;
+  if (error) return <p className="error">{error}</p>;
+  if (!info) return <div aria-busy="true" />;
+  if (!info.set_up) return <SetUp onDone={load} intro={intro} />;
+  if (!key) return <Unlock info={info} onReset={load} />;
+  return <>{children({ info, master: key, reload: load })}</>;
 }
 
-function Shell({ children }: { children: React.ReactNode }) {
+export default function VaultPage() {
   return (
     <div className="page vault-page">
       <header className="page-head"><h1><ShieldCheck size={26} aria-hidden /> {tr("Vault")}</h1></header>
-      {children}
+      <VaultGate>{(ctx) => <Contents {...ctx} />}</VaultGate>
     </div>
   );
 }
 
 // ------------------------------------------------------------------ setting up
 
-function SetUp({ onDone }: { onDone: () => void }) {
+function SetUp({ onDone, intro }: { onDone: () => void; intro?: ReactNode }) {
   const [pass, setPass] = useState("");
   const [again, setAgain] = useState("");
   const [busy, setBusy] = useState(false);
@@ -103,7 +109,7 @@ function SetUp({ onDone }: { onDone: () => void }) {
 
   return (
     <section className="panel vault-setup">
-      <h2>{tr("A locked space for private files")}</h2>
+      {intro ?? <h2>{tr("A locked space for private files")}</h2>}
       <p>{tr("Files in the vault are encrypted on this device before they're sent. The server only stores scrambled data: the ZiraHive admin can't open them, and neither can anyone who takes the disk.")}</p>
       <p className="muted small">{tr("Choose a passphrase you don't use anywhere else. You'll also get a recovery key to keep somewhere safe.")}</p>
       <form className="stack-form" onSubmit={create}>
@@ -118,7 +124,7 @@ function SetUp({ onDone }: { onDone: () => void }) {
 
 // ------------------------------------------------------------------ unlocking
 
-function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
+export function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
   const [mode, setMode] = useState<"pass" | "recovery" | "reset">("pass");
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
@@ -150,7 +156,7 @@ function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
   return (
     <section className="panel vault-setup">
       <h2><Lock size={20} aria-hidden /> {tr("Your vault is locked")}</h2>
-      <p className="muted">{tr("{n} files, {size}", { n: info.item_count, size: formatBytes(info.bytes) })}</p>
+      <p className="muted">{tr("{n} encrypted items, {size}", { n: info.item_count, size: formatBytes(info.bytes) })}</p>
       <form className="stack-form" onSubmit={submit}>
         {mode === "pass" && <label>{tr("Vault passphrase")}<input type="password" value={value} onChange={(e) => setValue(e.target.value)} autoComplete="current-password" required autoFocus /></label>}
         {mode === "recovery" && <label>{tr("Recovery key")}<input value={value} onChange={(e) => setValue(e.target.value)} placeholder="ABCD-EFGH-…" required autoFocus spellCheck={false} /></label>}
@@ -171,7 +177,7 @@ function Unlock({ info, onReset }: { info: VaultInfo; onReset: () => void }) {
   );
 }
 
-function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8Array; title: string; onDone: () => void; onCancel?: () => void }) {
+export function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8Array; title: string; onDone: () => void; onCancel?: () => void }) {
   const [pass, setPass] = useState("");
   const [again, setAgain] = useState("");
   const [password, setPassword] = useState("");
@@ -206,106 +212,51 @@ function ChangePassphrase({ raw, title, onDone, onCancel }: { raw: Uint8Array; t
 
 // ------------------------------------------------------------------ contents
 
-interface Opened { item: VaultItem; fk: FileKey; meta: FileMeta }
 interface Job { name: string; done: number; total: number; error?: string }
 
-function kindOf(type: string) {
-  return type.startsWith("image/") ? "image" : type.startsWith("video/") ? "video" : type.startsWith("audio/") ? "audio" : "file";
-}
-
-async function makeThumb(file: File): Promise<{ blob: Blob; width: number; height: number } | null> {
-  try {
-    let source: CanvasImageSource, w: number, h: number;
-    if (file.type.startsWith("image/")) {
-      const bmp = await createImageBitmap(file);
-      source = bmp; w = bmp.width; h = bmp.height;
-    } else if (file.type.startsWith("video/")) {
-      const v = document.createElement("video");
-      v.muted = true; v.preload = "metadata"; v.src = URL.createObjectURL(file);
-      await new Promise((res, rej) => { v.onloadeddata = res; v.onerror = rej; setTimeout(rej, 8000); });
-      v.currentTime = Math.min(1, (v.duration || 2) / 2);
-      await new Promise((res) => { v.onseeked = res; setTimeout(res, 3000); });
-      source = v; w = v.videoWidth; h = v.videoHeight;
-      setTimeout(() => URL.revokeObjectURL(v.src), 1000);
-    } else return null;
-    const scale = Math.min(1, 480 / Math.max(w, h));
-    const c = document.createElement("canvas");
-    c.width = Math.max(1, Math.round(w * scale)); c.height = Math.max(1, Math.round(h * scale));
-    c.getContext("2d")!.drawImage(source, 0, 0, c.width, c.height);
-    const blob = await new Promise<Blob | null>((res) => c.toBlob(res, "image/webp", 0.8));
-    return blob ? { blob, width: w, height: h } : null;
-  } catch { return null; }  // e.g. HEIC, which browsers can't draw: shown with an icon instead
-}
-
-function Contents({ info, master, reload }: { info: VaultInfo; master: CryptoKey; reload: () => void }) {
+function Contents({ master, reload }: VaultCtx) {
   const [items, setItems] = useState<Opened[] | null>(null);
   const [thumbs, setThumbs] = useState<Record<string, string>>({});
   const made = useRef<string[]>([]);
   const [jobs, setJobs] = useState<Job[]>([]);
   const [viewing, setViewing] = useState<Opened | null>(null);
   const [changing, setChanging] = useState(false);
+  const [here, setHere] = useState(ROOT);
+  const [naming, setNaming] = useState<"new" | "rename" | null>(null);
+  const [moving, setMoving] = useState<Opened | null>(null);
+  const [cleaning, setCleaning] = useState(false);
+  const [error, setError] = useState("");
   const input = useRef<HTMLInputElement>(null);
 
+  const alive = useRef(true);
+  useEffect(() => () => { alive.current = false; }, []);
   const load = useCallback(async () => {
-    const rows = await api.vaultItems();
-    const opened: Opened[] = [];
-    for (const item of rows) {
-      try {
-        const fk = await openFileKey(master, item.wrapped_key);
-        opened.push({ item, fk, meta: await openMeta(fk, item.meta) });
-      } catch { /* not ours to read: skip */ }
-    }
+    const opened = await openAll(master);
     setItems(opened);
-    // thumbnails, a few at a time
-    const queue = opened.filter((o) => o.item.has_thumb);
-    const worker = async () => {
-      for (let o = queue.shift(); o; o = queue.shift()) {
-        try {
-          const res = await fetch(`/api/vault/items/${o.item.id}/thumb`, { credentials: "same-origin" });
-          const plain = await open(o.fk.key, new Uint8Array(await res.arrayBuffer()));
-          const url = URL.createObjectURL(new Blob([plain], { type: "image/webp" }));
-          made.current.push(url);
-          setThumbs((t) => ({ ...t, [o!.item.id]: url }));
-        } catch { /* leave the icon */ }
-      }
-    };
-    await Promise.all([worker(), worker(), worker(), worker()]);
+    made.current.push(...await loadThumbs(opened, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
+    made.current.push(...await fillMissingThumbs(opened, (id, u) => setThumbs((t) => ({ ...t, [id]: u })), () => !alive.current));
   }, [master]);
 
   useEffect(() => { void load(); }, [load]);
   useEffect(() => () => { made.current.forEach(URL.revokeObjectURL); }, []);
+  // a folder that no longer exists (deleted, renamed elsewhere): go up until one does
+  useEffect(() => {
+    if (!items || here === ROOT) return;
+    if (!allFolders(items).includes(here)) setHere(ROOT);
+  }, [items, here]);
 
-  const uploadOne = async (file: File, index: number) => {
+  const uploadOne = async (file: File, index: number, folder: string) => {
     const set = (c: Partial<Job>) => setJobs((js) => js.map((j, i) => (i === index ? { ...j, ...c } : j)));
-    try {
-      const { fk, wrapped } = await newFileKey(master);
-      const thumb = await makeThumb(file);
-      const meta: FileMeta = { name: file.name, type: file.type || "application/octet-stream", size: file.size, modified: file.lastModified,
-        width: thumb?.width, height: thumb?.height };
-      const size = encryptedSize(file.size);
-      const item = await api.createVaultItem({ size, chunk_size: CHUNK, wrapped_key: wrapped, meta: await sealMeta(fk, meta) });
-      const n = Math.max(1, Math.ceil(file.size / CHUNK));
-      let offset = 0;
-      for (let i = 0; i < n; i++) {
-        const plain = new Uint8Array(await file.slice(i * CHUNK, (i + 1) * CHUNK).arrayBuffer());
-        const cipher = await encryptChunk(fk, i, i === n - 1, plain);
-        for (let attempt = 0; ; attempt++) {
-          try { await api.vaultChunk(item.id, offset, cipher); break; }
-          catch (e) { if (attempt >= 3) throw e; await new Promise((r) => setTimeout(r, 1000 * 2 ** attempt)); }
-        }
-        offset += cipher.length;
-        set({ done: Math.min(file.size, (i + 1) * CHUNK) });
-      }
-      if (thumb) await api.vaultThumb(item.id, unb64(await seal(fk.key, new Uint8Array(await thumb.blob.arrayBuffer()))));
-    } catch (e) { set({ error: e instanceof Error ? e.message : tr("Upload failed") }); }
+    try { await encryptAndUpload(master, file, { folder }, (done) => set({ done })); }
+    catch (e) { set({ error: e instanceof Error ? e.message : tr("Upload failed") }); }
   };
 
   const add = async (files: FileList | null) => {
     if (!files?.length) return;
     const list = Array.from(files);
-    const start = jobs.length;
+    const start = jobs.length, folder = here;
     setJobs((js) => [...js, ...list.map((f) => ({ name: f.name, done: 0, total: f.size }))]);
-    for (let i = 0; i < list.length; i++) await uploadOne(list[i], start + i);
+    for (let i = 0; i < list.length; i++) await uploadOne(list[i], start + i, folder);
     await load();
     reload();
   };
@@ -327,20 +278,55 @@ function Contents({ info, master, reload }: { info: VaultInfo; master: CryptoKey
     await load();
   };
 
+  const removeFolder = async () => {
+    if (!items) return;
+    const n = filesWithin(items, here).length;
+    const ask = n === 0 ? tr("Delete the empty folder \"{name}\"?", { name: nameOf(here) })
+      : n === 1 ? tr("Delete \"{name}\" and the 1 file in it forever?", { name: nameOf(here) })
+      : tr("Delete \"{name}\" and the {n} files in it forever?", { name: nameOf(here), n });
+    if (!confirm(ask)) return;
+    setError("");
+    try { await deleteFolder(items, here); setHere(parentOf(here)); }
+    catch (e) { setError(e instanceof Error ? e.message : tr("Something went wrong")); }
+    await load();
+    reload();
+  };
+
   if (changing) {
     return <ChangePassphrase raw={masterBytes()!} title={tr("Change vault passphrase")} onDone={() => { setChanging(false); reload(); }} onCancel={() => setChanging(false)} />;
   }
 
   const busy = jobs.some((j) => !j.error && j.done < j.total);
+  const files = items ? items.filter((o) => !isFolder(o)) : [];
+  const total = files.reduce((n, o) => n + o.meta.size, 0);
+  const folders = items ? subfolders(items, here) : [];
+  const shown = items ? filesIn(items, here) : [];
+  const crumbs = here === ROOT ? [] : here.split("/").slice(1).map((_, i, parts) => "/" + parts.slice(0, i + 1).join("/"));
   return (
     <>
       <div className="vault-bar">
-        <span className="muted">{tr("{n} files, {size}", { n: info.item_count, size: formatBytes(info.bytes) })} · {tr("Locks itself after 10 minutes without use")}</span>
+        <span className="muted">{tr("{n} files, {size}", { n: files.length, size: formatBytes(total) })}</span>
+        <AutoLock />
         <input ref={input} type="file" multiple hidden onChange={(e) => { void add(e.target.files); e.target.value = ""; }} />
         <button className="primary" onClick={() => input.current?.click()}><Upload size={16} /> {tr("Add files")}</button>
+        <button onClick={() => setNaming("new")}><FolderPlus size={16} /> {tr("New folder")}</button>
+        <button onClick={() => setCleaning(true)} disabled={!files.length}><Copy size={16} /> {tr("Find duplicates")}</button>
         <button onClick={() => setChanging(true)}><KeyRound size={16} /> {tr("Change passphrase")}</button>
         <button onClick={lock}><Lock size={16} /> {tr("Lock")}</button>
       </div>
+      <nav className="crumbs vault-crumbs" aria-label={tr("Folder")}>
+        <button className={here === ROOT ? "here" : ""} onClick={() => setHere(ROOT)}><ShieldCheck size={16} aria-hidden /> {tr("Vault")}</button>
+        {crumbs.map((p) => (
+          <span key={p}><span className="sep" aria-hidden>›</span><button className={p === here ? "here" : ""} onClick={() => setHere(p)}>{nameOf(p)}</button></span>
+        ))}
+        {here !== ROOT && (
+          <span className="vault-folder-actions">
+            <button className="icon" onClick={() => setNaming("rename")} aria-label={tr("Rename folder")} title={tr("Rename folder")}><Pencil size={15} /></button>
+            <button className="icon" onClick={() => void removeFolder()} aria-label={tr("Delete folder")} title={tr("Delete folder")}><Trash2 size={15} /></button>
+          </span>
+        )}
+      </nav>
+      {error && <p className="error" role="alert">{error}</p>}
       {jobs.length > 0 && (
         <ul className="vault-jobs" aria-live="polite">
           {jobs.map((j, i) => (
@@ -358,9 +344,21 @@ function Contents({ info, master, reload }: { info: VaultInfo; master: CryptoKey
           <p>{tr("Add private photos, ID scans, bank papers or anything else only you should see.")}</p>
         </div>
       )}
+      {items && items.length > 0 && here !== ROOT && folders.length === 0 && shown.length === 0 && (
+        <p className="muted">{tr("This folder is empty. Add files, or move files here from another folder.")}</p>
+      )}
       <div className="vault-grid">
-        {items?.map((o) => {
-          const k = kindOf(o.meta.type);
+        {folders.map((p) => {
+          const n = filesWithin(items!, p).length;
+          return (
+            <button key={p} className="vault-tile vault-folder" onClick={() => setHere(p)} aria-label={tr("Open folder {name}", { name: nameOf(p) })}>
+              <span className="vault-icon"><Folder size={34} /></span>
+              <span className="vault-name">{nameOf(p)} <small className="muted">· {n}</small></span>
+            </button>
+          );
+        })}
+        {shown.map((o) => {
+          const k = kindOf(o.meta.type, o.meta.name);
           return (
             <button key={o.item.id} className="vault-tile" onClick={() => setViewing(o)} aria-label={tr("Open {name}", { name: o.meta.name })}>
               {thumbs[o.item.id] ? <img src={thumbs[o.item.id]} alt="" />
@@ -370,34 +368,51 @@ function Contents({ info, master, reload }: { info: VaultInfo; master: CryptoKey
           );
         })}
       </div>
-      {viewing && <Viewer o={viewing} onClose={() => setViewing(null)} onDelete={() => void remove(viewing)} onRename={() => void rename(viewing)} />}
+      {cleaning && items && (
+        <VaultCleanup what="documents" items={items} thumbs={thumbs} onChanged={() => { void load(); reload(); }} onClose={() => setCleaning(false)} />
+      )}
+      {viewing && <Viewer o={viewing} onClose={() => setViewing(null)} onDelete={() => void remove(viewing)} onRename={() => void rename(viewing)}
+        onMove={() => setMoving(viewing)} />}
+      {naming && items && (
+        <FolderNameDialog items={items} parent={naming === "new" ? here : parentOf(here)} current={naming === "rename" ? here : undefined}
+          onClose={() => setNaming(null)}
+          onSave={async (name) => {
+            if (naming === "new") { await createFolder(master, here, name); await load(); }
+            else { await renameFolder(master, items, here, name); await load(); setHere(join(parentOf(here), name)); }
+          }} />
+      )}
+      {moving && items && (
+        <MoveToFolderDialog master={master} items={items} count={1} from={folderOf(moving)} onClose={() => setMoving(null)}
+          onMove={async (folder) => { await moveTo(moving, folder); setViewing(null); await load(); }} />
+      )}
     </>
   );
 }
 
-function Viewer({ o, onClose, onDelete, onRename }: { o: Opened; onClose: () => void; onDelete: () => void; onRename: () => void }) {
-  const [url, setUrl] = useState<string | null>(null);
+function Viewer({ o, onClose, onDelete, onRename, onMove }: { o: Opened; onClose: () => void; onDelete: () => void; onRename: () => void; onMove: () => void }) {
+  const [url, setUrl] = useState<string | null>(null);      // the file itself, for Save
+  const [shown, setShown] = useState<string | null>(null);  // what the page shows (HEIC as JPEG)
   const [done, setDone] = useState(0);
   const [error, setError] = useState("");
+  const k = kindOf(o.meta.type, o.meta.name);
   useEffect(() => {
-    let made: string | null = null, cancelled = false;
-    (async () => {
-      const res = await fetch(`/api/vault/items/${o.item.id}/data`, { credentials: "same-origin" });
-      if (!res.ok || !res.body) throw new Error(String(res.status));
-      const blob = await decryptStream(o.fk, res.body, o.item.size, o.item.chunk_size, setDone);
+    const made: string[] = [];
+    let cancelled = false;
+    const link = (b: Blob) => { const u = URL.createObjectURL(b); made.push(u); return u; };
+    decryptItem(o, setDone).then(async (blob) => {
       if (cancelled) return;
-      made = URL.createObjectURL(new Blob([blob], { type: o.meta.type }));
-      setUrl(made);
-    })().catch(() => setError(tr("This file couldn't be decrypted. It may be damaged.")));
-    return () => { cancelled = true; if (made) URL.revokeObjectURL(made); };
-  }, [o]);
-  const k = kindOf(o.meta.type);
+      setUrl(link(blob));
+      const view = k === "image" ? await viewablePhoto(blob, o.meta.name).catch(() => blob) : blob;
+      if (!cancelled) setShown(view === blob ? made[0] : link(view));
+    }).catch(() => setError(tr("This file couldn't be decrypted. It may be damaged.")));
+    return () => { cancelled = true; made.forEach((u) => URL.revokeObjectURL(u)); };
+  }, [o, k]);
   return (
     <Dialog title={o.meta.name} onClose={onClose} wide>
       <div className="vault-view">
         {error ? <p className="error">{error}</p>
           : !url ? <progress max={o.item.size} value={done} aria-label={tr("Decrypting")} />
-          : k === "image" ? <img src={url} alt={o.meta.name} />
+          : k === "image" ? (shown ? <ZoomImage src={shown} alt={o.meta.name} /> : <progress aria-label={tr("Getting the photo ready")} />)
           : k === "video" ? <video src={url} controls autoPlay playsInline />
           : k === "audio" ? <audio src={url} controls autoPlay />
           : <p className="muted">{tr("This file opens after you save it.")}</p>}
@@ -406,6 +421,7 @@ function Viewer({ o, onClose, onDelete, onRename }: { o: Opened; onClose: () => 
       <div className="admin-row">
         {url && <a className="button primary" href={url} download={o.meta.name}><Download size={16} /> {tr("Save")}</a>}
         <button onClick={onRename}><Pencil size={16} /> {tr("Rename")}</button>
+        <button onClick={onMove}><FolderInput size={16} /> {tr("Move to folder")}</button>
         <button className="danger" onClick={onDelete}><Trash2 size={16} /> {tr("Delete forever")}</button>
       </div>
       <p className="muted small"><Link to="/files">{tr("Files outside the vault")}</Link></p>

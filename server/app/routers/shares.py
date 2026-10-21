@@ -18,7 +18,7 @@ from ..schemas import PublicAsset, PublicListing, PublicShareOut, ShareIn, Share
 from ..security import (client_ip, create_scoped_token, current_user, hash_password, read_scope,
                         share_throttle, verify_password)
 from ..services import storage
-from ..services.assets import file_response, preview_response, thumb_response
+from ..services.assets import file_response, preview_response, thumb_response, view_response
 from ..services.events import audit
 
 router = APIRouter(prefix="/api", tags=["shares"])
@@ -187,13 +187,15 @@ async def share_items(token: str, path: str = "", key: str | None = None,
 
 @router.get("/s/{token}/assets/{asset_id}/file")
 async def share_file(token: str, asset_id: str, request: Request, key: str | None = None,
-                     download: bool = False, session: AsyncSession = Depends(get_session)):
+                     download: bool = False, view: bool = False, session: AsyncSession = Depends(get_session)):
     link = await _unlocked(session, token, key)
     if download and not link.allow_download:
         raise HTTPException(403, "The owner turned off downloads for this link")
     asset = await _shared_asset(session, link, asset_id)
     if not link.allow_download and asset.kind == "photo":
         return await preview_response(asset)  # view-only links never hand out the original
+    if view and not download:
+        return await view_response(request, asset)
     return file_response(request, asset, download)
 
 

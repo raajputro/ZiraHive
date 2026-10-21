@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { api, url, type BookDetail, type Chapter, type Track } from "./api";
+import { attachEqualizer } from "./equalizer";
 
 import { digits, t as tr } from "./i18n";
 /** One thing in the queue: a song, or one part (file) of an audiobook. */
@@ -68,7 +69,7 @@ export function trackItem(t: Track): QueueItem {
   return {
     key: `t-${t.id}-${Math.random().toString(36).slice(2, 7)}`, kind: "track", id: t.id, part: 0, title: t.title,
     subtitle: [t.artist, t.album_title].filter(Boolean).join(" · "), cover: t.cover_ready && t.album_id ? url.albumCover({ id: t.album_id }) : null,
-    duration: t.duration ?? 0, playable: t.playable, link: t.album_id ? `/listen/album/${t.album_id}` : "/listen/songs", track: t,
+    duration: t.duration ?? 0, playable: t.playable, link: t.link ?? (t.album_id ? `/listen/album/${t.album_id}` : "/listen/songs"), track: t,
   };
 }
 
@@ -86,6 +87,7 @@ const write = (k: string, v: string) => { try { localStorage.setItem(k, v); } ca
 
 export function AudioProvider({ children }: { children: ReactNode }) {
   const audio = useRef<HTMLAudioElement>(null);
+  useEffect(() => { attachEqualizer(audio.current); }, []);
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [index, setIndex] = useState(0);
   const [book, setBook] = useState<BookDetail | null>(null);
@@ -244,7 +246,9 @@ export function AudioProvider({ children }: { children: ReactNode }) {
   };
 
   const insert = (tracks: Track[], afterCurrent: boolean) => {
-    if (state.current.book || !queue.length) { playTracks(tracks); return; }
+    // recitations and songs never share a queue: adding one kind to the other starts a new queue
+    const isQuran = (t?: Track) => !!t?.quran;
+    if (state.current.book || !queue.length || tracks.some((t) => isQuran(t) !== isQuran(queue[0]?.track))) { playTracks(tracks); return; }
     const items = tracks.map(trackItem);
     setQueue((qu) => afterCurrent ? [...qu.slice(0, index + 1), ...items, ...qu.slice(index + 1)] : [...qu, ...items]);
   };

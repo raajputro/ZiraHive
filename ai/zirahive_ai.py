@@ -39,14 +39,22 @@ FACE_FILES = {
 MAX_SIDE = 1600  # pictures are scaled down to this before looking at them
 
 app = FastAPI(title="ZiraHive AI", docs_url=None, redoc_url=None)
-_lock = threading.Lock()
+_locks: dict[str, threading.Lock] = {}
+_locks_lock = threading.Lock()
 _models: dict[str, object] = {}
 _loading: dict[str, float] = {}
+# Indexing photos uses all but one core, so a search typed meanwhile still gets an answer quickly.
+_BACKGROUND_THREADS = max(1, (os.cpu_count() or 2) - 1)
 
 
 def _get(name: str, make):
-    """Loads a model the first time it's needed (downloading it once), then keeps it."""
-    with _lock:
+    """Loads a model the first time it's needed (downloading it once), then keeps it. Each model
+    has its own lock, so a search never waits for, say, the subtitle model to finish loading."""
+    if name in _models:
+        return _models[name]
+    with _locks_lock:
+        lock = _locks.setdefault(name, threading.Lock())
+    with lock:
         if name not in _models:
             _loading[name] = time.time()
             try:
@@ -59,7 +67,7 @@ def _get(name: str, make):
 def _clip_vision():
     from fastembed import ImageEmbedding
 
-    return ImageEmbedding(CLIP_VISION, cache_dir=str(MODELS / "fastembed"))
+    return ImageEmbedding(CLIP_VISION, cache_dir=str(MODELS / "fastembed"), threads=_BACKGROUND_THREADS)
 
 
 def _clip_text():
@@ -92,7 +100,7 @@ def _whisper():
 
     device = "cuda" if os.environ.get("ZIRAHIVE_AI_GPU") == "1" else "cpu"
     return WhisperModel(WHISPER, device=device, compute_type="int8" if device == "cpu" else "float16",
-                        download_root=str(MODELS / "whisper"))
+                        download_root=str(MODELS / "whisper"), cpu_threads=min(4, _BACKGROUND_THREADS))
 
 
 def _unit(v) -> list[float]:
@@ -133,6 +141,18 @@ class Texts(BaseModel):
 class TranscribeIn(BaseModel):
     path: str
     language: str | None = None  # None: detect
+
+
+@app.on_event("startup")
+def _warm_up() -> None:
+    """Load the search model straight away (small, a second or two), so the first photo search
+    after a restart doesn't wait for it."""
+    def load():
+        try:
+            _get("clip_text", _clip_text)
+        except Exception as exc:  # no internet on first run, say: it loads on first use instead
+            log.warning("couldn't load the search model yet: %s", exc)
+    threading.Thread(target=load, daemon=True).start()
 
 
 @app.get("/health")

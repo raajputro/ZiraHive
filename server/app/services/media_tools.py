@@ -3,7 +3,9 @@ from __future__ import annotations
 
 import json
 import logging
+import os
 import subprocess
+import threading
 from dataclasses import dataclass
 from datetime import datetime, timezone
 from pathlib import Path
@@ -55,11 +57,27 @@ def image_info(path: Path) -> tuple[int | None, int | None, datetime | None]:
 def make_image_thumb(src: Path, dest: Path, size: int = THUMB_SIZE) -> None:
     dest.parent.mkdir(parents=True, exist_ok=True)
     with Image.open(src) as im:
+        icc = im.info.get("icc_profile")  # iPhone photos are Display P3: keep their colours
         im = ImageOps.exif_transpose(im)
         im.thumbnail((size, size))
         if im.mode not in ("RGB", "RGBA"):
             im = im.convert("RGB")
-        im.save(dest, "WEBP", quality=80)
+        im.save(dest, "WEBP", quality=80, **({"icc_profile": icc} if icc else {}))
+
+
+def make_full_jpeg(src: Path, dest: Path) -> None:
+    """The whole photo, full size, as a JPEG any browser can show (for HEIC/HEIF originals,
+    which only Safari can open). Written to a temporary name first, so two people opening the
+    same photo at once never see half a file."""
+    dest.parent.mkdir(parents=True, exist_ok=True)
+    tmp = dest.with_name(f".{dest.name}.{os.getpid()}.{threading.get_ident()}.tmp")
+    with Image.open(src) as im:
+        icc = im.info.get("icc_profile")
+        im = ImageOps.exif_transpose(im)
+        if im.mode != "RGB":
+            im = im.convert("RGB")
+        im.save(tmp, "JPEG", quality=92, **({"icc_profile": icc} if icc else {}))
+    os.replace(tmp, dest)
 
 
 def probe(path: Path) -> ProbeResult:

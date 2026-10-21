@@ -10,6 +10,7 @@ import { usePrefs } from "../prefs";
 import { defaultAudio, defaultQuality, SubtitleTracks, TrackMenus, useSubtitle, useVideoSource } from "../video";
 
 import { digits, t as tr } from "../i18n";
+import { nativeApp, onPlayerClosed } from "../native";
 
 const clock = (sec: number) => {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
@@ -18,7 +19,45 @@ const clock = (sec: number) => {
 // Remount for every title so progress is always saved against the right one.
 export default function PlayerRoute() {
   const { id } = useParams();
-  return id ? <Player key={id} id={id} /> : null;
+  const [web, setWeb] = useState(false);
+  if (!id) return null;
+  // In the Android app, films play in the phone's own player (more formats, floating window)
+  return nativeApp && !web ? <NativeHandoff key={id} id={id} onUseWeb={() => setWeb(true)} /> : <Player key={id} id={id} />;
+}
+
+/** Inside the app: hand the title to the native player, and come back here when it closes. */
+function NativeHandoff({ id, onUseWeb }: { id: string; onUseWeb: () => void }) {
+  const navigate = useNavigate();
+  const { lowData } = usePrefs();
+  const [m, setM] = useState<Media | null>(null);
+  const [error, setError] = useState("");
+  const [playing, setPlaying] = useState(false);
+  const start = async () => {
+    setError("");
+    try {
+      const [media, t] = await Promise.all([api.mediaItem(id), api.tracks(id)]);
+      setM(media);
+      const info = await api.castInfo(id, defaultQuality(t, lowData), defaultAudio(t));
+      nativeApp!.play({ ...info, mediaId: id });
+      setPlaying(true);
+    } catch (e) { setError((e as Error).message); }
+  };
+  useEffect(() => { void start(); }, [id]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // back to where the film was chosen once the player closes (not when it just went floating)
+  useEffect(() => onPlayerClosed((r) => { if (r.mediaId === id) navigate(-1); }), [id, navigate]);
+  return (
+    <div className="player-page native-handoff">
+      <button className="tv-back" onClick={() => navigate(-1)}><ArrowLeft size={18} aria-hidden />{" "}{tr("Back")}</button>
+      {m?.poster_ready && <img className="handoff-poster" src={url.poster(m)} alt="" />}
+      <h1>{m?.title ?? ""}</h1>
+      {error ? <p className="error" role="alert">{error}</p>
+        : <p className="muted">{playing ? tr("Playing in the ZiraHive player.") : tr("Loading…")}</p>}
+      <div className="admin-row">
+        <button className="primary" onClick={() => void start()}><Play size={16} />{" "}{tr("Play")}</button>
+        <button onClick={onUseWeb}>{tr("Use the web player (watch parties, casting)")}</button>
+      </div>
+    </div>
+  );
 }
 
 const COUNTDOWN = 10;

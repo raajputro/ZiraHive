@@ -46,7 +46,7 @@ export interface Activity {
 }
 export interface FolderListing { folder: string; folders: string[]; assets: Asset[] }
 export interface PhotoPage { items: Asset[]; next_cursor: string | null }
-export type LibraryKind = "movies" | "shows" | "mixed" | "music" | "audiobooks" | "books" | "comics";
+export type LibraryKind = "movies" | "shows" | "mixed" | "music" | "audiobooks" | "books" | "comics" | "quran";
 export const VIDEO_KINDS: LibraryKind[] = ["movies", "shows", "mixed"];
 
 // ------------------------------------------------------------------ music
@@ -58,8 +58,21 @@ export interface Track {
   id: string; library_id: string; album_id: string | null; title: string; artist: string | null; album_title: string | null;
   track_no: number | null; disc_no: number | null; year: number | null; genre: string | null; duration: number | null;
   codec: string | null; playable: boolean; favorite: boolean; plays: number; cover_ready: boolean;
+  /** A Quran recitation (Quran & Namaz), never shown among songs. */
+  quran?: boolean;
+  /** Where the player's title links to (set by the page; the album page by default). */
+  link?: string;
 }
 export interface MusicAlbumDetail extends MusicAlbum { tracks: Track[] }
+export interface DuplicateSong { id: string; title: string; artist: string | null; path: string; library: string; size: number; codec: string | null; duration: number | null; moved: boolean }
+export interface DuplicateSongGroup { keep: DuplicateSong; copies: DuplicateSong[] }
+export interface Surah { number: number; name: string; arabic: string; bangla: string; ayahs: number; place: "makkah" | "madinah" }
+export interface Reciter { name: string; surahs: number; files: number; duration: number; cover_album_id: string | null }
+export interface QuranHome { reciters: Reciter[]; recent: Track[]; has_category: boolean }
+export interface SurahFiles { number: number; tracks: Track[]; duration: number }
+export interface ReciterDetail { name: string; cover_album_id: string | null; surahs: SurahFiles[]; other: Track[] }
+export type PrayerStatus = "ontime" | "late" | "missed";
+export interface PrayerLogEntry { day: string; prayer: string; status: PrayerStatus; jamaah: boolean }
 export interface Artist { name: string; album_count: number; track_count: number; cover_album_id: string | null }
 export interface ArtistDetail { name: string; albums: MusicAlbum[]; tracks: Track[] }
 export interface Playlist { id: string; name: string; created_at: string; updated_at: string; track_count: number; duration: number; cover_album_ids: string[] }
@@ -204,6 +217,7 @@ export interface Plugin {
 export interface HealthItem { id: string; title: string; status: "ok" | "warn" | "fail" | "info"; detail: string; fix: string | null }
 export interface AiStatus { ai: boolean; ollama: boolean; models: Record<string, string>; photos: number; photos_indexed: number; people: number; documents_ready: number; llm_model: string; embed_model: string }
 export interface PersonSummary { id: string; name: string | null; photos: number; cover_face: string | null; hidden: boolean }
+export interface DocDuplicates { groups: { keep: string; same: boolean; similarity: number; files: Asset[] }[]; checked: number; waiting: number }
 export interface Cleanup { duplicates: { keep: string; photos: Asset[] }[]; blurry: Asset[]; measured: number; waiting: number }
 export interface AskAnswer { answer: string; sources: { n: number; asset_id: string; filename: string; folder: string; passage: string }[] }
 
@@ -250,6 +264,21 @@ export const api = {
 
   // music
   musicHome: () => request<MusicHome>("GET", "/api/music/home"),
+  songDuplicates: () => request<DuplicateSongGroup[]>("GET", "/api/music/duplicates"),
+  checkSongDuplicates: () => request<{ groups: number; hidden: number; moved: number }>("POST", "/api/music/duplicates/check"),
+  keepSongCopy: (id: string) => request<void>("POST", `/api/music/duplicates/${id}/keep`),
+  quranHome: () => request<QuranHome>("GET", "/api/quran"),
+  surahs: () => request<Surah[]>("GET", "/api/quran/surahs"),
+  reciter: (name: string) => request<ReciterDetail>("GET", `/api/quran/reciter${q({ name })}`),
+  surahReciters: (n: number) => request<{ reciter: string; tracks: Track[]; duration: number }[]>("GET", `/api/quran/surah/${n}`),
+  addRecitation: (reciter: string, file: File) =>
+    request<{ reciter: string; name: string; size: number }>("PUT", `/api/quran/files${q({ reciter, name: file.name })}`, file),
+  rescanQuran: () => request<{ scanning: number }>("POST", "/api/quran/rescan"),
+  prayerSettings: () => request<import("./prayer").PrayerSettings>("GET", "/api/namaz/settings"),
+  savePrayerSettings: (s: import("./prayer").PrayerSettings) => request<import("./prayer").PrayerSettings>("PUT", "/api/namaz/settings", s),
+  prayerLog: (start: string, end: string) => request<PrayerLogEntry[]>("GET", `/api/namaz/log${q({ start, end })}`),
+  setPrayer: (day: string, prayer: string, status: PrayerStatus | null, jamaah = false) =>
+    request<PrayerLogEntry | null>("PUT", "/api/namaz/log", { day, prayer, status, jamaah }),
   musicAlbums: (params: { library_id?: string; q?: string; artist?: string; sort?: "added" | "title" | "artist" | "year"; limit?: number } = {}) =>
     request<MusicAlbum[]>("GET", `/api/music/albums${q(params)}`),
   musicAlbum: (id: string) => request<MusicAlbumDetail>("GET", `/api/music/albums/${id}`),
@@ -301,6 +330,7 @@ export const api = {
   mergePeople: (id: string, into: string) => request<void>("POST", `/api/people/${id}/merge`, { into }),
   notThisPerson: (id: string, faceId: string) => request<void>("DELETE", `/api/people/${id}/faces/${faceId}`),
   cleanup: () => request<Cleanup>("GET", "/api/photos/cleanup"),
+  fileDuplicates: () => request<DocDuplicates>("GET", "/api/files/duplicates"),
   trashAsset: (id: string) => request<void>("DELETE", `/api/assets/${id}`),
   makeSubtitles: (mediaId: string, language?: string) =>
     request<{ status: string }>("POST", `/api/media/${mediaId}/ai-subtitles`, { language: language || undefined }),
@@ -437,9 +467,13 @@ export const url = {
   shareLink: (s: { token: string }) => `${publicBase || location.origin}/s/${s.token}`,
   publicFile: (token: string, a: { id: string }, key?: string, download = false) =>
     `/api/s/${token}/assets/${a.id}/file${q({ key, download: download ? "true" : undefined })}`,
+  /** The original to look at in the browser: HEIC photos come back as a full-size JPEG. */
+  publicView: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/file${q({ key, view: "true" })}`,
   publicThumb: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/thumb${q({ key })}`,
   publicPreview: (token: string, a: { id: string }, key?: string) => `/api/s/${token}/assets/${a.id}/preview${q({ key })}`,
   file: (a: Asset, download = false) => `/api/assets/${a.id}/file${download ? "?download=true" : ""}`,
+  /** The original to look at in the browser: HEIC photos come back as a full-size JPEG. */
+  view: (a: { id: string }) => `/api/assets/${a.id}/file?view=true`,
   poster: (m: { id: string; base?: string }) => `${mediaBase(m)}/poster`,
   seriesPoster: (s: { id: string }) => `/api/series/${s.id}/poster`,
   titlePoster: (t: Title) => (t.type === "series" ? `/api/series/${t.id}/poster` : `/api/media/${t.id}/poster`),
@@ -494,3 +528,60 @@ export function formatDuration(sec: number | null): string {
   const h = Math.floor(sec / 3600), m = Math.floor((sec % 3600) / 60), s = Math.floor(sec % 60);
   return h ? tr("{h} h {m} min", { h, m }) : digits(`${m}:${String(s).padStart(2, "0")}`);
 }
+
+// ------------------------------------------------------------------ IPTV (Live TV)
+export type IptvKind = "live" | "vod" | "series";
+export type IptvStreamKind = "live" | "vod" | "episode";
+export interface IptvSource { id: string; name: string; shared: boolean; mine: boolean; can_manage: boolean; server: string | null; username: string | null }
+export interface IptvAccount {
+  status: string; expires_at: string | null; max_connections: number | null; active_connections: number | null;
+  is_trial: boolean; timezone: string | null;
+}
+export interface IptvCategory { id: string; name: string; count: number }
+export interface IptvItem {
+  id: string; name: string; icon: string | null; category_id: string | null;
+  num?: number | null; epg_id?: string | null; archive?: boolean; rating?: number | null; added?: string | null;
+  ext?: string; year?: string | null;
+}
+export interface IptvPage { total: number; items: IptvItem[] }
+export interface IptvEpg { title: string; description: string | null; start: string | null; end: string | null }
+export interface IptvMovie {
+  id: string; name: string; plot: string | null; cast: string | null; director: string | null; genre: string | null;
+  year: string | null; rating: number | null; duration: number | null; height: number | null;
+  poster: string | null; backdrop: string | null; ext: string;
+}
+export interface IptvEpisode {
+  id: string; season: number; episode: number | null; title: string; plot: string | null; duration: number | null;
+  height: number | null; image: string | null; ext: string;
+}
+export interface IptvSeries {
+  id: string; name: string; plot: string | null; cast: string | null; genre: string | null; rating: number | null;
+  year: string | null; poster: string | null; backdrop: string | null; episodes: IptvEpisode[];
+}
+export interface IptvPlay {
+  mode: "live" | "direct" | "hls" | "convert"; url?: string; convert_url: string; direct_url?: string | null;
+  hls_url?: string | null; qualities?: string[]; duration?: number | null;
+}
+export interface IptvFavorite { id: string; source_id: string; kind: IptvKind; stream_id: string; name: string; icon: string | null; ext: string | null }
+export interface IptvSourceIn { name: string; server: string; port?: string; username: string; password: string; shared?: boolean }
+
+export const iptvApi = {
+  sources: () => request<IptvSource[]>("GET", "/api/iptv/sources"),
+  addSource: (body: IptvSourceIn) => request<IptvSource & { account: IptvAccount }>("POST", "/api/iptv/sources", body),
+  updateSource: (id: string, body: Partial<IptvSourceIn>) =>
+    request<IptvSource & { account: IptvAccount | null }>("PATCH", `/api/iptv/sources/${id}`, body),
+  deleteSource: (id: string) => request<void>("DELETE", `/api/iptv/sources/${id}`),
+  account: (id: string) => request<IptvAccount>("GET", `/api/iptv/sources/${id}/account`),
+  categories: (id: string, kind: IptvKind) => request<IptvCategory[]>("GET", `/api/iptv/sources/${id}/categories${q({ kind })}`),
+  items: (id: string, params: { kind: IptvKind; category?: string; q?: string; sort?: string; offset?: number; limit?: number }) =>
+    request<IptvPage>("GET", `/api/iptv/sources/${id}/items${q(params)}`),
+  epg: (id: string, streamId: string) => request<IptvEpg[]>("GET", `/api/iptv/sources/${id}/epg/${encodeURIComponent(streamId)}`),
+  movie: (id: string, vodId: string) => request<IptvMovie>("GET", `/api/iptv/sources/${id}/movie/${encodeURIComponent(vodId)}`),
+  series: (id: string, seriesId: string) => request<IptvSeries>("GET", `/api/iptv/sources/${id}/series/${encodeURIComponent(seriesId)}`),
+  play: (id: string, kind: IptvStreamKind, streamId: string, params: { ext?: string; duration?: number; height?: number }) =>
+    request<IptvPlay>("GET", `/api/iptv/sources/${id}/play/${kind}/${encodeURIComponent(streamId)}${q(params)}`),
+  favorites: (sourceId?: string) => request<IptvFavorite[]>("GET", `/api/iptv/favorites${q({ source_id: sourceId })}`),
+  addFavorite: (body: { source_id: string; kind: IptvKind; stream_id: string; name: string; icon?: string | null; ext?: string | null }) =>
+    request<IptvFavorite>("POST", "/api/iptv/favorites", body),
+  removeFavorite: (id: string) => request<void>("DELETE", `/api/iptv/favorites/${id}`),
+};

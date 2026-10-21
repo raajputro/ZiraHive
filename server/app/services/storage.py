@@ -129,6 +129,11 @@ def preview_path(asset_id: str) -> Path:
     return get_settings().cache_dir / "previews" / f"{asset_id}.webp"
 
 
+def fullview_path(asset_id: str) -> Path:
+    """Full-size JPEG of a HEIC/HEIF photo, for browsers that can't open HEIC."""
+    return get_settings().cache_dir / "fullview" / f"{asset_id}.jpg"
+
+
 def cover_path(kind: str, item_id: str) -> Path:
     """Album and book covers: covers/album-<id>.webp, covers/book-<id>.webp"""
     return get_settings().cache_dir / "covers" / f"{kind}-{item_id}.webp"

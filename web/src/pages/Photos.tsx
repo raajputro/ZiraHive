@@ -1,12 +1,17 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import ZoomImage from "../components/ZoomImage";
 import { NavLink } from "react-router-dom";
-import { Upload, Play, ChevronLeft, ChevronRight, X, Download, Check, CheckSquare, FolderPlus, Maximize } from "lucide-react";
+import { Upload, Play, ChevronLeft, ChevronRight, X, Download, Check, CheckSquare, FolderPlus, Maximize, Trash2, Lock, ShieldCheck } from "lucide-react";
 import { api, url, formatDuration, type Asset, type Memory } from "../api";
 import { useUploads } from "../uploads";
 import { usePrefs } from "../prefs";
 import { DropZone } from "./Files";
 import { AddToAlbumDialog } from "./Albums";
 import { PhotoSearchBox } from "./SmartPhotos";
+import Dialog from "../components/Dialog";
+import { VaultGate } from "./Vault";
+import { masterKey } from "../vault/session";
+import { moveToVault } from "../vault/photos";
 
 import { locale, t as tr } from "../i18n";
 const monthFmt = new Intl.DateTimeFormat(locale(), { month: "long", year: "numeric" });
@@ -20,6 +25,7 @@ export function PhotoTabs() {
         <NavLink to="/photos/albums">{tr("Albums")}</NavLink>
         <NavLink to="/photos/people">{tr("People")}</NavLink>
         <NavLink to="/photos/cleanup">{tr("Clean up")}</NavLink>
+        <NavLink to="/photos/vault"><Lock size={14} aria-hidden /> {tr("Vault")}</NavLink>
       </nav>
       <PhotoSearchBox />
     </div>
@@ -75,18 +81,26 @@ export default function PhotosPage() {
   const input = useRef<HTMLInputElement>(null);
   const { enqueue, onComplete } = useUploads();
 
+  // A ref, not the `loading` state: the first load and the scroll watcher can both start in the
+  // same moment, before React has re-rendered, and the second would fetch the first page again.
+  const inFlight = useRef(false);
   const load = useCallback(async (reset = false) => {
-    if (loading) return;
+    if (inFlight.current && !reset) return;
+    inFlight.current = true;
     setLoading(true);
     try {
       const page = await api.photos(reset ? null : cursor);
-      setItems((prev) => (reset ? page.items : [...prev, ...page.items]));
+      setItems((prev) => {
+        if (reset) return page.items;
+        const have = new Set(prev.map((a) => a.id));
+        return [...prev, ...page.items.filter((a) => !have.has(a.id))];
+      });
       setCursor(page.next_cursor);
       setDone(!page.next_cursor);
       setError("");
     } catch (e) { setError(e instanceof Error ? e.message : tr("Couldn't load photos")); }
-    finally { setLoading(false); }
-  }, [cursor, loading]);
+    finally { inFlight.current = false; setLoading(false); }
+  }, [cursor]);
 
   useEffect(() => { void load(true); api.onThisDay().then(setMemories).catch(() => undefined); /* eslint-disable-next-line */ }, []);
   // thumbnails are made in the background; refresh shortly after uploads finish
@@ -120,6 +134,72 @@ export default function PhotosPage() {
     return n;
   });
   const stopSelecting = () => { setSelecting(false); setSelected(new Set()); };
+  const [trashing, setTrashing] = useState(false);
+  /** Drops photos that left the timeline (trash or vault) from everything on screen. */
+  const dropFromView = (gone: Set<string>) => {
+    if (!gone.size) return;
+    setItems((prev) => prev.filter((a) => !gone.has(a.id)));
+    setMemories((prev) => prev.map((m) => ({ ...m, items: m.items.filter((a) => !gone.has(a.id)) })).filter((m) => m.items.length));
+    setSelected((s) => new Set([...s].filter((id) => !gone.has(id))));
+    setViewer((v) => {
+      if (!v) return v;
+      const rest = v.items.filter((x) => !gone.has(x.id));
+      return rest.length ? { items: rest, index: Math.min(v.index, rest.length - 1) } : null;
+    });
+  };
+  const [vaultWaiting, setVaultWaiting] = useState<Asset[] | null>(null);  // waiting for the vault to be unlocked
+  const [vaulting, setVaulting] = useState<number | null>(null);  // progress 0..1
+  const runVault = async (master: CryptoKey, list: Asset[]) => {
+    const gone = new Set<string>();
+    setError("");
+    try {
+      for (let k = 0; k < list.length; k++) {
+        setVaulting(k / list.length);
+        await moveToVault(master, list[k], (f) => setVaulting((k + f) / list.length));
+        gone.add(list[k].id);
+      }
+    } catch (e) {
+      setError(tr("Couldn't move \"{filename}\" to the vault: {reason}", { filename: list[gone.size]?.filename ?? "", reason: e instanceof Error ? e.message : "" }));
+    } finally {
+      setVaulting(null);
+      dropFromView(gone);
+    }
+    return gone;
+  };
+  const toVault = async (list: Asset[]) => {
+    if (!list.length) return;
+    const ask = list.length === 1
+      ? tr("Move \"{filename}\" to your vault? It's encrypted on this device and removed from Photos, albums and search.", { filename: list[0].filename })
+      : tr("Move {count} items to your vault? They're encrypted on this device and removed from Photos, albums and search.", { count: list.length });
+    if (!confirm(ask)) return;
+    const key = masterKey();
+    if (!key) { setViewer(null); setVaultWaiting(list); return; }
+    const gone = await runVault(key, list);
+    if (selecting && gone.size === list.length) stopSelecting();
+  };
+  // Moves photos to the trash (restorable for 30 days) and drops them from what's on screen.
+  const trash = async (ids: string[]) => {
+    setTrashing(true);
+    const gone = new Set<string>();
+    try {
+      for (const id of ids) { await api.trashAsset(id); gone.add(id); }
+      setError("");
+    } catch (e) { setError(e instanceof Error ? e.message : tr("Couldn't move to trash")); }
+    finally {
+      setTrashing(false);
+      dropFromView(gone);
+    }
+    return gone;
+  };
+  const trashSelected = async () => {
+    const ask = selected.size === 1
+      ? tr("Move 1 item to the trash? You can restore it for 30 days.")
+      : tr("Move {count} items to the trash? You can restore them for 30 days.", { count: selected.size });
+    if (!confirm(ask)) return;
+    const gone = await trash([...selected]);
+    if (gone.size === selected.size) stopSelecting();
+  };
+  const trashFromViewer = async (a: Asset) => { await trash([a.id]); };
   const addFiles = (files: File[]) => enqueue(files.filter((f) => /^(image|video)\//.test(f.type) || /\.(heic|heif|dng)$/i.test(f.name)), "/Uploads");
 
   return (
@@ -131,6 +211,8 @@ export default function PhotosPage() {
             <>
               <span className="muted">{selected.size}{" "}{tr("selected")}</span>
               <button className="primary" disabled={!selected.size} onClick={() => setAlbumPicker(true)}><FolderPlus size={17} />{" "}{tr("Add to album")}</button>
+              <button disabled={!selected.size || vaulting !== null} onClick={() => void toVault(items.filter((a) => selected.has(a.id)))}><Lock size={17} />{" "}{tr("Move to vault")}</button>
+              <button className="danger" disabled={!selected.size || trashing} onClick={() => void trashSelected()}><Trash2 size={17} />{" "}{tr("Move to trash")}</button>
               <button onClick={stopSelecting}>{tr("Done")}</button>
             </>
           ) : (
@@ -144,6 +226,9 @@ export default function PhotosPage() {
         </header>
         <PhotoTabs />
         {error && <p className="error" role="alert">{error}</p>}
+        {vaulting !== null && (
+          <div className="vault-busy" role="status"><span><Lock size={15} aria-hidden /> {tr("Encrypting and moving to your vault…")}</span><progress max={1} value={vaulting} /></div>
+        )}
         {!selecting && <OnThisDay memories={memories} onOpen={(m, i) => setViewer({ items: m.items, index: i })} />}
         {!loading && !error && items.length === 0 && (
           <div className="empty">
@@ -171,7 +256,19 @@ export default function PhotosPage() {
         <div ref={sentinel} className="sentinel">{loading && tr("Loading…")}</div>
       </div>
       {viewer && viewer.items[viewer.index] && (
-        <Lightbox items={viewer.items} index={viewer.index} onIndex={(i) => setViewer({ ...viewer, index: i })} onClose={() => setViewer(null)} />
+        <Lightbox items={viewer.items} index={viewer.index} onIndex={(i) => setViewer({ ...viewer, index: i })} onClose={() => setViewer(null)} onTrash={(a) => void trashFromViewer(a)}
+          onVault={vaulting === null ? (a) => void toVault([a]) : undefined} />
+      )}
+      {vaultWaiting && (
+        <Dialog title={tr("Unlock your vault")} onClose={() => setVaultWaiting(null)}>
+          <VaultGate intro={<h2><ShieldCheck size={20} aria-hidden /> {tr("A locked place for private photos")}</h2>}>
+            {(ctx) => <WhenReady run={() => {
+              const list = vaultWaiting;
+              setVaultWaiting(null);
+              void runVault(ctx.master, list).then((gone) => { if (selecting && gone.size === list.length) stopSelecting(); });
+            }} />}
+          </VaultGate>
+        </Dialog>
       )}
       {albumPicker && (
         <AddToAlbumDialog assetIds={[...selected]} onClose={() => setAlbumPicker(false)} onDone={() => { setAlbumPicker(false); stopSelecting(); }} />
@@ -180,8 +277,15 @@ export default function PhotosPage() {
   );
 }
 
-export function Lightbox({ items, index, onIndex, onClose }:
-  { items: Asset[]; index: number; onIndex: (i: number) => void; onClose: () => void }) {
+/** Calls `run` once, as soon as it is shown. */
+function WhenReady({ run }: { run: () => void }) {
+  const done = useRef(false);
+  useEffect(() => { if (!done.current) { done.current = true; run(); } });
+  return null;
+}
+
+export function Lightbox({ items, index, onIndex, onClose, onTrash, onVault }:
+  { items: Asset[]; index: number; onIndex: (i: number) => void; onClose: () => void; onTrash?: (a: Asset) => void; onVault?: (a: Asset) => void }) {
   const a = items[index];
   const { lowData } = usePrefs();
   const [original, setOriginal] = useState(false);
@@ -196,9 +300,9 @@ export function Lightbox({ items, index, onIndex, onClose }:
     return () => window.removeEventListener("keydown", onKey);
   }, [index, items.length, onClose, onIndex]);
 
-  // Screen-sized preview by default (works for HEIC in every browser); low-data mode uses
-  // the small thumbnail; "Full size" loads the untouched original.
-  const src = original ? url.file(a) : lowData ? url.thumb(a) : url.preview(a);
+  // Screen-sized preview by default; low-data mode uses the small thumbnail; "Full size" loads
+  // the original (HEIC photos as a full-size JPEG, so it works in every browser).
+  const src = original ? url.view(a) : lowData ? url.thumb(a) : url.preview(a);
   return (
     <div className="lightbox" role="dialog" aria-modal="true" aria-label={a.filename}>
       <div className="lightbox-bar">
@@ -207,6 +311,13 @@ export function Lightbox({ items, index, onIndex, onClose }:
           <button className="icon" onClick={() => setOriginal(true)} aria-label={tr("Show full size")} title={tr("Show full size")}><Maximize size={18} /></button>
         )}
         <a className="icon" href={url.file(a, true)} aria-label={tr("Download")}><Download size={18} /></a>
+        {onVault && (
+          <button className="icon" onClick={() => onVault(a)} aria-label={tr("Move to vault")} title={tr("Move to vault")}><Lock size={18} /></button>
+        )}
+        {onTrash && (
+          <button className="icon" onClick={() => confirm(tr("Move \"{filename}\" to the trash?", { filename: a.filename })) && onTrash(a)}
+            aria-label={tr("Move to trash")} title={tr("Move to trash")}><Trash2 size={18} /></button>
+        )}
         <button className="icon" onClick={onClose} aria-label={tr("Close")}><X size={20} /></button>
       </div>
       {index > 0 && <button className="lb-nav prev" onClick={() => onIndex(index - 1)} aria-label={tr("Previous")}><ChevronLeft size={30} /></button>}
@@ -214,7 +325,8 @@ export function Lightbox({ items, index, onIndex, onClose }:
         {a.kind === "video"
           ? <video key={a.id} src={url.file(a)} controls autoPlay={!lowData} preload={lowData ? "none" : "metadata"}
               poster={a.thumb_ready ? url.thumb(a) : undefined} playsInline />
-          : <img key={a.id + src} src={src} alt={a.filename} onError={() => original && setOriginal(false)} />}
+          : <ZoomImage key={a.id + src} src={src} alt={a.filename} onError={() => original && setOriginal(false)}
+              onSwipe={(d) => { if (d === "next" && index < items.length - 1) onIndex(index + 1); if (d === "prev" && index > 0) onIndex(index - 1); }} />}
       </div>
       {index < items.length - 1 && <button className="lb-nav next" onClick={() => onIndex(index + 1)} aria-label={tr("Next")}><ChevronRight size={30} /></button>}
     </div>

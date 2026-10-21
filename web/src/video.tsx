@@ -63,7 +63,13 @@ export function useVideoSource(video: RefObject<HTMLVideoElement>, opts: {
       }
     }
     if (latest.current.autoplay) void v.play().catch(() => undefined);
-    return () => { hls.current?.destroy(); hls.current = null; };
+    return () => {
+      // Switching quality or audio: remember where we are BEFORE tearing the stream down,
+      // because detaching it resets the video to 0 and the next stream would start from there.
+      if (v.currentTime > 0 && latest.current.startAt.current == null) latest.current.startAt.current = v.currentTime;
+      hls.current?.destroy();
+      hls.current = null;
+    };
   }, [video, media, tracks, quality, audio]);
 }
 

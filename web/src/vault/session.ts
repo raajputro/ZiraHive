@@ -1,8 +1,21 @@
 // The unlocked master key lives only in this tab's memory. It is never stored, and it is
-// forgotten after 10 minutes without activity, when you press Lock, or when the tab closes.
+// forgotten after a few minutes without activity (5 unless changed on this browser), when you
+// press Lock, or when the tab closes.
 import { useEffect, useState } from "react";
 
-const IDLE_MS = 10 * 60 * 1000;
+export const LOCK_DEFAULT = 5, LOCK_MIN = 1, LOCK_MAX = 120;
+const LOCK_KEY = "zirahive.vault.lockMinutes";
+const clampMinutes = (n: number) => Math.min(LOCK_MAX, Math.max(LOCK_MIN, Math.round(n)));
+/** Minutes without activity before the vault locks itself, on this browser. */
+export function lockMinutes(): number {
+  try { const v = Number(localStorage.getItem(LOCK_KEY)); if (v) return clampMinutes(v); } catch { /* private mode */ }
+  return LOCK_DEFAULT;
+}
+export function setLockMinutes(n: number) {
+  try { localStorage.setItem(LOCK_KEY, String(clampMinutes(n))); } catch { /* private mode: this tab only */ }
+  touch();  // restart the countdown with the new length
+  emit();
+}
 let master: CryptoKey | null = null;
 let masterRaw: Uint8Array | null = null;
 let timer = 0;
@@ -13,7 +26,7 @@ function emit() { listeners.forEach((fn) => fn()); }
 function touch() {
   if (!master) return;
   window.clearTimeout(timer);
-  timer = window.setTimeout(lock, IDLE_MS);
+  timer = window.setTimeout(lock, lockMinutes() * 60 * 1000);
 }
 
 export function unlock(key: CryptoKey, raw: Uint8Array) {

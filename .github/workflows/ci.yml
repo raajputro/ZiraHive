@@ -4,6 +4,9 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: write   # failing jobs push their log to a ci-log-<job> branch, readable without GitHub's log viewer
+
 jobs:
   server-tests:
     runs-on: ubuntu-latest
@@ -21,8 +24,16 @@ jobs:
         with: { python-version: "3.12", cache: pip, cache-dependency-path: server/requirements*.txt }
       - run: sudo apt-get update && sudo apt-get install -y ffmpeg libarchive-tools poppler-utils tesseract-ocr tesseract-ocr-ben
       - run: pip install -r server/requirements-dev.txt
-      - run: pytest -q
+      - run: set -o pipefail; pytest -q 2>&1 | tee ${{ github.workspace }}/ci-server.log
+        shell: bash
         working-directory: server
+      - name: Share the log
+        if: failure()
+        run: |
+          mkdir -p /tmp/cilog && cp ${{ github.workspace }}/ci-server.log /tmp/cilog/ 2>/dev/null || echo "no log" > /tmp/cilog/ci-server.log
+          cd /tmp/cilog && git init -q -b ci-log-server && git config user.name "ZiraHive CI" && git config user.email "ci@zirahive.invalid"
+          git add . && git commit -q -m "log ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-log-server
 
   web-build:
     runs-on: ubuntu-latest
@@ -46,17 +57,37 @@ jobs:
       - uses: actions/setup-python@v5
         with: { python-version: "3.12", cache: pip, cache-dependency-path: ai/requirements.txt }
       - run: pip install -r ai/requirements.txt pytest httpx
-      - run: pytest -q ai/tests
+      - run: set -o pipefail; pytest -q ai/tests 2>&1 | tee ${{ github.workspace }}/ci-ai.log
+        shell: bash
+      - name: Share the log
+        if: failure()
+        run: |
+          mkdir -p /tmp/cilog && cp ${{ github.workspace }}/ci-ai.log /tmp/cilog/ 2>/dev/null || echo "no log" > /tmp/cilog/ci-ai.log
+          cd /tmp/cilog && git init -q -b ci-log-ai && git config user.name "ZiraHive CI" && git config user.email "ci@zirahive.invalid"
+          git add . && git commit -q -m "log ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-log-ai
 
   docker-build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: cp .env.example .env && sed -i 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci12345/' .env
-      - run: docker compose build
-      - run: docker compose config --quiet
-      - run: docker compose --profile ai --profile remote config --quiet
-      - run: docker compose --profile ai build ai
+      # .env.example has placeholders to fill in (your_drive:/ZiraHiveData); CI uses folders here
+      - run: |
+          cp .env.example .env
+          sed -i -e 's/^POSTGRES_PASSWORD=.*/POSTGRES_PASSWORD=ci12345/' -e 's#^ZIRAHIVE_DATA_PATH=.*#ZIRAHIVE_DATA_PATH=./ci-data#' .env
+      - run: |
+          set -o pipefail
+          { docker compose --progress plain build && docker compose config --quiet \
+            && docker compose --profile ai --profile remote config --quiet \
+            && docker compose --progress plain --profile ai build ai; } 2>&1 | tee ${{ github.workspace }}/ci-docker.log
+        shell: bash
+      - name: Share the log
+        if: failure()
+        run: |
+          mkdir -p /tmp/cilog && cp ${{ github.workspace }}/ci-docker.log /tmp/cilog/ 2>/dev/null || echo "no log" > /tmp/cilog/ci-docker.log
+          cd /tmp/cilog && git init -q -b ci-log-docker && git config user.name "ZiraHive CI" && git config user.email "ci@zirahive.invalid"
+          git add . && git commit -q -m "log ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-log-docker
 
   e2e:
     runs-on: ubuntu-latest
@@ -105,9 +136,16 @@ jobs:
           npm ci
           npx playwright install --with-deps chromium chrome
           sleep 10   # let the worker finish scanning the sample media
-          npx playwright test
+          set -o pipefail
+          npx playwright test --reporter=line 2>&1 | tee ${{ github.workspace }}/ci-e2e.log
+        shell: bash
       - if: failure()
-        run: tail -n 100 api.log worker.log web.log
+        run: |
+          tail -n 100 api.log worker.log web.log | tee -a ${{ github.workspace }}/ci-e2e.log
+          mkdir -p /tmp/cilog && cp ${{ github.workspace }}/ci-e2e.log /tmp/cilog/ 2>/dev/null || echo "no log" > /tmp/cilog/ci-e2e.log
+          cd /tmp/cilog && git init -q -b ci-log-e2e && git config user.name "ZiraHive CI" && git config user.email "ci@zirahive.invalid"
+          git add . && git commit -q -m "log ${{ github.sha }}"
+          git push -f "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git" ci-log-e2e
       - if: always()
         uses: actions/upload-artifact@v4
         with:

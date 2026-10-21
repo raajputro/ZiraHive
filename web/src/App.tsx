@@ -1,6 +1,8 @@
 import { createContext, useContext, useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { useStickyHeads } from "./stickyHead";
+import { nativeApp } from "./native";
 import { BrowserRouter, NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { Images, Folder, Clapperboard, Headphones, BookOpen, Trash2, Settings, LogOut, Fingerprint } from "lucide-react";
+import { Images, Folder, Clapperboard, Tv, Headphones, BookOpen, MoonStar, Trash2, Settings, LogOut, Fingerprint, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { api, ApiError, type User } from "./api";
 import { cancelled, getPasskey, passkeyProblem } from "./passkeys";
 import { UploadProvider } from "./uploads";
@@ -15,6 +17,7 @@ import AskPage from "./pages/Ask";
 import AlbumsPage, { AlbumPage } from "./pages/Albums";
 import PublicSharePage from "./pages/PublicShare";
 import FilesPage from "./pages/Files";
+import FileDuplicatesPage from "./pages/FileDuplicates";
 import WatchHome, { LibraryPage } from "./pages/Watch";
 import SeriesPage from "./pages/Series";
 import PlayerRoute from "./pages/Player";
@@ -25,12 +28,16 @@ import TrashPage from "./pages/Trash";
 import { AlbumDetailPage, AlbumsPage as MusicAlbumsPage, ArtistDetailPage, ArtistsPage, AudiobookPage, AudiobooksPage, ListenHome,
   PlaylistDetailPage, PlaylistsPage, SongsPage } from "./pages/Listen";
 import { ReadHome, ReadLibraryPage, ReadSeriesPage } from "./pages/Read";
+import { NamazPage, PrayerAlerts, QariPage, QuranHomePage, SurahPage, SurahsPage } from "./pages/Quran";
 import ReaderRoute from "./pages/Reader";
 import VaultPage from "./pages/Vault";
+import PhotoVaultPage from "./pages/PhotoVault";
 import ScanPage from "./pages/Scan";
 import AdminPage from "./pages/Admin";
+import { TvHome, TvMoviePage, TvPage, TvPlayerPage, TvSeriesPage, TvSourcesPage } from "./pages/Tv";
 
 import { t as tr, adoptAccountLanguage, lang, setLang } from "./i18n";
+const RAIL_KEY = "zirahive.nav.collapsed";
 interface AuthCtx { user: User; signOut: () => void; refreshUser: () => void }
 const AuthContext = createContext<AuthCtx | null>(null);
 export const useAuth = () => useContext(AuthContext)!;
@@ -59,7 +66,7 @@ function SignedInApp() {
   if (user === undefined) return <div className="boot" aria-busy="true" />;
   if (user === null) return <SignIn firstRun={needsSetup} onSignedIn={(u) => { adoptAccountLanguage(u.language); setNeedsSetup(false); setUser(u); }} />;
 
-  const signOut = () => { void api.logout().finally(() => setUser(null)); };
+  const signOut = () => { nativeApp?.signedOut(); void api.logout().finally(() => setUser(null)); };
   const refreshUser = () => { void api.me().then(setUser).catch(() => undefined); };
   return (
     <AuthContext.Provider value={{ user, signOut, refreshUser }}>
@@ -75,9 +82,11 @@ function SignedInApp() {
               <Route path="/photos/people" element={<PeoplePage />} />
               <Route path="/photos/people/:id" element={<PersonPage />} />
               <Route path="/photos/cleanup" element={<CleanupPage />} />
+              <Route path="/photos/vault" element={<PhotoVaultPage />} />
               <Route path="/ask" element={<AskPage />} />
               <Route path="/photos/albums/:id" element={<AlbumPage />} />
               <Route path="/files/*" element={<FilesPage />} />
+              <Route path="/duplicates" element={<FileDuplicatesPage />} />
               <Route path="/watch" element={<WatchHome />} />
               <Route path="/watch/c/:id" element={<LibraryPage />} />
               <Route path="/watch/series/:id" element={<SeriesPage />} />
@@ -88,6 +97,13 @@ function SignedInApp() {
               <Route path="/watch/parties" element={<PartiesPage />} />
               <Route path="/party/:id" element={<PartyRoute />} />
               <Route path="/movies" element={<Navigate to="/watch" replace />} />
+              <Route path="/tv" element={<TvHome />} />
+              <Route path="/tv/sources" element={<TvSourcesPage />} />
+              <Route path="/tv/:source" element={<TvPage />} />
+              <Route path="/tv/:source/movie/:id" element={<TvMoviePage />} />
+              <Route path="/tv/:source/show/:id" element={<TvSeriesPage />} />
+              <Route path="/tv/:source/play/:kind/:id" element={<TvPlayerPage />} />
+              <Route path="/tv/:source/:tab" element={<TvPage />} />
               <Route path="/listen" element={<ListenHome />} />
               <Route path="/listen/albums" element={<MusicAlbumsPage />} />
               <Route path="/listen/album/:id" element={<AlbumDetailPage />} />
@@ -98,6 +114,11 @@ function SignedInApp() {
               <Route path="/listen/playlist/:id" element={<PlaylistDetailPage />} />
               <Route path="/listen/audiobooks" element={<AudiobooksPage />} />
               <Route path="/listen/book/:id" element={<AudiobookPage />} />
+              <Route path="/quran" element={<QuranHomePage />} />
+              <Route path="/quran/qari" element={<QariPage />} />
+              <Route path="/quran/surahs" element={<SurahsPage />} />
+              <Route path="/quran/surah/:n" element={<SurahPage />} />
+              <Route path="/quran/namaz" element={<NamazPage />} />
               <Route path="/read" element={<ReadHome />} />
               <Route path="/read/c/:id" element={<ReadLibraryPage />} />
               <Route path="/read/series" element={<ReadSeriesPage />} />
@@ -119,26 +140,49 @@ function SignedInApp() {
 function Shell({ children }: { children: ReactNode }) {
   const { user, signOut } = useAuth();
   const { pathname } = useLocation();
-  const cinema = ["/watch", "/play", "/party", "/listen"].some((p) => pathname.startsWith(p));
+  const cinema = ["/watch", "/play", "/party", "/listen", "/tv"].some((p) => pathname.startsWith(p));
   useEffect(() => { document.documentElement.dataset.room = cinema ? "cinema" : "home"; }, [cinema]);
+  // The side navigation can shrink to icons. Remembered per browser; on narrower screens it starts small.
+  const [collapsed, setCollapsed] = useState(() => {
+    try { const saved = localStorage.getItem(RAIL_KEY); if (saved !== null) return saved === "1"; } catch { /* private mode */ }
+    return window.innerWidth < 1100;
+  });
+  useEffect(() => { document.documentElement.dataset.rail = collapsed ? "collapsed" : "open"; }, [collapsed]);
+  const toggleRail = () => setCollapsed((c) => {
+    try { localStorage.setItem(RAIL_KEY, c ? "0" : "1"); } catch { /* private mode */ }
+    return !c;
+  });
   const links = [
     { to: "/photos", label: tr("Photos"), icon: Images },
     { to: "/files", label: tr("Files"), icon: Folder },
     { to: "/watch", label: tr("Watch"), icon: Clapperboard },
+    // IPTV channels carry no age ratings, so kids' profiles don't get Live TV
+    ...(user.max_age == null ? [{ to: "/tv", label: tr("Live TV"), icon: Tv, desktop: false }] : []),
     { to: "/listen", label: tr("Listen"), icon: Headphones },
     { to: "/read", label: tr("Read"), icon: BookOpen },
+    { to: "/quran", label: tr("Quran & Namaz"), short: tr("Quran"), icon: MoonStar },
     { to: "/trash", label: tr("Trash"), icon: Trash2, desktop: true },
     { to: "/settings", label: tr("Settings"), icon: Settings, desktop: true },
   ];
+  useStickyHeads();
   return (
     <div className="shell">
       <nav className="rail" aria-label={tr("Main")}>
-        <div className="brand"><HiveMark size={26} />{" "}{tr("ZiraHive")}</div>
-        {links.map(({ to, label, icon: Icon, desktop }) => (
-          <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}><Icon size={19} aria-hidden /> <span>{label}</span></NavLink>
+        <div className="brand">
+          <HiveMark size={26} /><span className="rail-label">{tr("ZiraHive")}</span>
+          <button className="icon rail-toggle" onClick={toggleRail} aria-expanded={!collapsed}
+            aria-label={collapsed ? tr("Expand navigation") : tr("Collapse navigation")} title={collapsed ? tr("Expand navigation") : tr("Collapse navigation")}>
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
+          </button>
+        </div>
+        {links.map(({ to, label, short, icon: Icon, desktop }: { to: string; label: string; short?: string; icon: typeof Images; desktop?: boolean }) => (
+          <NavLink key={to} to={to} className={desktop ? "desktop-only" : undefined}
+            title={collapsed ? label : undefined} aria-label={collapsed ? label : undefined}>
+            <Icon size={19} aria-hidden /> <span className="rail-label">{short
+              ? <><span className="label-long">{label}</span><span className="label-short">{short}</span></> : label}</span></NavLink>
         ))}
         <div className="rail-foot">
-          <span className="who">{user.username}</span>
+          <span className="who" title={user.username}>{user.username}</span>
           <NotificationBell />
           <button className="icon" onClick={signOut} aria-label={tr("Sign out")} title={tr("Sign out")}><LogOut size={17} /></button>
         </div>
@@ -151,6 +195,7 @@ function Shell({ children }: { children: ReactNode }) {
       </div>
       <main>{children}</main>
       <NowPlaying />
+      <PrayerAlerts />
     </div>
   );
 }

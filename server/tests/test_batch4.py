@@ -264,5 +264,10 @@ async def test_age_limits_and_rescans(media_root, client, admin):
     await jobs.drain_local()
     assert len((await client.get("/api/books", params={"library_id": libs["Ebooks"]["id"]})).json()) == 4
 
+    # a song added later is announced. (The first scan runs as the server starts, sometimes
+    # before the account exists, so it can't be relied on for the notification.)
+    sample.tone(media_root / "Music" / "Singles" / "New Tune.mp3", 2, 820, {"title": "New Tune", "artist": "Radio Days"})
+    await client.post(f"/api/libraries/{libs['Music']['id']}/scan")
+    await jobs.drain_local()
     notes = (await client.get("/api/notifications")).json()
-    assert any("new songs in Music" in n["title"] for n in notes["items"])
+    assert any(n["title"] == "1 new song in Music" for n in notes["items"])

@@ -158,7 +158,7 @@ class PhotoPage(BaseModel):
     next_cursor: str | None
 
 
-_KIND = r"^(movies|shows|mixed|music|audiobooks|books|comics)$"
+_KIND = r"^(movies|shows|mixed|music|audiobooks|books|comics|quran)$"
 
 
 class LibraryIn(BaseModel):
@@ -600,6 +600,7 @@ class TrackOut(ORM):
     favorite: bool = False
     plays: int = 0
     cover_ready: bool = False  # the album's cover
+    quran: bool = False        # a recitation (Quran & Namaz), not a song
 
 
 class MusicAlbumDetailOut(MusicAlbumOut):

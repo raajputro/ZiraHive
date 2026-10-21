@@ -8,7 +8,14 @@ export default function Dialog({ title, onClose, children, wide = false }:
   const ref = useRef<HTMLDialogElement>(null);
   useEffect(() => {
     const d = ref.current;
-    if (d && !d.open) d.showModal();
+    if (d && !d.open) {
+      d.showModal();
+      // showModal() focuses the first focusable thing, which is the close (X) button. In a form,
+      // start in the field instead: one marked data-autofocus, else the first text field.
+      const field = d.querySelector<HTMLElement>("[data-autofocus]")
+        ?? d.querySelector<HTMLElement>("input:not([type=hidden]):not([type=checkbox]):not([type=radio]):not([type=file]):not([disabled]), textarea:not([disabled])");
+      field?.focus();
+    }
     return () => d?.close();
   }, []);
   return (

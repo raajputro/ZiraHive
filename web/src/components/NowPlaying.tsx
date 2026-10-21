@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { ChevronDown, ListMusic, Loader2, Moon, Pause, Play, Repeat, Repeat1, Rewind, FastForward, Shuffle, SkipBack, SkipForward, X } from "lucide-react";
 import { clock, useAudio, type Sleep } from "../audio";
+import { EqualizerButton } from "./Equalizer";
 
 import { t as tr } from "../i18n";
 const RATES = [0.75, 1, 1.1, 1.25, 1.5, 1.75, 2];
@@ -87,6 +88,7 @@ export default function NowPlaying() {
                   </label>
                 )}
                 <SleepMenu isBook={isBook} />
+                <EqualizerButton />
               </div>
             </div>
           ) : isBook ? (

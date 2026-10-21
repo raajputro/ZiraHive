@@ -109,7 +109,9 @@ export async function rewrap(masterRaw: Uint8Array, passphrase: string) {
 
 // ------------------------------------------------------------------- files
 
-export interface FileMeta { name: string; type: string; size: number; modified: number; width?: number; height?: number }
+/** `taken`: when a photo or video was taken (ms), if it came from Photos. */
+/** `folder`: the vault folder it is in, like "/Taxes/2025" (missing = the top). Encrypted with the rest. */
+export interface FileMeta { name: string; type: string; size: number; modified: number; width?: number; height?: number; taken?: number; folder?: string }
 export interface FileKey { key: CryptoKey; prefix: Uint8Array }
 
 export const encryptedSize = (plain: number, chunk = CHUNK) => plain + TAG * Math.max(1, Math.ceil(plain / chunk));

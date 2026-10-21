@@ -111,7 +111,7 @@ class Settings(BaseSettings):
             name, _, rest = part.partition(":")
             path, kind = rest, "movies"
             # allow an optional ":kind" suffix, but keep Windows-like "C:/x" intact
-            if rest.rsplit(":", 1)[-1] in ("movies", "shows", "mixed", "music", "audiobooks", "books", "comics"):
+            if rest.rsplit(":", 1)[-1] in ("movies", "shows", "mixed", "music", "audiobooks", "books", "comics", "quran"):
                 path, kind = rest.rsplit(":", 1)
             if name and path:
                 out.append((name.strip(), path.strip(), kind))

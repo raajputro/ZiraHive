@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+from pathlib import Path
 
 from fastapi import HTTPException, Request
 from fastapi.responses import FileResponse
@@ -39,9 +40,37 @@ async def viewable_asset(session: AsyncSession, user_id: str, asset_id: str,
     raise HTTPException(404, "File not found")
 
 
+_HEIC_MIME = {"image/heic", "image/heif", "image/heic-sequence", "image/heif-sequence"}
+
+
+def is_heic(asset: Asset) -> bool:
+    return asset.kind == "photo" and (
+        (asset.mime or "").lower() in _HEIC_MIME or Path(asset.filename).suffix.lower() in (".heic", ".heif"))
+
+
 def file_response(request: Request, asset: Asset, download: bool = False):
     path = storage.abs_storage_path(asset.storage_path)
     return ranged_file_response(request, path, asset.mime, asset.filename, inline=not download)
+
+
+async def view_response(request: Request, asset: Asset):
+    """The original to look at in the browser: as it is, except HEIC/HEIF photos, which come
+    as a full-size JPEG (made once and kept, remade if the original changes)."""
+    if not is_heic(asset):
+        return file_response(request, asset)
+    src = storage.abs_storage_path(asset.storage_path)
+    dest = storage.fullview_path(asset.id)
+    try:
+        fresh = dest.exists() and dest.stat().st_mtime >= src.stat().st_mtime
+        if not fresh:
+            await asyncio.to_thread(media_tools.make_full_jpeg, src, dest)
+    except FileNotFoundError:
+        raise HTTPException(404, "File not found")
+    except Exception:
+        return await preview_response(asset)  # can't decode it here: the screen-sized copy is next best
+    name = Path(asset.filename).with_suffix(".jpg").name
+    return FileResponse(dest, media_type="image/jpeg", headers=_CACHE,
+                        content_disposition_type="inline", filename=name)
 
 
 def thumb_response(asset: Asset) -> FileResponse:

@@ -14,6 +14,8 @@ import PluginsPanel from "../components/PluginsPanel";
 import LinksPanel from "../components/LinksPanel";
 import AiPanel from "../components/AiPanel";
 import HealthPanel from "../components/HealthPanel";
+import DuplicateSongs from "../components/DuplicateSongs";
+import AndroidAppPanel from "../components/AndroidAppPanel";
 const when = (iso: string | null) => (iso ? new Date(iso).toLocaleString(locale()) : tr("never"));
 
 type Tab = "account" | "server" | "people" | "log";
@@ -37,8 +39,8 @@ export default function AdminPage() {
           <button key={t} className={tab === t ? "active" : ""} aria-current={tab === t ? "page" : undefined} onClick={() => go(t)}>{label}</button>
         ))}
       </nav>
-      {tab === "account" && <><AccountPanel /><PasskeysPanel /><TwoFactorPanel /><NotificationsPanel /><Password /></>}
-      {tab === "server" && user.is_admin && <><HealthPanel /><SecurityPanel /><BackupPanel /><StatsPanel /><ActivityPanel /><Libraries /><AiPanel /><LinksPanel /><PluginsPanel /></>}
+      {tab === "account" && <><AccountPanel /><AndroidAppPanel admin={user.is_admin} /><PasskeysPanel /><TwoFactorPanel /><NotificationsPanel /><Password /></>}
+      {tab === "server" && user.is_admin && <><HealthPanel /><SecurityPanel /><BackupPanel /><StatsPanel /><ActivityPanel /><Libraries /><DuplicateSongs /><AiPanel /><LinksPanel /><PluginsPanel /></>}
       {tab === "people" && user.is_admin && <Users />}
       {tab === "log" && user.is_admin && <AuditPanel />}
     </div>
@@ -77,6 +79,7 @@ const KIND_LABEL: Record<LibraryKind, string> = {
   audiobooks: tr("Audiobooks"),
   books: tr("Books (EPUB, PDF)"),
   comics: tr("Comics and manga"),
+  quran: tr("Quran recitations"),
 };
 
 function Libraries() {

@@ -33,7 +33,7 @@ async def _fresh(url: str) -> None:
                 await conn.exec_driver_sql("DROP SCHEMA public CASCADE")
                 await conn.exec_driver_sql("CREATE SCHEMA public")
             await conn.run_sync(db.migrate)
-            assert await conn.run_sync(db.schema_version) == "0001"
+            assert await conn.run_sync(db.schema_version) == "0004"
             assert await conn.run_sync(drift) == []
             await conn.run_sync(db.migrate)  # a second start changes nothing
     finally:
@@ -64,7 +64,7 @@ async def test_a_database_from_before_migrations_is_caught_up(tmp_path):
         await conn.run_sync(db.migrate)
         cols = await conn.run_sync(lambda c: {x["name"] for x in inspect(c).get_columns("assets")})
         assert "phash" in cols
-        assert await conn.run_sync(db.schema_version) == "0001"
+        assert await conn.run_sync(db.schema_version) == "0004"
         assert (await conn.execute(text("SELECT username FROM users"))).scalar() == "mahbub"
     await engine.dispose()
 
@@ -72,7 +72,7 @@ async def test_a_database_from_before_migrations_is_caught_up(tmp_path):
 async def test_health_check(client, admin):
     checks = {c["id"]: c for c in (await client.get("/api/admin/health")).json()}
     assert checks["version"]["detail"] == "1.0.0"
-    assert checks["database"]["status"] == "ok" and "schema 0001" in checks["database"]["detail"]
+    assert checks["database"]["status"] == "ok" and "schema 0004" in checks["database"]["detail"]
     assert checks["storage"]["status"] in ("ok", "warn")
     assert checks["lan"]["status"] == "warn" and checks["lan"]["fix"]
     assert all(c["status"] in ("ok", "warn", "fail", "info") for c in checks.values())

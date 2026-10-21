@@ -11,9 +11,10 @@ from sqlalchemy import select
 from . import db
 from .config import get_settings
 from .models import Library
-from .routers import admin, albums, auth, backup, books, dlna, federation, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, shares, sync, uploads, vault
-from .services import jobs, transcode
-from .services.libraries import discover
+from .routers import admin, albums, app_downloads, auth, backup, books, dlna, federation, iptv as iptv_router, links, passkeys, smart, plugins as plugins_router, scans, files, media, music, parties, playback, quran, shares, sync, uploads, vault
+from .services import iptv_live, jobs, transcode
+from .services.browse import same_folder_key
+from .services.libraries import adopt_quran, discover, merge_duplicates
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s %(levelname)s %(name)s: %(message)s")
 log = logging.getLogger("zirahive")
@@ -25,10 +26,16 @@ async def bootstrap_libraries() -> None:
     """Add a category for every folder in the media folder, plus any listed in
     ZIRAHIVE_MEDIA_LIBRARIES, and scan the new ones."""
     async with db.sessionmaker()() as session:
+        for lib in await merge_duplicates(session):  # a folder that became two categories
+            await jobs.enqueue("scan_library", lib.id)
         for lib in await discover(session):
             await jobs.enqueue("scan_library", lib.id)
+        for lib in await adopt_quran(session):  # recitations out of Listen
+            await jobs.enqueue("scan_library", lib.id)
+        known = {same_folder_key(p) for p in (await session.scalars(select(Library.path))).all()}
         for name, path, kind in get_settings().parsed_libraries():
-            if not await session.scalar(select(Library.id).where(Library.path == path)):
+            if same_folder_key(path) not in known:
+                known.add(same_folder_key(path))
                 lib = Library(name=name, path=path, kind=kind)
                 session.add(lib)
                 await session.commit()
@@ -45,9 +52,12 @@ async def lifespan(_: FastAPI):
     await db.create_all()
     await jobs.init_queue()
     await bootstrap_libraries()
+    await jobs.retry_missing_thumbs()
     transcode.manager.start_janitor()
+    iptv_live.manager.start_janitor()
     log.info("ZiraHive %s ready (data: %s)", VERSION, settings.data_dir.resolve())
     yield
+    await iptv_live.manager.shutdown()
     await transcode.manager.shutdown()
     await jobs.close_queue()
     await db.dispose()
@@ -73,7 +83,7 @@ def create_app() -> FastAPI:
                            allow_methods=["*"], allow_headers=["*"],
                            expose_headers=["Upload-Offset", "Content-Range"])
     for r in (auth.router, passkeys.router, uploads.router, files.router, albums.router, shares.router,
-              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, federation.router, links.router, smart.router, admin.router):
+              media.router, playback.router, parties.router, music.router, books.router, vault.router, backup.router, sync.router, scans.router, dlna.router, plugins_router.router, federation.router, links.router, smart.router, iptv_router.router, app_downloads.router, quran.router, admin.router):
         app.include_router(r)
 
     @app.get("/api/health", tags=["system"])

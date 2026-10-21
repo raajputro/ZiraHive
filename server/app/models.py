@@ -402,6 +402,27 @@ class Track(Base):
     mtime: Mapped[float] = mapped_column(Float, default=0)
     missing: Mapped[bool] = mapped_column(Boolean, default=False)
     added_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+    # Set by the duplicate-song check (services/music_audit.py): this file is another copy of that
+    # track, so it's left out of Listen. dup_moved: the file was moved to .zirahive-duplicates.
+    # dup_kept: someone chose to keep it, so the check leaves it alone from then on.
+    duplicate_of: Mapped[str | None] = mapped_column(String(32), nullable=True, index=True)
+    dup_moved: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    dup_kept: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    # A Quran recitation: in a Quran category, or in a Quran-named folder inside a music category.
+    # Recitations are only ever shown in Quran & Namaz, never among songs.
+    quran: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+
+
+def track_shown():
+    """Audio files to list: on disk and not a duplicate copy."""
+    from sqlalchemy import and_
+    return and_(Track.missing.is_(False), Track.duplicate_of.is_(None))
+
+
+def song_shown():
+    """Songs (Listen): shown, and not a Quran recitation."""
+    from sqlalchemy import and_
+    return and_(track_shown(), Track.quran.is_(False))
 
 
 class TrackStat(Base):
@@ -700,3 +721,61 @@ class DocChunk(Base):
     text: Mapped[str] = mapped_column(Text)
     vector: Mapped[bytes] = mapped_column(LargeBinary)
     sha256: Mapped[str] = mapped_column(String(64))  # of the file the passage came from
+
+
+class IptvSource(Base):
+    """An IPTV subscription (Xtream Codes API: server address, username, password).
+    The password never leaves the server; the web app only sees the name."""
+
+    __tablename__ = "iptv_sources"
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    owner_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    name: Mapped[str] = mapped_column(String(80))
+    server: Mapped[str] = mapped_column(String(512))  # http://host:port, no path
+    username: Mapped[str] = mapped_column(String(255))
+    password: Mapped[str] = mapped_column(Text)
+    # shared by an admin: everyone in the family can watch it (but not see the login)
+    shared: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class IptvFavorite(Base):
+    __tablename__ = "iptv_favorites"
+    __table_args__ = (UniqueConstraint("user_id", "source_id", "kind", "stream_id"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    source_id: Mapped[str] = mapped_column(ForeignKey("iptv_sources.id", ondelete="CASCADE"), index=True)
+    kind: Mapped[str] = mapped_column(String(8))  # live, vod or series
+    stream_id: Mapped[str] = mapped_column(String(32))
+    name: Mapped[str] = mapped_column(String(255))
+    icon: Mapped[str | None] = mapped_column(Text, nullable=True)
+    ext: Mapped[str | None] = mapped_column(String(8), nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PrayerSettings(Base):
+    """Where someone prays and how their prayer times are worked out (one row per person).
+    `settings` is JSON: {lat, lng, place, method, asr, offsets: {fajr: 2, ...}, reminders: {...}}."""
+
+    __tablename__ = "prayer_settings"
+
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    settings: Mapped[str] = mapped_column(Text, default="{}")
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
+
+
+class PrayerLog(Base):
+    """One prayer on one day: prayed on time, prayed late (qaza) or missed."""
+
+    __tablename__ = "prayer_log"
+    __table_args__ = (UniqueConstraint("user_id", "day", "prayer"),)
+
+    id: Mapped[str] = mapped_column(String(32), primary_key=True, default=new_id)
+    user_id: Mapped[str] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), index=True)
+    day: Mapped[str] = mapped_column(String(10), index=True)   # YYYY-MM-DD, the person's own calendar day
+    prayer: Mapped[str] = mapped_column(String(8))              # fajr dhuhr asr maghrib isha (or witr, jumuah)
+    status: Mapped[str] = mapped_column(String(8))              # ontime | late | missed
+    jamaah: Mapped[bool] = mapped_column(Boolean, default=False, server_default=false())
+    updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
