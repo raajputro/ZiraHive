@@ -28,6 +28,7 @@ SEGMENT = 4
 WAIT_PLAYLIST = 30   # seconds to wait for the first segments
 IDLE_STOP = 40       # seconds without a request before a channel is stopped
 MAX_SESSIONS = 8
+AUDIO_FILTER = "aresample=async=1,aformat=channel_layouts=stereo,alimiter=limit=0.95:level=0"
 SEGMENT_NAME = re.compile(r"^\d{1,9}\.ts$")
 
 
@@ -95,7 +96,11 @@ class LiveManager:
             cmd += transcode.video_args("720p", None, keyframes_every=SEGMENT)
         else:
             cmd += ["-c:v", "copy"]
-        cmd += ["-c:a", "aac", "-ac", "2", "-b:a", "128k", "-sn", "-dn", "-f", "hls",
+        # Audio: keep it in step with its timestamps (providers' streams drop or repeat audio packets,
+        # which otherwise crackles), mix 5.1 down to stereo, and stop the downmix from clipping
+        # (centre + surrounds added together go past full scale on loud scenes and distort).
+        cmd += ["-af", AUDIO_FILTER, "-c:a", "aac", "-ac", "2", "-ar", "48000", "-b:a", "128k",
+                "-sn", "-dn", "-f", "hls",
                 "-hls_time", str(SEGMENT), "-hls_segment_type", "mpegts",
                 "-hls_segment_filename", str(s.folder / "%d.ts")]
         if s.rolling:

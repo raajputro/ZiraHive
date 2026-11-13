@@ -226,6 +226,10 @@ class PlayerActivity : AppCompatActivity() {
         return MediaItem.Builder()
             .setUri(url)
             .apply { if (hls) setMimeType(MimeTypes.APPLICATION_M3U8) }
+            // live: play at exactly 1x. ExoPlayer otherwise speeds up / slows down by a few percent
+            // to hold its distance from the live edge, and on TVs that makes the sound warble.
+            .apply { if (isLive()) setLiveConfiguration(MediaItem.LiveConfiguration.Builder()
+                .setMinPlaybackSpeed(1f).setMaxPlaybackSpeed(1f).build()) }
             .setSubtitleConfigurations(subs)
             .setMediaMetadata(MediaMetadata.Builder()
                 .setTitle(listOf(o.optString("title"), o.optString("subtitle")).filter { it.isNotBlank() }.joinToString(" · "))
